@@ -62,3 +62,7 @@ The liquidator can liquidate the position of the borrower if the borrower's posi
 
 The liquidator can perform the following actions:
 - The liquidator can liquidate the position of the borrower. The liquidator can only liquidate one position at a time.
+
+## Release
+
+- Before deploying to the mainnet, make sure to update the compiler 
