@@ -36,19 +36,23 @@ The admin can perform the following actions:
 - The admin can remove a token from the pool
 - The admin can change the configs like fee/ltv for the pool
 - The admin can stop/resume the pool
+- The admin can mint collected fees to the treasury as lToken
 
 ### Liquidity provider and borrower
 
-Once the token is supplied to the pool, the liquidity provider will receive the LP tokens. 
-The LP tokens represent the share of the liquidity provider in the pool. 
+Once the token is supplied to the pool, the liquidity provider will receive the LP tokens(lToken). 
+The lToken(Liability Token) represent the share of the liquidity provider in the pool. 
 The LP tokens can be used to withdraw the liquidity from the pool.
-The ratio of LP tokens to tokens will increase as time passes because of the fees collected by the pool.
+The ratio of lToken to token will increase as time passes because of the interest.
 
 The liquidity provider can perform the following actions:
 - The liquidity provider can deposit liquidity in the pool
 - The liquidity provider can withdraw liquidity from the pool
 
-The Borrower can borrow the tokens from the pool by depositing the collateral in the pool.
+The borrower can borrow the tokens from the pool by depositing the collateral in the pool.
+The borrower will receive the dToken(Debt token) which represents the debt of the borrower.
+The ratio of dToken to token will increase as time passes because of the interest.
+
 - The borrower can borrow the tokens from the pool
 - The borrower can repay the borrowed tokens to the pool
 
@@ -58,3 +62,7 @@ The liquidator can liquidate the position of the borrower if the borrower's posi
 
 The liquidator can perform the following actions:
 - The liquidator can liquidate the position of the borrower. The liquidator can only liquidate one position at a time.
+
+## Release
+
+- Before deploying to the mainnet, make sure to update the compiler 

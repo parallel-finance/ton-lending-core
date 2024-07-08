@@ -1,5 +1,5 @@
-import { toNano } from '@ton/core';
-import { Pool } from '../wrappers/Pool';
+import { address, toNano } from '@ton/core';
+import { Pool, ReserveConfiguration } from '../wrappers/Pool';
 import { NetworkProvider } from '@ton/blueprint';
 
 export async function run(provider: NetworkProvider) {
@@ -11,11 +11,10 @@ export async function run(provider: NetworkProvider) {
             value: toNano('0.05'),
         },
         {
-            $$type: 'Deploy',
-            queryId: 0n,
+            $$type: 'DropReserve',
+            reserveIndex: 0n,
         }
     );
 
-    // EQDq3wZDbchkMHMFnU5OmnKxlyONdgmdOLLdJkAIRVVIuhPE
     await provider.waitForDeploy(pool.address);
 }
