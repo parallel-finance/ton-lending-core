@@ -23,8 +23,8 @@ export async function run(provider: NetworkProvider, args: string[]) {
         {
             $$type: 'Mint',
             receiver: userAddress,
-            amount: 100000000000000n,
+            amount: 1000000000000n,
         }
     );
-    console.log(`Minted 100000000000000 SAM to ${userAddress.toString()}`);
+    console.log(`Minted 1000000000000n SAM to ${userAddress.toString()}`);
 }
