@@ -2,18 +2,22 @@ import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
 import { address, toNano, beginCell, Address } from '@ton/core';
 import { Pool, ReserveConfiguration } from '../wrappers/Pool';
 import '@ton/test-utils';
+import { SampleJetton } from '../build/SampleJetton/tact_SampleJetton';
+import { buildOnchainMetadata } from '../scripts/utils';
 
 describe('Pool', () => {
     let blockchain: Blockchain;
     let deployer: SandboxContract<TreasuryContract>;
     let pool: SandboxContract<Pool>;
+    let sampleJetton: SandboxContract<SampleJetton>;
 
     const reserveAddress = address('UQAEJ7U1iaC1TzcFel5lc2-JaEm8I0k5Krui3fzz3_GeANWV');
 
     const reserveConfiguration : ReserveConfiguration= {
         $$type: 'ReserveConfiguration',
-        lTokenAddress: address('UQAEJ7U1iaC1TzcFel5lc2-JaEm8I0k5Krui3fzz3_GeANWV'),
-        dTokenAddress: address('UQAEJ7U1iaC1TzcFel5lc2-JaEm8I0k5Krui3fzz3_GeANWV'),
+        poolWalletAddress: reserveAddress,
+        lTokenAddress: reserveAddress,
+        dTokenAddress: reserveAddress,
         ltv: 6000n,
         liquidationThreshold: 750n,
         liquidationBonus: 500n,
@@ -96,10 +100,11 @@ describe('Pool', () => {
             });
 
             const reserveConfigurationResult = await pool.getReserveConfiguration(reserveAddress);
-            const { lTokenAddress, dTokenAddress, ...otherReserveConfiguration } = reserveConfigurationResult;
+            const { poolWalletAddress, lTokenAddress, dTokenAddress, ...otherReserveConfiguration } = reserveConfigurationResult;
             expect(reserveConfiguration).toMatchObject(otherReserveConfiguration);
             expect (lTokenAddress.toString()).toEqual(reserveConfiguration.lTokenAddress.toString());
             expect (dTokenAddress.toString()).toEqual(reserveConfiguration.dTokenAddress.toString());
+            expect (poolWalletAddress.toString()).toEqual(reserveConfiguration.poolWalletAddress.toString());
         });
 
         it('should fail if reserve already exists', async () => {
@@ -201,6 +206,68 @@ describe('Pool', () => {
         });
     });
 
+    describe('handleTransferNotification', () => {
+        describe('handle supply', () => {
+
+            beforeEach(async () => {
+                const jettonParams = {
+                    name: 'SampleJetton',
+                    description: 'Sample Jetton for testing purposes',
+                    image: 'https://ipfs.io/ipfs/bafybeicn7i3soqdgr7dwnrwytgq4zxy7a5jpkizrvhm5mv6bgjd32wm3q4/welcome-to-IPFS.jpg',
+                    symbol: 'SAM'
+                };
+                let max_supply = toNano(1000000n); // 🔴 Set the specific total supply in nano
+                let content = buildOnchainMetadata(jettonParams);
+
+                sampleJetton = blockchain.openContract(await SampleJetton.fromInit(deployer.address, content, max_supply));
+
+                await sampleJetton.send(
+                    deployer.getSender(),
+                    {
+                        value: toNano('0.05')
+                    },
+                    {
+                        $$type: 'Deploy',
+                        queryId: 0n
+                    }
+                );
+            })
+
+            it('should handle supply successfully', async () => {
+                const poolWalletAddress = await sampleJetton.getGetWalletAddress(pool.address);
+                const result = await pool.send(
+                    deployer.getSender(),
+                    {
+                        value: toNano('0.05')
+                    },
+                    {
+                        $$type: 'AddReserve',
+                        reserveAddress: sampleJetton.address,
+                        reserveConfiguration: {
+                            ...reserveConfiguration,
+                            poolWalletAddress
+                        }
+                    }
+                );
+
+                expect(result.transactions).toHaveTransaction({
+                    from: deployer.address,
+                    to: pool.address,
+                    success: true
+                });
+                const reserveLength = await pool.getReservesLength();
+                expect(reserveLength).toEqual(1n);
+
+                const amount = toNano(100n);
+
+                // Mint token to deployer
+            });
+
+            it('should fail if the jetton is not configured', async () => {
+            });
+        });
+    })
+
     describe('getters', () => {
         beforeEach(async () => {
             await pool.send(
@@ -236,10 +303,11 @@ describe('Pool', () => {
 
         it('should getReserveConfiguration', async () => {
             const result = await pool.getReserveConfiguration(reserveAddress);
-            const { lTokenAddress, dTokenAddress, ...otherReserveConfiguration } = result;
+            const { poolWalletAddress, lTokenAddress, dTokenAddress, ...otherReserveConfiguration } = result;
             expect(reserveConfiguration).toMatchObject(otherReserveConfiguration);
             expect (lTokenAddress.toString()).toEqual(reserveConfiguration.lTokenAddress.toString());
             expect (dTokenAddress.toString()).toEqual(reserveConfiguration.dTokenAddress.toString());
+            expect (poolWalletAddress.toString()).toEqual(reserveConfiguration.poolWalletAddress.toString());
         });
 
         it('should getReservesLength', async () => {
