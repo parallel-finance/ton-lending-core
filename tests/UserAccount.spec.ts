@@ -105,7 +105,6 @@ describe('UserAccoount', () => {
     describe('getters', () => {
         it('should get empty account data', async () => {
             const result = await userAccount.getAccount();
-            console.log(result.positionsLength);
             expect(result).toMatchObject({
                 $$type: 'UpdatePositionResponse',
                 positionsLength: 0n,
