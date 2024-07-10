@@ -14,7 +14,11 @@ contract TestJettonReceive with Ownable, Deployable {
         self.ownedJettonWallet = emptyMap();
     }
 
-    fun setOwnedJettonWallet(jettonMaster: Address, jettonWallet: Address) {
+    get fun ownedJettonWallet(wallet: Address): Address? {
+      return self.ownedJettonWallet.get(wallet);
+    }
+
+    fun setOwnedJettonWallet(jettonWallet: Address, jettonMaster: Address) {
         self.requireOwner();
         self.ownedJettonWallet.set(jettonWallet, jettonMaster);
     }
