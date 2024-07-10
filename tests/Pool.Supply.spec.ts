@@ -187,6 +187,52 @@ describe('Pool', () => {
         });
 
         it('should fail if the jetton is not configured', async () => {
+            await pool.send(
+                deployer.getSender(),
+                {
+                    value: toNano('0.05')
+                },
+                {
+                    $$type: 'DropReserve',
+                    reserveIndex: 0n,
+                }
+            );
+            const reserveLength = await pool.getReservesLength();
+            expect(reserveLength).toEqual(0n);
+
+            const amount = toNano(100n);
+
+            // transfer jetton to pool
+            const deployerWalletAddress = await sampleJetton.getGetWalletAddress(deployer.address);
+            const poolWalletAddress = await sampleJetton.getGetWalletAddress(pool.address);
+            const deployerJettonDefaultWallet = blockchain.openContract(JettonDefaultWallet.fromAddress(deployerWalletAddress));
+            const forward_payload: Cell = beginCell()
+                .storeUint(0x55b591ba, 32)
+                .endCell();
+
+            const result = await deployerJettonDefaultWallet.send(
+                deployer.getSender(),
+                {
+                    value: toNano('0.1')
+                },
+                {
+                    $$type: 'TokenTransfer',
+                    queryId: 0n,
+                    amount: amount,
+                    destination: pool.address,
+                    response_destination: deployerWalletAddress,
+                    custom_payload: null,
+                    forward_ton_amount: toNano('0.05'),
+                    forward_payload: forward_payload
+                }
+            );
+
+            // TransferNotification -> failed to pass the check
+            expect(result.transactions).toHaveTransaction({
+                from: poolWalletAddress,
+                to: pool.address,
+                success: false
+            });
         });
     });
 });
