@@ -1,9 +1,11 @@
 import "@stdlib/deploy";
 import "@stdlib/ownable";
 import "@stdlib/stoppable";
+import "./user-account";
 
 struct ReserveConfiguration {
     // token addresses
+    poolWalletAddress: Address;
     lTokenAddress: Address;
     dTokenAddress: Address;
 
@@ -48,6 +50,13 @@ message(0x66660002) DropReserve {
     reserveIndex: Int as uint16;
 }
 
+message(0x7362d09c) TokenNotification {
+    queryId: Int as uint64;
+    amount: Int as coins;
+    from: Address;
+    forward_payload: Cell;
+}
+
 contract Pool with Deployable, Ownable, Resumable {
 
     owner: Address;
@@ -75,6 +84,63 @@ contract Pool with Deployable, Ownable, Resumable {
         self.requireNotStopped();
         self.dropReserve(msg.reserveIndex);
         self.reply("Reserve dropped".asComment());
+    }
+
+    receive(msg: TokenNotification) {
+        self.processTokenNotification(msg);
+    }
+
+    // TODO: process user account position update message
+
+    fun processTokenNotification(msg: TokenNotification) {
+        let matchedReserve: Address? = self.findMatchedReserve(context().sender);
+        require(matchedReserve != null, "Reserve not found");
+
+        let forwardPayload: Cell = msg.forward_payload;
+        let forwardPayloadSlice: Slice = forwardPayload.beginParse();
+        let opCode: Int = forwardPayloadSlice.loadUint(32);
+        // use crc32 code of 'Supply': utils.calculateRequestOpcode_1('Supply')
+        if (opCode == 0x55b591ba) {
+            let supplyAmount: Int = msg.amount;
+            self.updateUserAccountPosition(msg.queryId, msg.from, matchedReserve!!, supplyAmount, 0);
+        }
+    }
+
+    fun updateUserAccountPosition(queryId: Int, ownerAddress: Address, reserveAddress: Address, supply: Int, borrow: Int) {
+        let userAccountInit: StateInit = initOf UserAccount(myAddress(), ownerAddress);
+        let userAccountAddress: Address = contractAddress(userAccountInit);
+        send(SendParameters{
+        to: userAccountAddress,
+        value: 0,
+        bounce: true,
+        mode: SendRemainingValue,
+        body: UpdatePosition{
+            queryId: queryId,
+            address: reserveAddress,
+            supply: supply,
+            borrow: borrow
+        }.toCell(),
+        code: userAccountInit.code,
+        data: userAccountInit.data
+        });
+    }
+
+    fun findMatchedReserve(msgSender: Address): Address? {
+        let i: Int = 0;
+        let matchedReserve: Address? = null;
+        while (i < self.reservesLength && matchedReserve == null) {
+            let reserveAddress: Address = self.reserves.get(i)!!;
+            let reserveConfiguration: ReserveConfiguration = self.reservesConfiguration.get(reserveAddress)!!;
+            if (msgSender == reserveConfiguration.poolWalletAddress) {
+                matchedReserve = reserveAddress;
+            }
+            i = i + 1;
+        }
+        return matchedReserve;
+    }
+
+    fun getUserAccountInit(userAddress: Address): StateInit {
+        return initOf UserAccount(myAddress(), userAddress);
     }
 
     fun addReserve(reserveAddress: Address, reserveConfiguration: ReserveConfiguration) {

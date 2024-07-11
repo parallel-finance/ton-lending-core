@@ -1,6 +1,7 @@
 import {Sha256} from "@aws-crypto/sha256-js";
 import {beginCell, Cell} from "@ton/ton";
 import {Dictionary} from '@ton/core';
+import * as crc32 from 'crc-32';
 
 const ONCHAIN_CONTENT_PREFIX = 0x00;
 const SNAKE_PREFIX = 0x00;
@@ -60,4 +61,14 @@ export function buildOnchainMetadata(data: {
         .storeInt(ONCHAIN_CONTENT_PREFIX, 8)
         .storeDict(dict)
         .endCell();
+}
+
+function calculateRequestOpcode_1(str: string): string {
+    return (BigInt(crc32.str(str)) & BigInt(0x7fffffff)).toString(16);
+}
+
+function calculateResponseOpcode_2(str: string): string {
+    const a = BigInt(crc32.str(str));
+    const b = BigInt(0x80000000);
+    return ((a | b) < 0 ? (a | b) + BigInt('4294967296') : a | b).toString(16);
 }
