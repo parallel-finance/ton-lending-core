@@ -8,7 +8,7 @@ import "./jetton/assetToken/atoken-wallet";
 struct ReserveConfiguration {
     // token addresses
     poolWalletAddress: Address;
-    lTokenAddress: Address;
+    aTokenAddress: Address;
     dTokenAddress: Address;
 
     // liquidation configuration
@@ -31,7 +31,7 @@ struct ReserveConfiguration {
 
 struct ATokenDTokenContents {
     aTokenContent: Cell;
-    debtTokenContent: Cell;
+    dTokenContent: Cell;
 }
 
 struct ATokenDTokenAddress {
@@ -96,8 +96,8 @@ contract Pool with Deployable, Ownable, Resumable {
         self.processTokenNotification(msg);
     }
 
-    receive(msg: CheckHFForTokenTransfer) {
-        self.checkHFForTokenTransfer(msg);
+    receive(msg: CheckAndTransferAToken) {
+        self.checkHFAndTransferAToken(msg);
     }
 
     fun getATokenWalletAddress(aToken: Address, asset: Address,user: Address): Address {
@@ -105,13 +105,14 @@ contract Pool with Deployable, Ownable, Resumable {
         return contractAddress(sinit);
     }
 
-    fun checkHFForTokenTransfer(msg: CheckHFForTokenTransfer) {
-        let aToken: Address = self.reservesConfiguration.get(msg.asset)!!.lTokenAddress;
+    fun checkHFAndTransferAToken(msg: CheckAndTransferAToken) {
+        let aToken: Address = self.reservesConfiguration.get(msg.asset)!!.aTokenAddress;
         let userATokenWallet: Address = self.getATokenWalletAddress(aToken, msg.asset, msg.from);
         require(context().sender == userATokenWallet, "invalid sender");
-        // dump("checkHFForTokenTransfer");
         // TODO: check user health factor
         let isHealthy: Bool = true;
+        // chech HF
+        require(isHealthy == true, "invalid health factor");
         // send TokenTransferByPool back to aTokenWallet
         send(SendParameters{
             to: userATokenWallet,
@@ -119,7 +120,6 @@ contract Pool with Deployable, Ownable, Resumable {
             bounce: false,
             mode: SendRemainingValue,
             body: TokenTransferByPool{
-                isHealthy: isHealthy,
                 queryId: msg.queryId,
                 amount: msg.amount,
                 destination: msg.destination,
@@ -221,7 +221,7 @@ contract Pool with Deployable, Ownable, Resumable {
         self.reservesLength += 1;
         // deploy atoken
         let aTokenAddress: Address = self.deployAToken(contents.aTokenContent, reserveAddress);
-        reserveConfiguration.lTokenAddress = aTokenAddress;
+        reserveConfiguration.aTokenAddress = aTokenAddress;
         // TODO deploy debtToken
         self.reservesConfiguration.set(reserveAddress, reserveConfiguration);
     }

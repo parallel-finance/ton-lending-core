@@ -25,13 +25,13 @@ describe('Pool', () => {
     const contents: ATokenDTokenContents = {
         $$type: 'ATokenDTokenContents',
         aTokenContent,
-        debtTokenContent: Cell.EMPTY, // TODO
+        dTokenContent: Cell.EMPTY, // TODO
     };
 
     const reserveConfiguration: ReserveConfiguration = {
         $$type: 'ReserveConfiguration',
         poolWalletAddress: reserveAddress,
-        lTokenAddress: reserveAddress,
+        aTokenAddress: reserveAddress,
         dTokenAddress: reserveAddress,
         ltv: 6000n,
         liquidationThreshold: 750n,
@@ -100,7 +100,7 @@ describe('Pool', () => {
         expect((await aToken.getGetPoolData()).asset.toString()).toEqual(reserveAddress.toString());
 
         const reserveConfigurationResult = await pool.getReserveConfiguration(reserveAddress);
-        expect(reserveConfigurationResult.lTokenAddress.toString()).toEqual(aToken.address.toString());
+        expect(reserveConfigurationResult.aTokenAddress.toString()).toEqual(aToken.address.toString());
     });
 
     it('AToken transfer', async () => {

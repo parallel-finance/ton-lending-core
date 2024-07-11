@@ -23,13 +23,13 @@ describe('Pool', () => {
     const contents: ATokenDTokenContents = {
         $$type: 'ATokenDTokenContents',
         aTokenContent,
-        debtTokenContent: Cell.EMPTY, // TODO
+        dTokenContent: Cell.EMPTY, // TODO
     };
 
     const reserveConfiguration: ReserveConfiguration = {
         $$type: 'ReserveConfiguration',
         poolWalletAddress: reserveAddress,
-        lTokenAddress: reserveAddress,
+        aTokenAddress: reserveAddress,
         dTokenAddress: reserveAddress,
         ltv: 6000n,
         liquidationThreshold: 750n,
@@ -70,7 +70,7 @@ describe('Pool', () => {
         });
 
         const calculateATokenAddress = await pool.getCalculateATokenAddress(contents.aTokenContent, reserveAddress);
-        reserveConfiguration.lTokenAddress = calculateATokenAddress;
+        reserveConfiguration.aTokenAddress = calculateATokenAddress;
     });
 
     it('should deploy', async () => {
@@ -101,7 +101,7 @@ describe('Pool', () => {
 
             // TODO: the aToken calculated from Atoken.fromInit and pool.getCalculateATokenAddress is different!!! why?
             // const aToken = blockchain.openContract(await AToken.fromInit(pool.address, contents.aTokenContent, reserveAddress))
-            const aToken = blockchain.openContract(AToken.fromAddress(reserveConfiguration.lTokenAddress));
+            const aToken = blockchain.openContract(AToken.fromAddress(reserveConfiguration.aTokenAddress));
             expect((await aToken.getOwner()).toString()).toEqual(pool.address.toString());
             expect((await aToken.getGetPoolData()).pool.toString()).toEqual(pool.address.toString());
             expect((await aToken.getGetPoolData()).asset.toString()).toEqual(reserveAddress.toString());
@@ -124,11 +124,11 @@ describe('Pool', () => {
             });
 
             const reserveConfigurationResult = await pool.getReserveConfiguration(reserveAddress);
-            expect(reserveConfiguration.lTokenAddress.toString()).toEqual(aToken.address.toString());
-            const { poolWalletAddress, lTokenAddress, dTokenAddress, ...otherReserveConfiguration } =
+            expect(reserveConfiguration.aTokenAddress.toString()).toEqual(aToken.address.toString());
+            const { poolWalletAddress, aTokenAddress, dTokenAddress, ...otherReserveConfiguration } =
                 reserveConfigurationResult;
             expect(reserveConfiguration).toMatchObject(otherReserveConfiguration);
-            expect(lTokenAddress.toString()).toEqual(reserveConfiguration.lTokenAddress.toString());
+            expect(aTokenAddress.toString()).toEqual(reserveConfiguration.aTokenAddress.toString());
             expect(dTokenAddress.toString()).toEqual(reserveConfiguration.dTokenAddress.toString());
             expect(poolWalletAddress.toString()).toEqual(reserveConfiguration.poolWalletAddress.toString());
         });
@@ -271,9 +271,9 @@ describe('Pool', () => {
 
         it('should getReserveConfiguration', async () => {
             const result = await pool.getReserveConfiguration(reserveAddress);
-            const { poolWalletAddress, lTokenAddress, dTokenAddress, ...otherReserveConfiguration } = result;
+            const { poolWalletAddress, aTokenAddress, dTokenAddress, ...otherReserveConfiguration } = result;
             expect(reserveConfiguration).toMatchObject(otherReserveConfiguration);
-            expect(lTokenAddress.toString()).toEqual(reserveConfiguration.lTokenAddress.toString());
+            expect(aTokenAddress.toString()).toEqual(reserveConfiguration.aTokenAddress.toString());
             expect(dTokenAddress.toString()).toEqual(reserveConfiguration.dTokenAddress.toString());
             expect(poolWalletAddress.toString()).toEqual(reserveConfiguration.poolWalletAddress.toString());
         });

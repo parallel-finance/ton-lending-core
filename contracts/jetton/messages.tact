@@ -40,8 +40,6 @@ message TokenUpdateContent {
     content: Cell;
 }
 message TokenTransferByPool {
-    isHealthy: Bool;
-    
     queryId: Int as uint64;
     amount: Int as coins;
     destination: Address;
@@ -50,10 +48,9 @@ message TokenTransferByPool {
     forward_ton_amount: Int as coins;
     forward_payload: Cell; // Cell Value to include everything
 }
-message CheckHFForTokenTransfer {
+message CheckAndTransferAToken {
     asset: Address;
     from: Address;
-    
     queryId: Int as uint64;
     amount: Int as coins;
     destination: Address;

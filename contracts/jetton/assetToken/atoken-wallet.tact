@@ -25,13 +25,11 @@ contract ATokenDefaultWallet
     }
 
     // ACL: onlyPool
+
     receive(msg: TokenTransferByPool){
-        // dump("TokenTransferByPool");
         // Check sender
         let ctx: Context = context();
         require(ctx.sender == self.pool, "Invalid sender");
-        // chech HF
-        require(msg.isHealthy == true, "invalid health factor");
         // Gas checks
         let fwdFee: Int = (ctx.readForwardFee() + ctx.readForwardFee());
         let final: Int = ((2 * self.gasConsumption + self.minTonsForStorage) + fwdFee);
@@ -60,15 +58,12 @@ contract ATokenDefaultWallet
         );
     }
 
-    // Wallet.TokenTransfer -> Pool.checkUserHF -> Wallet.TokenTransferByPool -> Wallet.TokenTransferInternal
+    // FromWallet.TokenTransfer -> Pool.checkUserHF -> FromWallet.TokenTransferByPool -> ToWallet.TokenTransferInternal
     receive(msg: TokenTransfer){
         // 0xf8a7ea5
         let ctx: Context = context(); // Check sender
         require(ctx.sender == self.owner, "Invalid sender");
-        // Gas checks
-        let fwdFee: Int = (ctx.readForwardFee() + ctx.readForwardFee());
-        let final: Int = ((2 * self.gasConsumption + self.minTonsForStorage) + fwdFee);
-        require(ctx.value > min(final, ton("0.01")), "Invalid value!!");
+        // TODO: Gas checks
         // check balance
         require(self.balance > msg.amount, "Invalid balance");
         send(SendParameters{
@@ -76,9 +71,9 @@ contract ATokenDefaultWallet
                 value: 0,
                 mode: SendRemainingValue,
                 bounce: false,
-                body: CheckHFForTokenTransfer{
-                    asset: self.asset, 
-                    from: ctx.sender, 
+                body: CheckAndTransferAToken{
+                    asset: self.asset,
+                    from: ctx.sender,
                     queryId: msg.queryId,
                     amount: msg.amount,
                     destination: msg.destination,

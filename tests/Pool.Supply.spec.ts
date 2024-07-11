@@ -18,7 +18,7 @@ describe('Pool', () => {
     const reserveConfiguration: ReserveConfiguration = {
         $$type: 'ReserveConfiguration',
         poolWalletAddress: reserveAddress,
-        lTokenAddress: reserveAddress,
+        aTokenAddress: reserveAddress,
         dTokenAddress: reserveAddress,
         ltv: 6000n,
         liquidationThreshold: 750n,
@@ -79,7 +79,7 @@ describe('Pool', () => {
         const contents: ATokenDTokenContents = {
             $$type: "ATokenDTokenContents",
             aTokenContent,
-            debtTokenContent: Cell.EMPTY, // TODO
+            dTokenContent: Cell.EMPTY, // TODO
         };
 
         sampleJetton = blockchain.openContract(await SampleJetton.fromInit(deployer.address, content, max_supply));
