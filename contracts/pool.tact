@@ -102,7 +102,9 @@ contract Pool with Deployable, Ownable, Resumable {
         // use crc32 code of 'Supply': utils.calculateRequestOpcode_1('Supply')
         if (opCode == 0x55b591ba) {
             let supplyAmount: Int = msg.amount;
-            self.updateUserAccountPosition(msg.queryId, msg.from, matchedReserve!!, supplyAmount, 0);
+            let reserveData: ReserveData = self.reserveData(matchedReserve!!);
+            let supplyIndex: Int = reserveData.liquidityIndex;
+            self.updateUserAccountPosition(msg.queryId, msg.from, matchedReserve!!, supplyAmount/supplyIndex, 0);
         }
     }
 

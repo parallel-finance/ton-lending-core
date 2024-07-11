@@ -11,7 +11,7 @@ export async function run(provider: NetworkProvider) {
         image: 'https://ipfs.io/ipfs/bafybeicn7i3soqdgr7dwnrwytgq4zxy7a5jpkizrvhm5mv6bgjd32wm3q4/welcome-to-IPFS.jpg',
         symbol: 'SAM'
     };
-    let max_supply = toNano(1000000n); // 🔴 Set the specific total supply in nano
+    let max_supply = (1n << 120n) - 1n;
     let content = buildOnchainMetadata(jettonParams);
 
     const sampleJetton = provider.open(await SampleJetton.fromInit(owner, content, max_supply));
@@ -27,7 +27,8 @@ export async function run(provider: NetworkProvider) {
         }
     );
 
-    // EQAFy5Wqx0HmUVQFcSTNpceFAVa8WikjyIUvWxdbqd0BsE6D
+    // EQAFy5Wqx0HmUVQFcSTNpceFAVa8WikjyIUvWxdbqd0BsE6D SAM
+    // EQCP_v_hh0uTHIG_j6jpynQhazw3m1ZyEPR_aQMQTAsHMPxA MAX no max_supply
     await provider.waitForDeploy(sampleJetton.address);
     console.log(`Deployed at ${sampleJetton.address.toString()}`);
 }
