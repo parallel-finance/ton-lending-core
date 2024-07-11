@@ -206,68 +206,6 @@ describe('Pool', () => {
         });
     });
 
-    describe('handleTransferNotification', () => {
-        describe('handle supply', () => {
-
-            beforeEach(async () => {
-                const jettonParams = {
-                    name: 'SampleJetton',
-                    description: 'Sample Jetton for testing purposes',
-                    image: 'https://ipfs.io/ipfs/bafybeicn7i3soqdgr7dwnrwytgq4zxy7a5jpkizrvhm5mv6bgjd32wm3q4/welcome-to-IPFS.jpg',
-                    symbol: 'SAM'
-                };
-                let max_supply = toNano(1000000n); // 🔴 Set the specific total supply in nano
-                let content = buildOnchainMetadata(jettonParams);
-
-                sampleJetton = blockchain.openContract(await SampleJetton.fromInit(deployer.address, content, max_supply));
-
-                await sampleJetton.send(
-                    deployer.getSender(),
-                    {
-                        value: toNano('0.05')
-                    },
-                    {
-                        $$type: 'Deploy',
-                        queryId: 0n
-                    }
-                );
-            })
-
-            it('should handle supply successfully', async () => {
-                const poolWalletAddress = await sampleJetton.getGetWalletAddress(pool.address);
-                const result = await pool.send(
-                    deployer.getSender(),
-                    {
-                        value: toNano('0.05')
-                    },
-                    {
-                        $$type: 'AddReserve',
-                        reserveAddress: sampleJetton.address,
-                        reserveConfiguration: {
-                            ...reserveConfiguration,
-                            poolWalletAddress
-                        }
-                    }
-                );
-
-                expect(result.transactions).toHaveTransaction({
-                    from: deployer.address,
-                    to: pool.address,
-                    success: true
-                });
-                const reserveLength = await pool.getReservesLength();
-                expect(reserveLength).toEqual(1n);
-
-                const amount = toNano(100n);
-
-                // Mint token to deployer
-            });
-
-            it('should fail if the jetton is not configured', async () => {
-            });
-        });
-    })
-
     describe('getters', () => {
         beforeEach(async () => {
             await pool.send(

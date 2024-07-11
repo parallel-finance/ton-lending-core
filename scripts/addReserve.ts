@@ -1,15 +1,20 @@
 import { address, toNano } from '@ton/core';
 import { Pool, ReserveConfiguration } from '../wrappers/Pool';
 import { NetworkProvider } from '@ton/blueprint';
+import { SampleJetton } from '../build/SampleJetton/tact_SampleJetton';
 
 export async function run(provider: NetworkProvider) {
     const pool = provider.open(await Pool.fromInit());
-    const reserveAddress = address('UQAEJ7U1iaC1TzcFel5lc2-JaEm8I0k5Krui3fzz3_GeANWV');
+    console.log(`Deployed Pool at ${pool.address.toString()}`);
+    const reserveAddress = address('EQAFy5Wqx0HmUVQFcSTNpceFAVa8WikjyIUvWxdbqd0BsE6D');
+    const sampleJetton = provider.open(SampleJetton.fromAddress(reserveAddress));
+    const poolWalletAddress = await sampleJetton.getGetWalletAddress(pool.address);
 
     const reserveConfiguration : ReserveConfiguration= {
         $$type: 'ReserveConfiguration',
 
         // TODO: change to real addresses
+        poolWalletAddress,
         lTokenAddress: reserveAddress,
         dTokenAddress: reserveAddress,
 
