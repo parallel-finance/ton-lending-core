@@ -144,19 +144,7 @@ describe('Pool', () => {
                     forward_payload: forward_payload
                 }
             );
-            console.log(`deployer.address: ${deployer.address}`);
-            console.log(`deployerJettonDefaultWallet: ${deployerWalletAddress}`);
-            console.log(`poolWalletAddress: ${poolWalletAddress}`);
-            console.log(`poolAddress: ${pool.address}`);
-            console.log(`userAccountAddress: ${userAccountAddress}`);
 
-            /*
-    deployer.address: EQBGhqLAZseEqRXz4ByFPTGV7SVMlI4hrbs-Sps_Xzx01x8G
-    deployerJettonDefaultWallet: EQBzkoKwuiGsjC21aSZzL7rkeISXP_rwNPOQxMotdB-t1IfH
-    poolWalletAddress: EQDXs5Y9VUa988QJ5rW0MXHf7sKrKdW6fEvz3amaXc5CbH-2
-    poolAddress: EQBYOuZE7FA9LUvxSXaeQBB0O64ihtEJQPkvvLmcFbUNKPl-
-    userAccountAddress: EQBGhqLAZseEqRXz4ByFPTGV7SVMlI4hrbs-Sps_Xzx01x8G
-             */
             // TokenTransferInternal
             expect(result.transactions).toHaveTransaction({
                 from: deployerWalletAddress,

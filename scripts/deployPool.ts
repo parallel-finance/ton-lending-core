@@ -16,6 +16,6 @@ export async function run(provider: NetworkProvider) {
         }
     );
 
-    // EQDq3wZDbchkMHMFnU5OmnKxlyONdgmdOLLdJkAIRVVIuhPE
+    // EQBYOuZE7FA9LUvxSXaeQBB0O64ihtEJQPkvvLmcFbUNKPl-
     await provider.waitForDeploy(pool.address);
 }
