@@ -4,7 +4,7 @@
     "scripts": {
         "start": "blueprint run",
         "build": "blueprint build",
-        "build:all": "blueprint build -all",
+        "build --all": "blueprint build -all",
         "test": "jest --verbose",
         "run:testnet": "blueprint run --testnet --mnemonic"
     },
