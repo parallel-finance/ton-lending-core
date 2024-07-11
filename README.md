@@ -40,9 +40,8 @@ The admin can perform the following actions:
 
 ### Liquidity provider and borrower
 
-Once the token is supplied to the pool, the liquidity provider will receive the LP tokens(lToken). 
-The lToken(Liability Token) represent the share of the liquidity provider in the pool. 
-The LP tokens can be used to withdraw the liquidity from the pool.
+Once the token is supplied to the pool, the liquidity provider will receive the aToken(Asset token).
+The aToken can be used to withdraw the liquidity from the pool.
 The ratio of lToken to token will increase as time passes because of the interest.
 
 The liquidity provider can perform the following actions:
