@@ -7,6 +7,7 @@ struct TokenData {
 }
 
 message UpdatePosition {
+    queryId: Int as uint64;
     address: Address;
     supply: Int as int128;
     borrow: Int as int128;
