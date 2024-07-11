@@ -100,14 +100,32 @@ contract Pool with Deployable, Ownable, Resumable {
         self.checkHFAndTransferAToken(msg);
     }
 
-    fun getATokenWalletAddress(aToken: Address, asset: Address,user: Address): Address {
-        let sinit: StateInit = initOf ATokenDefaultWallet(aToken, myAddress(), asset, user);
-        return contractAddress(sinit);
+    receive(msg: UserPositionUpdated) {
+        // for supply
+        if (msg.supply > 0) {
+            self.mintAToken(msg.asset, msg.user, msg.supply);
+        }
+        // for withdraw
+        // for repay
+        // for borrow
+    }
+
+    fun mintAToken(asset: Address, user: Address, amount: Int) {
+        let aTokenAddress: Address = self.reservesConfiguration.get(asset)!!.aTokenAddress;
+        send(SendParameters{
+            to: aTokenAddress,
+            value: 0,
+            bounce: true,
+            mode: SendRemainingValue,
+            body: Mint{
+                amount: amount,
+                receiver: user
+            }.toCell()
+        });
     }
 
     fun checkHFAndTransferAToken(msg: CheckAndTransferAToken) {
-        let aToken: Address = self.reservesConfiguration.get(msg.asset)!!.aTokenAddress;
-        let userATokenWallet: Address = self.getATokenWalletAddress(aToken, msg.asset, msg.from);
+        let userATokenWallet: Address = self.userATokenWalletAddress(msg.asset, msg.from);
         require(context().sender == userATokenWallet, "invalid sender");
         // TODO: check user health factor
         let isHealthy: Bool = true;
@@ -279,5 +297,11 @@ contract Pool with Deployable, Ownable, Resumable {
         let sinit: StateInit = self.getAssetATokenInit(content, reserveAddress);
         let aTokenAddress: Address = contractAddress(sinit);
         return aTokenAddress;
+    }
+
+    get fun userATokenWalletAddress(asset: Address, user: Address): Address {
+        let aToken: Address = self.reservesConfiguration.get(asset)!!.aTokenAddress;
+        let sinit: StateInit = initOf ATokenDefaultWallet(aToken, myAddress(), asset, user);
+        return contractAddress(sinit);
     }
 }
