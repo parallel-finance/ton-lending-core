@@ -6,7 +6,8 @@ export async function run(provider: NetworkProvider, args: string[]) {
     const userAddress = Address.parse(provider.sender().address?.toString() || '');
     const ui= provider.ui();
 
-    const address = Address.parse('EQBgTTj_q3OVw9a8qVukPpN0IChMH-ZcL7Vj-zXlRF6Llc_3');
+    // testnet free mint SAM: EQAFy5Wqx0HmUVQFcSTNpceFAVa8WikjyIUvWxdbqd0BsE6D
+    const address = Address.parse(args.length > 0 ? args[0] : await ui.input('SampleJetton address'));
 
     if (!(await provider.isContractDeployed(address))) {
         ui.write(`Error: Contract at address ${address} is not deployed!`);

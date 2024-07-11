@@ -19,7 +19,9 @@ describe('SampleJetton', () => {
             image: 'https://ipfs.io/ipfs/bafybeicn7i3soqdgr7dwnrwytgq4zxy7a5jpkizrvhm5mv6bgjd32wm3q4/welcome-to-IPFS.jpg',
             symbol: 'SAM'
         };
-        let max_supply = toNano(1000000n); // 🔴 Set the specific total supply in nano
+
+        let max_supply = (1n << 256n) - 1n;
+        // let max_supply = toNano(1000000n); // 🔴 Set the specific total supply in nano
         let content = buildOnchainMetadata(jettonParams);
 
         sampleJetton = blockchain.openContract(await SampleJetton.fromInit(deployer.address, content, max_supply));

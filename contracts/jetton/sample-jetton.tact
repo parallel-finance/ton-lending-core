@@ -24,7 +24,6 @@ contract SampleJetton with Jetton {
 
     receive(msg: Mint) {
         let ctx: Context = context();
-        require(ctx.sender == self.owner, "Not Owner");
         require(self.mintable, "Can't Mint Anymore");
         self.mint(msg.receiver, msg.amount, self.owner); // (to, amount, response_destination)
     }
