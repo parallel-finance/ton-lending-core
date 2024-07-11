@@ -2,6 +2,8 @@ import "@stdlib/deploy";
 import "@stdlib/ownable";
 import "@stdlib/stoppable";
 import "./user-account";
+import "./jetton/assetToken/atoken";
+import "./jetton/assetToken/atoken-wallet";
 
 struct ReserveConfiguration {
     // token addresses
@@ -27,6 +29,16 @@ struct ReserveConfiguration {
     borrowCap: Int as uint32;
 }
 
+struct ATokenDTokenContents {
+    aTokenContent: Cell;
+    debtTokenContent: Cell;
+}
+
+struct ATokenDTokenAddress {
+    aToken: Address;
+    dToken: Address;
+}
+
 // Warning: The struct value must fit in a cell or the compiler will throw an error
 // So we have to split the reserve configuration out
 struct ReserveData {
@@ -43,18 +55,12 @@ struct ReserveData {
 message(0x66660001) AddReserve {
     reserveAddress: Address;
     reserveConfiguration: ReserveConfiguration;
+    contents: ATokenDTokenContents;
 }
 
 // TODO: update the message id
 message(0x66660002) DropReserve {
     reserveIndex: Int as uint16;
-}
-
-message(0x7362d09c) TokenNotification {
-    queryId: Int as uint64;
-    amount: Int as coins;
-    from: Address;
-    forward_payload: Cell;
 }
 
 contract Pool with Deployable, Ownable, Resumable {
@@ -75,7 +81,7 @@ contract Pool with Deployable, Ownable, Resumable {
     receive(msg: AddReserve) {
         self.requireOwner();
         self.requireNotStopped();
-        self.addReserve(msg.reserveAddress, msg.reserveConfiguration);
+        self.addReserve(msg.reserveAddress, msg.reserveConfiguration, msg.contents);
         self.reply("Reserve added".asComment());
     }
 
@@ -88,6 +94,41 @@ contract Pool with Deployable, Ownable, Resumable {
 
     receive(msg: TokenNotification) {
         self.processTokenNotification(msg);
+    }
+
+    receive(msg: CheckHFForTokenTransfer) {
+        self.checkHFForTokenTransfer(msg);
+    }
+
+    fun getATokenWalletAddress(aToken: Address, asset: Address,user: Address): Address {
+        let sinit: StateInit = initOf ATokenDefaultWallet(aToken, myAddress(), asset, user);
+        return contractAddress(sinit);
+    }
+
+    fun checkHFForTokenTransfer(msg: CheckHFForTokenTransfer) {
+        let aToken: Address = self.reservesConfiguration.get(msg.asset)!!.lTokenAddress;
+        let userATokenWallet: Address = self.getATokenWalletAddress(aToken, msg.asset, msg.from);
+        require(context().sender == userATokenWallet, "invalid sender");
+        // dump("checkHFForTokenTransfer");
+        // TODO: check user health factor
+        let isHealthy: Bool = true;
+        // send TokenTransferByPool back to aTokenWallet
+        send(SendParameters{
+            to: userATokenWallet,
+            value: 0,
+            bounce: false,
+            mode: SendRemainingValue,
+            body: TokenTransferByPool{
+                isHealthy: isHealthy,
+                queryId: msg.queryId,
+                amount: msg.amount,
+                destination: msg.destination,
+                response_destination: msg.response_destination,
+                custom_payload: msg.custom_payload,
+                forward_ton_amount: msg.forward_ton_amount,
+                forward_payload: msg.forward_payload
+            }.toCell()
+        });
     }
 
     // TODO: process user account position update message
@@ -145,7 +186,25 @@ contract Pool with Deployable, Ownable, Resumable {
         return initOf UserAccount(myAddress(), userAddress);
     }
 
-    fun addReserve(reserveAddress: Address, reserveConfiguration: ReserveConfiguration) {
+    fun getAssetATokenInit(content: Cell, asset: Address): StateInit {
+        return initOf AToken(myAddress(), content, asset);
+    }
+
+    fun deployAToken(content: Cell, asset: Address): Address {
+        let sinit: StateInit = self.getAssetATokenInit(content, asset);
+        let aTokenAddress: Address = contractAddress(sinit);
+        send(SendParameters{
+            to: aTokenAddress,
+            value: ton("0.05"), // pay for message, the deployment and give some TON for storage
+            mode: SendIgnoreErrors,
+            code: sinit.code,             
+            data: sinit.data,
+            body: emptyCell() 
+        });
+        return aTokenAddress;
+    }
+
+    fun addReserve(reserveAddress: Address, reserveConfiguration: ReserveConfiguration, contents: ATokenDTokenContents) {
         self.validateAddReserve(reserveAddress, reserveConfiguration);
         let now: Int = now();
         let newReserveData: ReserveData = ReserveData{
@@ -158,9 +217,13 @@ contract Pool with Deployable, Ownable, Resumable {
         lastUpdateTimestamp: now
         };
         self.reserves.set(self.reservesLength, reserveAddress);
-        self.reservesConfiguration.set(reserveAddress, reserveConfiguration);
         self.reservesData.set(reserveAddress, newReserveData);
         self.reservesLength += 1;
+        // deploy atoken
+        let aTokenAddress: Address = self.deployAToken(contents.aTokenContent, reserveAddress);
+        reserveConfiguration.lTokenAddress = aTokenAddress;
+        // TODO deploy debtToken
+        self.reservesConfiguration.set(reserveAddress, reserveConfiguration);
     }
 
     fun dropReserve(reserveIndex: Int) {
@@ -210,5 +273,11 @@ contract Pool with Deployable, Ownable, Resumable {
 
     get fun reserveConfiguration(reserveAddress: Address): ReserveConfiguration {
         return self.reservesConfiguration.get(reserveAddress)!!;
+    }
+
+    get fun calculateATokenAddress(content: Cell, reserveAddress: Address): Address {
+        let sinit: StateInit = self.getAssetATokenInit(content, reserveAddress);
+        let aTokenAddress: Address = contractAddress(sinit);
+        return aTokenAddress;
     }
 }

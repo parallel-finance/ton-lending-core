@@ -1,6 +1,6 @@
 import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
 import { address, beginCell, Cell, toNano } from '@ton/core';
-import { Pool, ReserveConfiguration } from '../wrappers/Pool';
+import { ATokenDTokenContents, Pool, ReserveConfiguration } from '../wrappers/Pool';
 import '@ton/test-utils';
 import { SampleJetton } from '../build/SampleJetton/tact_SampleJetton';
 import { buildOnchainMetadata } from '../scripts/utils';
@@ -69,6 +69,19 @@ describe('Pool', () => {
         let max_supply = toNano(1000000n); // 🔴 Set the specific total supply in nano
         let content = buildOnchainMetadata(jettonParams);
 
+        const aTokenJettonParams = {
+            name: 'SampleJetton AToken',
+            description: 'Sample Jetton aToken',
+            image: 'https://ipfs.io/ipfs/bafybeicn7i3soqdgr7dwnrwytgq4zxy7a5jpkizrvhm5mv6bgjd32wm3q4/welcome-to-IPFS.jpg',
+            symbol: 'aSAM',
+        };
+        let aTokenContent = buildOnchainMetadata(aTokenJettonParams);
+        const contents: ATokenDTokenContents = {
+            $$type: "ATokenDTokenContents",
+            aTokenContent,
+            debtTokenContent: Cell.EMPTY, // TODO
+        };
+
         sampleJetton = blockchain.openContract(await SampleJetton.fromInit(deployer.address, content, max_supply));
 
         await sampleJetton.send(
@@ -95,7 +108,8 @@ describe('Pool', () => {
                 reserveConfiguration: {
                     ...reserveConfiguration,
                     poolWalletAddress
-                }
+                },
+                contents
             }
         );
 

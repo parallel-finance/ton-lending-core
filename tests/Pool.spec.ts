@@ -1,9 +1,10 @@
 import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
-import { address, toNano, beginCell, Address } from '@ton/core';
-import { Pool, ReserveConfiguration } from '../wrappers/Pool';
+import { address, toNano, beginCell, Address, Cell } from '@ton/core';
+import { ATokenDTokenContents, Pool, ReserveConfiguration } from '../wrappers/Pool';
 import '@ton/test-utils';
 import { SampleJetton } from '../build/SampleJetton/tact_SampleJetton';
 import { buildOnchainMetadata } from '../scripts/utils';
+import { AToken } from '../wrappers/AToken';
 
 describe('Pool', () => {
     let blockchain: Blockchain;
@@ -12,8 +13,20 @@ describe('Pool', () => {
     let sampleJetton: SandboxContract<SampleJetton>;
 
     const reserveAddress = address('UQAEJ7U1iaC1TzcFel5lc2-JaEm8I0k5Krui3fzz3_GeANWV');
+    const aTokenJettonParams = {
+        name: 'SampleJetton AToken',
+        description: 'Sample Jetton aToken',
+        image: 'https://ipfs.io/ipfs/bafybeicn7i3soqdgr7dwnrwytgq4zxy7a5jpkizrvhm5mv6bgjd32wm3q4/welcome-to-IPFS.jpg',
+        symbol: 'aSAM',
+    };
+    let aTokenContent = buildOnchainMetadata(aTokenJettonParams);
+    const contents: ATokenDTokenContents = {
+        $$type: 'ATokenDTokenContents',
+        aTokenContent,
+        debtTokenContent: Cell.EMPTY, // TODO
+    };
 
-    const reserveConfiguration : ReserveConfiguration= {
+    const reserveConfiguration: ReserveConfiguration = {
         $$type: 'ReserveConfiguration',
         poolWalletAddress: reserveAddress,
         lTokenAddress: reserveAddress,
@@ -28,7 +41,7 @@ describe('Pool', () => {
         slope2: 3000n,
         borrowingEnabled: true,
         supplyCap: 1000000n,
-        borrowCap: 1000000n
+        borrowCap: 1000000n,
     };
 
     beforeEach(async () => {
@@ -41,20 +54,23 @@ describe('Pool', () => {
         const deployResult = await pool.send(
             deployer.getSender(),
             {
-                value: toNano('0.05')
+                value: toNano('0.05'),
             },
             {
                 $$type: 'Deploy',
-                queryId: 0n
-            }
+                queryId: 0n,
+            },
         );
 
         expect(deployResult.transactions).toHaveTransaction({
             from: deployer.address,
             to: pool.address,
             deploy: true,
-            success: true
+            success: true,
         });
+
+        const calculateATokenAddress = await pool.getCalculateATokenAddress(contents.aTokenContent, reserveAddress);
+        reserveConfiguration.lTokenAddress = calculateATokenAddress;
     });
 
     it('should deploy', async () => {
@@ -67,20 +83,28 @@ describe('Pool', () => {
             const result = await pool.send(
                 deployer.getSender(),
                 {
-                    value: toNano('0.05')
+                    value: toNano('0.2'),
                 },
                 {
                     $$type: 'AddReserve',
                     reserveAddress,
-                    reserveConfiguration
-                }
+                    reserveConfiguration,
+                    contents,
+                },
             );
 
             expect(result.transactions).toHaveTransaction({
                 from: deployer.address,
                 to: pool.address,
-                success: true
+                success: true,
             });
+
+            // TODO: the aToken calculated from Atoken.fromInit and pool.getCalculateATokenAddress is different!!! why?
+            // const aToken = blockchain.openContract(await AToken.fromInit(pool.address, contents.aTokenContent, reserveAddress))
+            const aToken = blockchain.openContract(AToken.fromAddress(reserveConfiguration.lTokenAddress));
+            expect((await aToken.getOwner()).toString()).toEqual(pool.address.toString());
+            expect((await aToken.getGetPoolData()).pool.toString()).toEqual(pool.address.toString());
+            expect((await aToken.getGetPoolData()).asset.toString()).toEqual(reserveAddress.toString());
 
             const reserveLength = await pool.getReservesLength();
             expect(reserveLength).toEqual(1n);
@@ -100,36 +124,40 @@ describe('Pool', () => {
             });
 
             const reserveConfigurationResult = await pool.getReserveConfiguration(reserveAddress);
-            const { poolWalletAddress, lTokenAddress, dTokenAddress, ...otherReserveConfiguration } = reserveConfigurationResult;
+            expect(reserveConfiguration.lTokenAddress.toString()).toEqual(aToken.address.toString());
+            const { poolWalletAddress, lTokenAddress, dTokenAddress, ...otherReserveConfiguration } =
+                reserveConfigurationResult;
             expect(reserveConfiguration).toMatchObject(otherReserveConfiguration);
-            expect (lTokenAddress.toString()).toEqual(reserveConfiguration.lTokenAddress.toString());
-            expect (dTokenAddress.toString()).toEqual(reserveConfiguration.dTokenAddress.toString());
-            expect (poolWalletAddress.toString()).toEqual(reserveConfiguration.poolWalletAddress.toString());
+            expect(lTokenAddress.toString()).toEqual(reserveConfiguration.lTokenAddress.toString());
+            expect(dTokenAddress.toString()).toEqual(reserveConfiguration.dTokenAddress.toString());
+            expect(poolWalletAddress.toString()).toEqual(reserveConfiguration.poolWalletAddress.toString());
         });
 
         it('should fail if reserve already exists', async () => {
-             await pool.send(
+            await pool.send(
                 deployer.getSender(),
                 {
-                    value: toNano('0.05')
+                    value: toNano('0.05'),
                 },
                 {
                     $$type: 'AddReserve',
                     reserveAddress,
-                    reserveConfiguration
-                }
+                    reserveConfiguration,
+                    contents,
+                },
             );
 
             const result = await pool.send(
                 deployer.getSender(),
                 {
-                    value: toNano('0.05')
+                    value: toNano('0.05'),
                 },
                 {
                     $$type: 'AddReserve',
                     reserveAddress,
-                    reserveConfiguration
-                }
+                    reserveConfiguration,
+                    contents,
+                },
             );
 
             expect(result.transactions).toHaveTransaction({
@@ -152,26 +180,27 @@ describe('Pool', () => {
             await pool.send(
                 deployer.getSender(),
                 {
-                    value: toNano('0.05')
+                    value: toNano('0.05'),
                 },
                 {
                     $$type: 'AddReserve',
                     reserveAddress,
-                    reserveConfiguration
-                }
+                    reserveConfiguration,
+                    contents,
+                },
             );
-        })
+        });
 
         it('should drop reserve successfully', async () => {
             const result = await pool.send(
                 deployer.getSender(),
                 {
-                    value: toNano('0.05')
+                    value: toNano('0.05'),
                 },
                 {
                     $$type: 'DropReserve',
                     reserveIndex: 0n,
-                }
+                },
             );
 
             expect(result.transactions).toHaveTransaction({
@@ -182,7 +211,7 @@ describe('Pool', () => {
 
             const reserveLength = await pool.getReservesLength();
             expect(reserveLength).toEqual(0n);
-        })
+        });
 
         it('should fail if reserve index is out of range when drop reserve', async () => {
             const notDeployer = await blockchain.treasury('notDeployer');
@@ -190,12 +219,12 @@ describe('Pool', () => {
             const result = await pool.send(
                 notDeployer.getSender(),
                 {
-                    value: toNano('0.05')
+                    value: toNano('0.05'),
                 },
                 {
                     $$type: 'DropReserve',
                     reserveIndex: 1n,
-                }
+                },
             );
 
             expect(result.transactions).toHaveTransaction({
@@ -211,15 +240,16 @@ describe('Pool', () => {
             await pool.send(
                 deployer.getSender(),
                 {
-                    value: toNano('0.05')
+                    value: toNano('0.05'),
                 },
                 {
                     $$type: 'AddReserve',
                     reserveAddress,
-                    reserveConfiguration
-                }
+                    reserveConfiguration,
+                    contents,
+                },
             );
-        })
+        });
 
         it('should getReserveAddress', async () => {
             const result = await pool.getReserveAddress(0n);
@@ -243,14 +273,14 @@ describe('Pool', () => {
             const result = await pool.getReserveConfiguration(reserveAddress);
             const { poolWalletAddress, lTokenAddress, dTokenAddress, ...otherReserveConfiguration } = result;
             expect(reserveConfiguration).toMatchObject(otherReserveConfiguration);
-            expect (lTokenAddress.toString()).toEqual(reserveConfiguration.lTokenAddress.toString());
-            expect (dTokenAddress.toString()).toEqual(reserveConfiguration.dTokenAddress.toString());
-            expect (poolWalletAddress.toString()).toEqual(reserveConfiguration.poolWalletAddress.toString());
+            expect(lTokenAddress.toString()).toEqual(reserveConfiguration.lTokenAddress.toString());
+            expect(dTokenAddress.toString()).toEqual(reserveConfiguration.dTokenAddress.toString());
+            expect(poolWalletAddress.toString()).toEqual(reserveConfiguration.poolWalletAddress.toString());
         });
 
         it('should getReservesLength', async () => {
             const result = await pool.getReservesLength();
             expect(result).toEqual(1n);
         });
-    })
+    });
 });
