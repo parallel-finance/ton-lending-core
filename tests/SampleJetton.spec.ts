@@ -20,7 +20,8 @@ describe('SampleJetton', () => {
             symbol: 'SAM'
         };
 
-        let max_supply = (1n << 256n) - 1n;
+        // It's the largest value I can use for max_supply in the tests
+        let max_supply = (1n << 120n) - 1n;
         // let max_supply = toNano(1000000n); // 🔴 Set the specific total supply in nano
         let content = buildOnchainMetadata(jettonParams);
 
