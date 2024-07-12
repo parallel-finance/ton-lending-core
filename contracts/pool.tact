@@ -6,7 +6,6 @@ import "./jetton/assetToken/atoken";
 import "./jetton/assetToken/atoken-wallet";
 
 struct ReserveConfiguration {
-    assetType: Int as uint8;
     // token addresses
     poolWalletAddress: Address;
     aTokenAddress: Address;
