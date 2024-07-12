@@ -22,7 +22,6 @@ struct ReserveConfiguration {
     // supply and borrow configuration
     isActive: Bool;
     isFrozen: Bool;
-    isPaused: Bool;
     borrowingEnabled: Bool;
     supplyCap: Int as uint32;
     borrowCap: Int as uint32;
