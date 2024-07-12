@@ -13,6 +13,13 @@ message UpdatePosition {
     borrow: Int as int128;
 }
 
+message UserPositionUpdated {
+    user: Address;
+    asset: Address;
+    supply: Int as int128;
+    borrow: Int as int128;
+}
+
 struct UpdatePositionResponse {
     positions: map<Int, Address>;
     positionsLength: Int;
@@ -61,7 +68,18 @@ contract UserAccount with Deployable {
         self.requireMaster();
         self.processUpdatePosition(msg);
         // TODO: consider return the updated position data?
-        self.reply("Position updated".asComment());
+        send(SendParameters{
+            to: self.master,
+            value: 0,
+            mode: SendRemainingValue,
+            bounce: true,
+            body: UserPositionUpdated{
+                user: self.owner,
+                asset: msg.address,
+                supply: msg.supply,
+                borrow: msg.borrow
+            }.toCell()
+        });
     }
 
     get fun account(): UpdatePositionResponse {

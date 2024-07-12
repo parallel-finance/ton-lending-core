@@ -15,7 +15,7 @@ export async function run(provider: NetworkProvider) {
 
         // TODO: change to real addresses
         poolWalletAddress,
-        lTokenAddress: reserveAddress,
+        aTokenAddress: reserveAddress,
         dTokenAddress: reserveAddress,
 
         ltv: 6000n,
