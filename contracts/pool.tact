@@ -63,6 +63,7 @@ message(0x66660001) AddReserve {
     reserveAddress: Address;
     reserveConfiguration: ReserveConfiguration;
     contents: ATokenDTokenContents;
+    reserveInterestRateStrategy: ReserveInterestRateStrategy;
 }
 
 // TODO: update the message id
@@ -89,7 +90,7 @@ contract Pool with Deployable, Ownable, Resumable {
     receive(msg: AddReserve) {
         self.requireOwner();
         self.requireNotStopped();
-        self.addReserve(msg.reserveAddress, msg.reserveConfiguration, msg.contents);
+        self.addReserve(msg.reserveAddress, msg.reserveConfiguration, msg.contents, msg.reserveInterestRateStrategy);
         self.reply("Reserve added".asComment());
     }
 
@@ -105,6 +106,8 @@ contract Pool with Deployable, Ownable, Resumable {
     }
 
     receive(msg: CheckAndTransferAToken) {
+        self.requireNotStopped();
+        // TODO: check isActive status of this asset
         self.checkHFAndTransferAToken(msg);
     }
 
@@ -230,7 +233,12 @@ contract Pool with Deployable, Ownable, Resumable {
         return aTokenAddress;
     }
 
-    fun addReserve(reserveAddress: Address, reserveConfiguration: ReserveConfiguration, contents: ATokenDTokenContents) {
+    fun addReserve(
+        reserveAddress: Address, 
+        reserveConfiguration: ReserveConfiguration, 
+        contents: ATokenDTokenContents, 
+        interestRateStrategy: ReserveInterestRateStrategy
+    ) {
         self.validateAddReserve(reserveAddress, reserveConfiguration);
         let now: Int = now();
         let newReserveData: ReserveData = ReserveData{
@@ -244,6 +252,7 @@ contract Pool with Deployable, Ownable, Resumable {
         totalBorrow: 0,
         lastUpdateTimestamp: now
         };
+        self.reserveInterestRateStrategy.set(reserveAddress, interestRateStrategy);
         self.reserves.set(self.reservesLength, reserveAddress);
         self.reservesData.set(reserveAddress, newReserveData);
         self.reservesLength += 1;
