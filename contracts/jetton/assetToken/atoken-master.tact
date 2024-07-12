@@ -1,13 +1,16 @@
 import "@stdlib/ownable";
 import "@stdlib/deploy";
+import "@stdlib/stoppable";
 import "./atoken-wallet";
 import "../messages";
 import "../types";
 @interface("org.ton.jetton.master")
-trait ATokenJettonTrait with Ownable, Deployable {
+trait ATokenJettonTrait with Ownable, Deployable, Resumable {
+    owner: Address; // PoolAddress
+    stopped: Bool;
+
     totalSupply: Int;
     mintable: Bool;
-    owner: Address; // PoolAddress
     content: Cell;
     asset: Address; // atoken underlying asset
 
@@ -19,6 +22,7 @@ trait ATokenJettonTrait with Ownable, Deployable {
 
     // ACL: onlyPool
     receive(msg: TokenBurnNotification){
+        self.requireNotStopped();
         self.requireWallet(msg.owner);
         self.totalSupply = (self.totalSupply - msg.amount);
         if (msg.response_destination != null) {

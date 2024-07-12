@@ -9,8 +9,10 @@ struct PoolDataInAToken {
 }
 
 contract AToken with ATokenJettonTrait {
-    totalSupply: Int as coins;
     owner: Address; // PoolAddress
+    stopped: Bool;
+
+    totalSupply: Int as coins;
     content: Cell;
     mintable: Bool;
     asset: Address; // atoken underlying asset
@@ -20,11 +22,13 @@ contract AToken with ATokenJettonTrait {
         self.mintable = true;
         self.content = content;
         self.asset = asset;
+        self.stopped = false;
     }
 
     receive(msg: Mint){
         let ctx: Context = context();
-        require(ctx.sender == self.owner, "Not Owner"); // comment this for tests
+        self.requireOwner();
+        self.requireNotStopped();
         require(self.mintable, "Can't Mint Anymore");
         self.mint(msg.receiver, msg.amount, self.owner); // (to, amount, response_destination)
     }

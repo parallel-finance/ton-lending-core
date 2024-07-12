@@ -1,6 +1,6 @@
 import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
 import { address, beginCell, Cell, toNano } from '@ton/core';
-import { ATokenDTokenContents, Pool, ReserveConfiguration } from '../wrappers/Pool';
+import { ATokenDTokenContents, Pool, ReserveConfiguration, ReserveInterestRateStrategy } from '../wrappers/Pool';
 import '@ton/test-utils';
 import { SampleJetton } from '../build/SampleJetton/tact_SampleJetton';
 import { buildOnchainMetadata } from '../scripts/utils';
@@ -26,12 +26,20 @@ describe('Pool', () => {
         liquidationBonus: 500n,
         reserveFactor: 1000n,
         liquidationProtocolFee: 50n,
-        optimalUsageRatio: 7000n,
-        slope1: 1000n,
-        slope2: 3000n,
+        isActive: true,
+        isFrozen: false,
         borrowingEnabled: true,
         supplyCap: 1000000n,
         borrowCap: 1000000n,
+    };
+
+    const reserveInterestRateStrategy: ReserveInterestRateStrategy = {
+        $$type: 'ReserveInterestRateStrategy',
+        optimalUsageRatio: 7000n,
+        maxUsageRatio: 3000n,
+        baseBorrowRate: 1000n,
+        slope1: 1000n,
+        slope2: 3000n,
     };
 
     beforeEach(async () => {
@@ -111,6 +119,7 @@ describe('Pool', () => {
                     poolWalletAddress,
                 },
                 contents,
+                reserveInterestRateStrategy
             },
         );
 

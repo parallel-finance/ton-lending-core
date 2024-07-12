@@ -131,7 +131,7 @@ contract ATokenDefaultWallet
 
     receive(msg: TokenBurn){
         let ctx: Context = context();
-        require(ctx.sender == self.owner, "Invalid sender"); // Check sender
+        require(ctx.sender == self.pool, "Invalid sender"); // Check sender
 
         self.balance = (self.balance - msg.amount); // Update balance
         require(self.balance >= 0, "Invalid balance");
