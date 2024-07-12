@@ -18,15 +18,20 @@ struct ReserveConfiguration {
     reserveFactor: Int as uint16;
     liquidationProtocolFee: Int as uint16;
 
-    // interest rate configuration
-    optimalUsageRatio: Int as uint16;
-    slope1: Int as uint16;
-    slope2: Int as uint16;
-
     // supply and borrow configuration
+    isActive: Bool;
+    isFrozen: Bool;
     borrowingEnabled: Bool;
     supplyCap: Int as uint32;
     borrowCap: Int as uint32;
+}
+
+struct ReserveInterestRateStrategy {
+    optimalUsageRatio: Int as uint128;
+    maxUsageRatio: Int as uint128;
+    baseBorrowRate: Int as uint128;
+    slope1: Int as uint128;
+    slope2: Int as uint128;
 }
 
 struct ATokenDTokenContents {
@@ -43,7 +48,9 @@ struct ATokenDTokenAddress {
 // So we have to split the reserve configuration out
 struct ReserveData {
     liquidityIndex: Int as uint128;
+    currentLiquidityRate: Int as uint128;
     borrowIndex: Int as uint128;
+    currentBorrowRate: Int as uint128;
     totalSupply: Int as coins;
     availableLiquidity: Int as coins;
     accruedToTreasury: Int as coins;
@@ -72,6 +79,7 @@ contract Pool with Deployable, Ownable, Resumable {
     reservesLength: Int = 0;
     reservesData: map<Address, ReserveData>;
     reservesConfiguration: map<Address, ReserveConfiguration>;
+    reserveInterestRateStrategy: map<Address, ReserveInterestRateStrategy>;
 
     init() {
         self.owner = sender();
@@ -227,7 +235,9 @@ contract Pool with Deployable, Ownable, Resumable {
         let now: Int = now();
         let newReserveData: ReserveData = ReserveData{
         liquidityIndex: 1,
+        currentLiquidityRate: 0,
         borrowIndex: 1,
+        currentBorrowRate: 0,
         totalSupply: 0,
         availableLiquidity: 0,
         accruedToTreasury: 0,
