@@ -110,7 +110,7 @@ describe('Pool', () => {
                 queryId: 0n,
             },
         );
-        console.log("sampleJetton", sampleJetton.address.toString())
+        console.log('sampleJetton', sampleJetton.address.toString());
 
         // add reserve
         const poolWalletAddress = await sampleJetton.getGetWalletAddress(pool.address);
@@ -163,7 +163,7 @@ describe('Pool', () => {
         const deployerJettonDefaultWallet = blockchain.openContract(
             JettonDefaultWallet.fromAddress(deployerWalletAddress),
         );
-        console.log("deployerJettonDefaultWallet", deployerJettonDefaultWallet.address.toString())
+        console.log('deployerJettonDefaultWallet', deployerJettonDefaultWallet.address.toString());
         const forward_payload: Cell = beginCell().storeUint(0x55b591ba, 32).endCell();
 
         const userAccountContract = blockchain.openContract(await UserAccount.fromInit(pool.address, deployer.address));
@@ -221,119 +221,122 @@ describe('Pool', () => {
             await deployerSupply(amount);
         });
 
-        // it('transfer AToken', async () => {
-        //     const amount = toNano(100n);
-        //     await deployerSupply(amount);
-        //     const aTokenWallet = blockchain.openContract(
-        //         ATokenDefaultWallet.fromAddress(
-        //             await pool.getUserATokenWalletAddress(sampleJetton.address, deployer.getSender().address),
-        //         ),
-        //     );
-        //     console.log('deployer aTokenWallet', aTokenWallet.address.toString());
-        //     const walletData = await aTokenWallet.getGetWalletData();
-        //     expect(walletData.balance).toEqual(amount);
-        //     expect(walletData.owner.toString()).toEqual(deployer.address.toString());
+        it('transfer AToken', async () => {
+            const amount = toNano(100n);
+            await deployerSupply(amount);
+            const aTokenWallet = blockchain.openContract(
+                ATokenDefaultWallet.fromAddress(
+                    await pool.getUserATokenWalletAddress(sampleJetton.address, deployer.getSender().address),
+                ),
+            );
+            console.log('deployer aTokenWallet', aTokenWallet.address.toString());
+            const walletData = await aTokenWallet.getGetWalletData();
+            expect(walletData.balance).toEqual(amount);
+            expect(walletData.owner.toString()).toEqual(deployer.address.toString());
 
-        //     const secondUserWallet = blockchain.openContract(
-        //         ATokenDefaultWallet.fromAddress(await aToken.getGetWalletAddress(secondUser.address)),
-        //     );
-        //     console.log(`secondUserWallet`, secondUserWallet.address.toString());
+            const secondUserWallet = blockchain.openContract(
+                ATokenDefaultWallet.fromAddress(await aToken.getGetWalletAddress(secondUser.address)),
+            );
+            console.log(`secondUserWallet`, secondUserWallet.address.toString());
 
-        //     let rst = await aTokenWallet.send(
-        //         deployer.getSender(),
-        //         {
-        //             value: toNano('1.5'),
-        //         },
-        //         {
-        //             $$type: 'TokenTransfer',
-        //             queryId: 1n,
-        //             amount: toNano(100),
-        //             destination: secondUser.address,
-        //             response_destination: deployer.getSender().address!!,
-        //             custom_payload: null,
-        //             forward_ton_amount: toNano('1'),
-        //             forward_payload: Cell.EMPTY,
-        //         },
-        //     );
-        //     expect(rst.transactions).toHaveTransaction({
-        //         from: deployer.address,
-        //         to: aTokenWallet.address,
-        //         success: true,
-        //     });
-        //     expect(rst.transactions).toHaveTransaction({
-        //         from: aTokenWallet.address,
-        //         to: pool.address,
-        //         success: true,
-        //     });
-        //     expect(rst.transactions).toHaveTransaction({
-        //         from: pool.address,
-        //         to: aTokenWallet.address,
-        //         success: true,
-        //     });
-        //     expect(rst.transactions).toHaveTransaction({
-        //         from: aTokenWallet.address,
-        //         to: secondUserWallet.address,
-        //         success: true,
-        //     });
-        //     const secondUserWalletData = await secondUserWallet.getGetWalletData();
-        //     expect(secondUserWalletData.balance).toEqual(toNano('100'));
-        //     expect(secondUserWalletData.master.toString()).toEqual(aToken.address.toString());
-        // });
+            let rst = await aTokenWallet.send(
+                deployer.getSender(),
+                {
+                    value: toNano('1.5'),
+                },
+                {
+                    $$type: 'TokenTransfer',
+                    queryId: 1n,
+                    amount: toNano(100),
+                    destination: secondUser.address,
+                    response_destination: deployer.getSender().address!!,
+                    custom_payload: null,
+                    forward_ton_amount: toNano('1'),
+                    forward_payload: Cell.EMPTY,
+                },
+            );
+            expect(rst.transactions).toHaveTransaction({
+                from: deployer.address,
+                to: aTokenWallet.address,
+                success: true,
+            });
+            expect(rst.transactions).toHaveTransaction({
+                from: aTokenWallet.address,
+                to: pool.address,
+                success: true,
+            });
+            expect(rst.transactions).toHaveTransaction({
+                from: pool.address,
+                to: aTokenWallet.address,
+                success: true,
+            });
+            expect(rst.transactions).toHaveTransaction({
+                from: aTokenWallet.address,
+                to: secondUserWallet.address,
+                success: true,
+            });
+            const secondUserWalletData = await secondUserWallet.getGetWalletData();
+            expect(secondUserWalletData.balance).toEqual(toNano('100'));
+            expect(secondUserWalletData.master.toString()).toEqual(aToken.address.toString());
+        });
 
-        // it('check reservesData after supply', async () => {
-        //     const amount = toNano(100n);
-        //     await deployerSupply(amount);
-        //     const reserveData = await pool.getReserveData(sampleJetton.address);
-        //     console.log('reserveData', reserveData);
-        // });
+        it('check reservesData after supply', async () => {
+            const amount = toNano(100n);
+            await deployerSupply(amount);
+            const reserveData = await pool.getReserveData(sampleJetton.address);
+            expect(reserveData.availableLiquidity).toEqual(amount);
+            expect(reserveData.totalSupply).toEqual(amount);
+            expect(reserveData.liquidityIndex).toEqual(BigInt('1000000000000000000000000000'));
+            expect(reserveData.borrowIndex).toEqual(BigInt('1000000000000000000000000000'));
+        });
 
-        // it('should fail if the jetton is not configured', async () => {
-        //     await pool.send(
-        //         deployer.getSender(),
-        //         {
-        //             value: toNano('0.05'),
-        //         },
-        //         {
-        //             $$type: 'DropReserve',
-        //             reserveIndex: 0n,
-        //         },
-        //     );
-        //     const reserveLength = await pool.getReservesLength();
-        //     expect(reserveLength).toEqual(0n);
+        it('should fail if the jetton is not configured', async () => {
+            await pool.send(
+                deployer.getSender(),
+                {
+                    value: toNano('0.05'),
+                },
+                {
+                    $$type: 'DropReserve',
+                    reserveIndex: 0n,
+                },
+            );
+            const reserveLength = await pool.getReservesLength();
+            expect(reserveLength).toEqual(0n);
 
-        //     const amount = toNano(100n);
+            const amount = toNano(100n);
 
-        //     // transfer jetton to pool
-        //     const deployerWalletAddress = await sampleJetton.getGetWalletAddress(deployer.address);
-        //     const poolWalletAddress = await sampleJetton.getGetWalletAddress(pool.address);
-        //     const deployerJettonDefaultWallet = blockchain.openContract(
-        //         JettonDefaultWallet.fromAddress(deployerWalletAddress),
-        //     );
-        //     const forward_payload: Cell = beginCell().storeUint(0x55b591ba, 32).endCell();
+            // transfer jetton to pool
+            const deployerWalletAddress = await sampleJetton.getGetWalletAddress(deployer.address);
+            const poolWalletAddress = await sampleJetton.getGetWalletAddress(pool.address);
+            const deployerJettonDefaultWallet = blockchain.openContract(
+                JettonDefaultWallet.fromAddress(deployerWalletAddress),
+            );
+            const forward_payload: Cell = beginCell().storeUint(0x55b591ba, 32).endCell();
 
-        //     const result = await deployerJettonDefaultWallet.send(
-        //         deployer.getSender(),
-        //         {
-        //             value: toNano('0.1'),
-        //         },
-        //         {
-        //             $$type: 'TokenTransfer',
-        //             queryId: 0n,
-        //             amount: amount,
-        //             destination: pool.address,
-        //             response_destination: deployerWalletAddress,
-        //             custom_payload: null,
-        //             forward_ton_amount: toNano('0.05'),
-        //             forward_payload: forward_payload,
-        //         },
-        //     );
+            const result = await deployerJettonDefaultWallet.send(
+                deployer.getSender(),
+                {
+                    value: toNano('0.1'),
+                },
+                {
+                    $$type: 'TokenTransfer',
+                    queryId: 0n,
+                    amount: amount,
+                    destination: pool.address,
+                    response_destination: deployerWalletAddress,
+                    custom_payload: null,
+                    forward_ton_amount: toNano('0.05'),
+                    forward_payload: forward_payload,
+                },
+            );
 
-        //     // TransferNotification -> failed to pass the check
-        //     expect(result.transactions).toHaveTransaction({
-        //         from: poolWalletAddress,
-        //         to: pool.address,
-        //         success: false,
-        //     });
-        // });
+            // TransferNotification -> failed to pass the check
+            expect(result.transactions).toHaveTransaction({
+                from: poolWalletAddress,
+                to: pool.address,
+                success: false,
+            });
+        });
     });
 });

@@ -122,7 +122,6 @@ contract Pool with Deployable, Ownable, Resumable {
         if (opCode == 0x55b591ba) {
             let supplyAmount: Int = msg.amount;
             let reserveData: ReserveData = self.reserveData(matchedReserve!!);
-            let supplyIndex: Int = reserveData.liquidityIndex;
             let reserveConfigration: ReserveConfiguration = self.reservesConfiguration.get(matchedReserve!!)!!;
             let reserveCache: ReserveCache = reserveData.cache(reserveConfigration);
             // _updateIndexes and _accrueToTreasury
@@ -135,7 +134,7 @@ contract Pool with Deployable, Ownable, Resumable {
             reserveData.updateInterestRates(reserveCache, rateStrategy, supplyAmount, 0);
             
             // update liquidity and set reserveData to storage back;
-            let scaledSupplyAmount: Int = supplyAmount / supplyIndex;
+            let scaledSupplyAmount: Int = supplyAmount.rayDiv(reserveCache.nextLiquidityIndex);
             reserveData.availableLiquidity += supplyAmount;
             reserveData.totalSupply += scaledSupplyAmount;
             self.reservesData.set(matchedReserve!!, reserveData);
@@ -208,9 +207,9 @@ contract Pool with Deployable, Ownable, Resumable {
         self.validateAddReserve(reserveAddress, reserveConfiguration);
         let now: Int = now();
         let newReserveData: ReserveData = ReserveData{
-        liquidityIndex: 0,
+        liquidityIndex: RAY,
         currentLiquidityRate: 0,
-        borrowIndex: 0,
+        borrowIndex: RAY,
         currentBorrowRate: 0,
         totalSupply: 0,
         availableLiquidity: 0,
