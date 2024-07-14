@@ -72,6 +72,9 @@ describe('TestJettonReceive', () => {
                 queryId: 1n,
             },
         );
+
+        console.log(await testJettonReceive.getTestDiv(1n, 3n));
+        console.log(await testJettonReceive.getTestDiv(10n, 3n));
     });
 
     it('dump correct', async () => {
