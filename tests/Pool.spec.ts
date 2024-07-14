@@ -5,6 +5,7 @@ import '@ton/test-utils';
 import { SampleJetton } from '../build/SampleJetton/tact_SampleJetton';
 import { buildOnchainMetadata } from '../scripts/utils';
 import { AToken } from '../wrappers/AToken';
+import { RAY } from '../helpers/constant';
 
 describe('Pool', () => {
     let blockchain: Blockchain;
@@ -123,8 +124,8 @@ describe('Pool', () => {
 
             const reserveData = await pool.getReserveData(reserveAddress);
             expect(reserveData).toMatchObject({
-                liquidityIndex: 1n,
-                borrowIndex: 1n,
+                liquidityIndex: RAY,
+                borrowIndex: RAY,
                 totalSupply: 0n,
                 availableLiquidity: 0n,
                 accruedToTreasury: 0n,
@@ -272,8 +273,8 @@ describe('Pool', () => {
         it('should getReserveData', async () => {
             const result = await pool.getReserveData(reserveAddress);
             expect(result).toMatchObject({
-                liquidityIndex: 1n,
-                borrowIndex: 1n,
+                liquidityIndex: RAY,
+                borrowIndex: RAY,
                 totalSupply: 0n,
                 availableLiquidity: 0n,
                 accruedToTreasury: 0n,

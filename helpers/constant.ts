@@ -1,0 +1,2 @@
+export const RAY = BigInt("1000000000000000000000000000")
+export const WAD = BigInt("1000000000000000000")
