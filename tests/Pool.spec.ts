@@ -1,5 +1,5 @@
 import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
-import { address, toNano, beginCell, Address, Cell } from '@ton/core';
+import { address, toNano } from '@ton/core';
 import { ATokenDTokenContents, Pool, ReserveConfiguration, ReserveInterestRateStrategy } from '../wrappers/Pool';
 import '@ton/test-utils';
 import { SampleJetton } from '../build/SampleJetton/tact_SampleJetton';
@@ -21,10 +21,19 @@ describe('Pool', () => {
         symbol: 'aSAM',
     };
     let aTokenContent = buildOnchainMetadata(aTokenJettonParams);
+
+    const dTokenJettonParams = {
+        name: 'SampleJetton DToken',
+        description: 'Sample Jetton dToken',
+        image: 'https://ipfs.io/ipfs/bafybeicn7i3soqdgr7dwnrwytgq4zxy7a5jpkizrvhm5mv6bgjd32wm3q4/welcome-to-IPFS.jpg',
+        symbol: 'dSAM',
+    };
+    let dTokenContent = buildOnchainMetadata(dTokenJettonParams);
+
     const contents: ATokenDTokenContents = {
         $$type: 'ATokenDTokenContents',
         aTokenContent,
-        dTokenContent: Cell.EMPTY, // TODO
+        dTokenContent,
     };
 
     const reserveConfiguration: ReserveConfiguration = {
@@ -45,7 +54,7 @@ describe('Pool', () => {
     };
 
     const reserveInterestRateStrategy: ReserveInterestRateStrategy = {
-        $$type: "ReserveInterestRateStrategy",
+        $$type: 'ReserveInterestRateStrategy',
         optimalUsageRatio: 7000n,
         maxUsageRatio: 3000n,
         baseBorrowRate: 1000n,
@@ -78,8 +87,14 @@ describe('Pool', () => {
             success: true,
         });
 
-        const calculateATokenAddress = await pool.getCalculateATokenAddress(contents.aTokenContent, reserveAddress);
-        reserveConfiguration.aTokenAddress = calculateATokenAddress;
+        reserveConfiguration.aTokenAddress = await pool.getCalculateATokenAddress(
+            contents.aTokenContent,
+            reserveAddress,
+        );
+        reserveConfiguration.dTokenAddress = await pool.getCalculateDTokenAddress(
+            contents.dTokenContent,
+            reserveAddress,
+        );
     });
 
     it('should deploy', async () => {
@@ -99,7 +114,7 @@ describe('Pool', () => {
                     reserveAddress,
                     reserveConfiguration,
                     contents,
-                    reserveInterestRateStrategy
+                    reserveInterestRateStrategy,
                 },
             );
 
@@ -154,7 +169,7 @@ describe('Pool', () => {
                     reserveAddress,
                     reserveConfiguration,
                     contents,
-                    reserveInterestRateStrategy
+                    reserveInterestRateStrategy,
                 },
             );
 
@@ -168,7 +183,7 @@ describe('Pool', () => {
                     reserveAddress,
                     reserveConfiguration,
                     contents,
-                    reserveInterestRateStrategy
+                    reserveInterestRateStrategy,
                 },
             );
 
@@ -199,7 +214,7 @@ describe('Pool', () => {
                     reserveAddress,
                     reserveConfiguration,
                     contents,
-                    reserveInterestRateStrategy
+                    reserveInterestRateStrategy,
                 },
             );
         });
@@ -260,7 +275,7 @@ describe('Pool', () => {
                     reserveAddress,
                     reserveConfiguration,
                     contents,
-                    reserveInterestRateStrategy
+                    reserveInterestRateStrategy,
                 },
             );
         });

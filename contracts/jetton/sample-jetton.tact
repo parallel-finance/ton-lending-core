@@ -1,10 +1,5 @@
 import "./jetton-master";
 
-message Mint {
-    amount: Int;
-    receiver: Address;
-}
-
 contract SampleJetton with Jetton {
     totalSupply: Int as coins;
     owner: Address;

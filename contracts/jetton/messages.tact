@@ -59,3 +59,8 @@ message CheckAndTransferAToken {
     forward_ton_amount: Int as coins;
     forward_payload: Cell; // Cell Value to include everything
 }
+
+message Mint {
+    amount: Int;
+    receiver: Address;
+}

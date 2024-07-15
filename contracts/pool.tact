@@ -3,7 +3,9 @@ import "@stdlib/ownable";
 import "@stdlib/stoppable";
 import "./user-account";
 import "./jetton/assetToken/atoken";
+import "./jetton/debtToken/dtoken";
 import "./jetton/assetToken/atoken-wallet";
+import "./jetton/debtToken/dtoken-wallet";
 import "./types/struct";
 import "./types/message";
 import "./libraries/logic/reserve-logic";
@@ -63,12 +65,18 @@ contract Pool with Deployable, Ownable, Resumable {
         // for withdraw
         // for repay
         // for borrow
+        if (msg.borrow > 0) {
+            self.mintDToken(msg.asset, msg.user, msg.borrow);
+        }
     }
 
     receive(msg: BorrowToken) {
         // send message to get user account data
         let userAccountInit: StateInit = initOf UserAccount(myAddress(), sender());
         let userAccountAddress: Address = contractAddress(userAccountInit);
+        let reserveAddress: Address = msg.tokenAddress;
+        let reserveConfiguration: ReserveConfiguration? = self.reservesConfiguration.get(reserveAddress);
+        require(reserveConfiguration != null, "Reserve not found");
 
         send(SendParameters{
             to: userAccountAddress,
@@ -92,11 +100,24 @@ contract Pool with Deployable, Ownable, Resumable {
             let userAccountData: UserAccountData = msg.accountData;
             let isHealthy: Bool = self.isHealthyForAction(msg.action, msg.amount, userAccountData, self.reservesData);
             if (isHealthy) {
-                let reserveData: ReserveData = self.reservesData.get(msg.tokenAddress)!!;
-                // TODO: calculate the borrow index after borrow
-                let borrowIndex: Int = reserveData.borrowIndex;
-                // TODO: update reserve data
-                self.updateUserAccountPosition(msg.queryId, msg.borrower, msg.tokenAddress, 0, msg.amount/reserveData.borrowIndex);
+                let borrowAmount: Int = msg.amount;
+                let reserveAddress: Address = msg.tokenAddress;
+                let reserveData: ReserveData = self.reservesData.get(reserveAddress)!!;
+                let reserveConfigration: ReserveConfiguration = self.reservesConfiguration.get(reserveAddress)!!;
+                let reserveCache: ReserveCache = reserveData.cache(reserveConfigration);
+                // _updateIndexes and _accrueToTreasury
+                reserveCache = reserveData.updateState(reserveCache);
+
+                // updateInterestRates
+                let rateStrategy: ReserveInterestRateStrategy = self.reserveInterestRateStrategy.get(reserveAddress)!!;
+                reserveData.updateInterestRates(reserveCache, rateStrategy, 0, borrowAmount);
+
+                // update liquidity and set reserveData to storage back;
+                let scaledBorrowAmount: Int = borrowAmount.rayDiv(reserveCache.nextBorrowIndex);
+                reserveData.availableLiquidity -= borrowAmount;
+                reserveData.totalBorrow += scaledBorrowAmount;
+                self.reservesData.set(reserveAddress, reserveData);
+                self.updateUserAccountPosition(msg.queryId, msg.borrower, msg.tokenAddress, 0, scaledBorrowAmount);
             }
         }
     }
@@ -109,6 +130,21 @@ contract Pool with Deployable, Ownable, Resumable {
         let aTokenAddress: Address = self.reservesConfiguration.get(asset)!!.aTokenAddress;
         send(SendParameters{
             to: aTokenAddress,
+            value: 0,
+            bounce: true,
+            mode: SendRemainingValue,
+            body: Mint{
+                amount: amount,
+                receiver: user
+            }.toCell()
+        });
+    }
+
+    // TODO: handle bounce message
+    fun mintDToken(asset: Address, user: Address, amount: Int) {
+        let dTokenAddress: Address = self.reservesConfiguration.get(asset)!!.dTokenAddress;
+        send(SendParameters{
+            to: dTokenAddress,
             value: 0,
             bounce: true,
             mode: SendRemainingValue,
@@ -219,6 +255,10 @@ contract Pool with Deployable, Ownable, Resumable {
         return initOf AToken(myAddress(), content, asset);
     }
 
+    fun getAssetDTokenInit(content: Cell, asset: Address): StateInit {
+        return initOf DToken(myAddress(), content, asset);
+    }
+
     fun deployAToken(content: Cell, asset: Address): Address {
         let sinit: StateInit = self.getAssetATokenInit(content, asset);
         let aTokenAddress: Address = contractAddress(sinit);
@@ -231,6 +271,20 @@ contract Pool with Deployable, Ownable, Resumable {
             body: emptyCell()
         });
         return aTokenAddress;
+    }
+
+    fun deployDToken(content: Cell, asset: Address): Address {
+        let sinit: StateInit = self.getAssetDTokenInit(content, asset);
+        let dTokenAddress: Address = contractAddress(sinit);
+        send(SendParameters{
+            to: dTokenAddress,
+            value: ton("0.05"), // pay for message, the deployment and give some TON for storage
+            mode: SendIgnoreErrors,
+            code: sinit.code,
+            data: sinit.data,
+            body: emptyCell()
+        });
+        return dTokenAddress;
     }
 
     fun addReserve(
@@ -259,7 +313,8 @@ contract Pool with Deployable, Ownable, Resumable {
         // deploy atoken
         let aTokenAddress: Address = self.deployAToken(contents.aTokenContent, reserveAddress);
         reserveConfiguration.aTokenAddress = aTokenAddress;
-        // TODO deploy debtToken
+        let dTokenAddress: Address = self.deployDToken(contents.dTokenContent, reserveAddress);
+        reserveConfiguration.dTokenAddress = dTokenAddress;
         self.reservesConfiguration.set(reserveAddress, reserveConfiguration);
     }
 
@@ -316,6 +371,12 @@ contract Pool with Deployable, Ownable, Resumable {
         let sinit: StateInit = self.getAssetATokenInit(content, reserveAddress);
         let aTokenAddress: Address = contractAddress(sinit);
         return aTokenAddress;
+    }
+
+    get fun calculateDTokenAddress(content: Cell, reserveAddress: Address): Address {
+        let sinit: StateInit = self.getAssetDTokenInit(content, reserveAddress);
+        let dTokenAddress: Address = contractAddress(sinit);
+        return dTokenAddress;
     }
 
     get fun userATokenWalletAddress(asset: Address, user: Address): Address {
