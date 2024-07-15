@@ -69,6 +69,9 @@ contract Pool with Deployable, Ownable, Resumable {
         // send message to get user account data
         let userAccountInit: StateInit = initOf UserAccount(myAddress(), sender());
         let userAccountAddress: Address = contractAddress(userAccountInit);
+        let reserveAddress: Address = msg.tokenAddress;
+        let reserveConfiguration: ReserveConfiguration? = self.reservesConfiguration.get(reserveAddress);
+        require(reserveConfiguration != null, "Reserve not found");
 
         send(SendParameters{
             to: userAccountAddress,
@@ -92,11 +95,24 @@ contract Pool with Deployable, Ownable, Resumable {
             let userAccountData: UserAccountData = msg.accountData;
             let isHealthy: Bool = self.isHealthyForAction(msg.action, msg.amount, userAccountData, self.reservesData);
             if (isHealthy) {
-                let reserveData: ReserveData = self.reservesData.get(msg.tokenAddress)!!;
-                // TODO: calculate the borrow index after borrow
-                let borrowIndex: Int = reserveData.borrowIndex;
-                // TODO: update reserve data
-                self.updateUserAccountPosition(msg.queryId, msg.borrower, msg.tokenAddress, 0, msg.amount/reserveData.borrowIndex);
+                let borrowAmount: Int = msg.amount;
+                let reserveAddress: Address = msg.tokenAddress;
+                let reserveData: ReserveData = self.reservesData.get(reserveAddress)!!;
+                let reserveConfigration: ReserveConfiguration = self.reservesConfiguration.get(reserveAddress)!!;
+                let reserveCache: ReserveCache = reserveData.cache(reserveConfigration);
+                // _updateIndexes and _accrueToTreasury
+                reserveCache = reserveData.updateState(reserveCache);
+
+                // updateInterestRates
+                let rateStrategy: ReserveInterestRateStrategy = self.reserveInterestRateStrategy.get(reserveAddress)!!;
+                reserveData.updateInterestRates(reserveCache, rateStrategy, 0, borrowAmount);
+
+                // update liquidity and set reserveData to storage back;
+                let scaledBorrowAmount: Int = borrowAmount.rayDiv(reserveCache.nextBorrowIndex);
+                reserveData.availableLiquidity -= borrowAmount;
+                reserveData.totalBorrow += scaledBorrowAmount;
+                self.reservesData.set(reserveAddress, reserveData);
+                self.updateUserAccountPosition(msg.queryId, msg.borrower, msg.tokenAddress, 0, scaledBorrowAmount);
             }
         }
     }
