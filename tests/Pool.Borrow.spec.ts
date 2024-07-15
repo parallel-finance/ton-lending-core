@@ -358,6 +358,7 @@ describe('Pool', () => {
             expect(userHealthInfo.avgLtv).toEqual(reserveConfiguration.ltv);
             expect(userHealthInfo.avgLiquidationThreshold).toEqual(reserveConfiguration.liquidationThreshold);
             expect(userHealthInfo.totalCollateralInBaseCurrency).toEqual(100n * toNano(1));
+            expect(userHealthInfo.totalSupplyInBaseCurrency).toEqual(100n * toNano(1));
             expect(userHealthInfo.totalDebtInBaseCurrency).toEqual(60n * toNano(1));
             expect(userHealthInfo.healthFactorInRay).toEqual(
                 (100n * toNano(1) * reserveConfiguration.liquidationThreshold * RAY) /

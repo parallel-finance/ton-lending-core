@@ -74,6 +74,8 @@ struct UserAccountHealthInfo {
     // base in 10000
     avgLiquidationThreshold: Int as uint16;
     // base in oracle price decimal: 10**9
+    totalSupplyInBaseCurrency: Int as uint128;
+    // base in oracle price decimal: 10**9
     totalCollateralInBaseCurrency: Int as uint128;
     // base in oracle price decimal: 10**9
     totalDebtInBaseCurrency: Int as uint128;

@@ -156,6 +156,8 @@ contract Pool with Deployable, Ownable, Resumable {
     }
 
     get fun userAccountHealthInfo(userAccountData: UserAccountData): UserAccountHealthInfo {
+        // sum(reserve supply amount * reserve price)
+        let totalSupply: Int = 0;
         // sum(reserve Collateral amount * reserve price)
         let totalCollateral: Int = 0;
         // sum(reserve Collateral amount * reserve price * reserve ltv)
@@ -169,12 +171,15 @@ contract Pool with Deployable, Ownable, Resumable {
             let reserveData: ReserveData = self.reservesData.get(reserve)!!;
             let reserveConfiguration: ReserveConfiguration = self.reservesConfiguration.get(reserve)!!;
             
-            if (tokenData.asCollateral && tokenData.supply > 0) {
+            if (tokenData.supply > 0) {
                 let normalizedIncome: Int = reserveData.getNormalizedIncome();
                 let supplyValue: Int = tokenData.supply.rayMul(normalizedIncome) * reserveData.price / JETTON_UNIT;
-                totalCollateral += supplyValue;
-                totalCollateralMulLtv += supplyValue * reserveConfiguration.ltv;
-                totalCollateralMulLT += supplyValue  * reserveConfiguration.liquidationThreshold;
+                totalSupply += supplyValue;
+                if (tokenData.asCollateral) {
+                    totalCollateral += supplyValue;
+                    totalCollateralMulLtv += supplyValue * reserveConfiguration.ltv;
+                    totalCollateralMulLT += supplyValue  * reserveConfiguration.liquidationThreshold;
+                }
             }
             if (tokenData.borrow > 0) {
                 let normalizedDebt: Int = reserveData.getNormalizedDebt();
@@ -185,6 +190,7 @@ contract Pool with Deployable, Ownable, Resumable {
         return UserAccountHealthInfo{
             avgLtv: totalCollateralMulLtv / totalCollateral,
             avgLiquidationThreshold: totalCollateralMulLT / totalCollateral,
+            totalSupplyInBaseCurrency: totalSupply,
             totalCollateralInBaseCurrency: totalCollateral,
             totalDebtInBaseCurrency: totalDebt,
             healthFactorInRay: totalDebt != 0 ? (totalCollateralMulLT / PERCENTAGE_FACTOR).rayDiv(totalDebt) : UINT256_MAX // base in RAY
