@@ -1,4 +1,5 @@
 import "@stdlib/deploy";
+import "./types/message";
 
 struct TokenData {
     supply: Int as int128;
@@ -6,21 +7,7 @@ struct TokenData {
     asCollateral: Bool;
 }
 
-message UpdatePosition {
-    queryId: Int as uint64;
-    address: Address;
-    supply: Int as int128;
-    borrow: Int as int128;
-}
-
-message UserPositionUpdated {
-    user: Address;
-    asset: Address;
-    supply: Int as int128;
-    borrow: Int as int128;
-}
-
-struct UpdatePositionResponse {
+struct UserAccountData {
     positions: map<Int, Address>;
     positionsLength: Int;
     positionsDetail: map<Address, TokenData>;
@@ -82,8 +69,30 @@ contract UserAccount with Deployable {
         });
     }
 
-    get fun account(): UpdatePositionResponse {
-        return UpdatePositionResponse{
+    receive(msg: GetUserAccountData) {
+        self.requireMaster();
+        send(SendParameters{
+            to: context().sender,
+            value: 0,
+            mode: SendRemainingValue,
+            bounce: false,
+            body: UserAccountDataResponse{
+                queryId: msg.queryId,
+                borrower: msg.borrower,
+                tokenAddress: msg.tokenAddress,
+                action: msg.action,
+                amount: msg.amount,
+                accountData: UserAccountData{
+                    positions: self.positions,
+                    positionsLength: self.positionsLength,
+                    positionsDetail: self.positionsDetail
+                }
+            }.toCell()
+        });
+    }
+
+    get fun account(): UserAccountData {
+        return UserAccountData{
             positions: self.positions,
             positionsLength: self.positionsLength,
             positionsDetail: self.positionsDetail

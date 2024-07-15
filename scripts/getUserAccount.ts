@@ -9,8 +9,8 @@ export async function run(provider: NetworkProvider, args: string[]) {
     const poolAddress = pool.address;
 
     const userAccountContract = provider.open(await UserAccount.fromInit(poolAddress ,providerAddress));
-    console.log(`User Account Contract: ${userAccountContract.address.toString()}`);
     const userAccount = await userAccountContract.getAccount();
+    console.log(`User Account Contract: ${userAccountContract.address.toString()}`);
     const { positionsLength, positions, positionsDetail } = userAccount;
     console.log(`User Account: ${providerAddress.toString()}`);
     console.log(`Positions Length: ${positionsLength}`);
