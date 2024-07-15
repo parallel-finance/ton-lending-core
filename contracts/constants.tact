@@ -1,0 +1,4 @@
+const ACTION_BORROW: Int = 0;
+const ACTION_WITHDRAW: Int = 1;
+const ACTION_TRANSFER_ATOKEN: Int = 2;
+const ACTION_LIQUIDATION: Int = 3;

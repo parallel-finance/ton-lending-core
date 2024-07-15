@@ -5,29 +5,24 @@ import "./user-account";
 import "./jetton/assetToken/atoken";
 import "./jetton/assetToken/atoken-wallet";
 import "./types/struct";
+import "./types/message";
 import "./libraries/logic/reserve-logic";
-
-// TODO: update the message id
-message(0x66660001) AddReserve {
-    reserveAddress: Address;
-    reserveConfiguration: ReserveConfiguration;
-    contents: ATokenDTokenContents;
-    reserveInterestRateStrategy: ReserveInterestRateStrategy;
-}
-
-// TODO: update the message id
-message(0x66660002) DropReserve {
-    reserveIndex: Int as uint16;
-}
+import "./constants";
 
 contract Pool with Deployable, Ownable, Resumable {
 
     owner: Address;
     stopped: Bool;
+    // pool query id to trach the messages
+    queryId: Int = 0;
 
+    // index -> baseTokenAddress, this index starts from 0
     reserves: map<Int, Address>;
+    // length of reserves
     reservesLength: Int = 0;
+    // baseTokenAddress -> reserveData
     reservesData: map<Address, ReserveData>;
+    // baseTokenAddress -> reserveConfiguration
     reservesConfiguration: map<Address, ReserveConfiguration>;
     reserveInterestRateStrategy: map<Address, ReserveInterestRateStrategy>;
 
@@ -68,6 +63,46 @@ contract Pool with Deployable, Ownable, Resumable {
         // for withdraw
         // for repay
         // for borrow
+    }
+
+    receive(msg: BorrowToken) {
+        // send message to get user account data
+        let userAccountInit: StateInit = initOf UserAccount(myAddress(), sender());
+        let userAccountAddress: Address = contractAddress(userAccountInit);
+
+        send(SendParameters{
+            to: userAccountAddress,
+            value: 0,
+            bounce: false,
+            mode: SendRemainingValue,
+            body: GetUserAccountData{
+                queryId: self.queryId,
+                borrower: context().sender,
+                action: ACTION_BORROW,
+                tokenAddress: msg.tokenAddress,
+                amount: msg.amount
+            }.toCell()
+        });
+        self.queryId += 1;
+    }
+
+    receive(msg: UserAccountDataResponse) {
+        // check if the request is for borrow
+        if(msg.action == 0) {
+            let userAccountData: UserAccountData = msg.accountData;
+            let isHealthy: Bool = self.isHealthyForAction(msg.action, msg.amount, userAccountData, self.reservesData);
+            if (isHealthy) {
+                let reserveData: ReserveData = self.reservesData.get(msg.tokenAddress)!!;
+                // TODO: calculate the borrow index after borrow
+                let borrowIndex: Int = reserveData.borrowIndex;
+                // TODO: update reserve data
+                self.updateUserAccountPosition(msg.queryId, msg.borrower, msg.tokenAddress, 0, msg.amount/reserveData.borrowIndex);
+            }
+        }
+    }
+
+    fun isHealthyForAction(action: Int, amount: Int, userAccountData: UserAccountData, reservesData: map<Address, ReserveData>): Bool {
+        return true;
     }
 
     fun mintAToken(asset: Address, user: Address, amount: Int) {
@@ -112,9 +147,9 @@ contract Pool with Deployable, Ownable, Resumable {
     // TODO: process user account position update message
 
     fun processTokenNotification(msg: TokenNotification) {
-        let matchedReserve: Address? = self.findMatchedReserve(context().sender);
+        let matchedReserve: Address? = self.findReserveByPoolWalletAddress(context().sender);
         require(matchedReserve != null, "Reserve not found");
-        
+
         let forwardPayload: Cell = msg.forward_payload;
         let forwardPayloadSlice: Slice = forwardPayload.beginParse();
         let opCode: Int = forwardPayloadSlice.loadUint(32);
@@ -126,13 +161,13 @@ contract Pool with Deployable, Ownable, Resumable {
             let reserveCache: ReserveCache = reserveData.cache(reserveConfigration);
             // _updateIndexes and _accrueToTreasury
             reserveCache = reserveData.updateState(reserveCache);
-            
+
             // TODO: validateSupply
 
             // updateInterestRates
             let rateStrategy: ReserveInterestRateStrategy = self.reserveInterestRateStrategy.get(matchedReserve!!)!!;
             reserveData.updateInterestRates(reserveCache, rateStrategy, supplyAmount, 0);
-            
+
             // update liquidity and set reserveData to storage back;
             let scaledSupplyAmount: Int = supplyAmount.rayDiv(reserveCache.nextLiquidityIndex);
             reserveData.availableLiquidity += supplyAmount;
@@ -162,13 +197,13 @@ contract Pool with Deployable, Ownable, Resumable {
         });
     }
 
-    fun findMatchedReserve(msgSender: Address): Address? {
+    fun findReserveByPoolWalletAddress(poolWalletAddress: Address): Address? {
         let i: Int = 0;
         let matchedReserve: Address? = null;
         while (i < self.reservesLength && matchedReserve == null) {
             let reserveAddress: Address = self.reserves.get(i)!!;
             let reserveConfiguration: ReserveConfiguration = self.reservesConfiguration.get(reserveAddress)!!;
-            if (msgSender == reserveConfiguration.poolWalletAddress) {
+            if (poolWalletAddress == reserveConfiguration.poolWalletAddress) {
                 matchedReserve = reserveAddress;
             }
             i = i + 1;
@@ -191,17 +226,17 @@ contract Pool with Deployable, Ownable, Resumable {
             to: aTokenAddress,
             value: ton("0.05"), // pay for message, the deployment and give some TON for storage
             mode: SendIgnoreErrors,
-            code: sinit.code,             
+            code: sinit.code,
             data: sinit.data,
-            body: emptyCell() 
+            body: emptyCell()
         });
         return aTokenAddress;
     }
 
     fun addReserve(
-        reserveAddress: Address, 
-        reserveConfiguration: ReserveConfiguration, 
-        contents: ATokenDTokenContents, 
+        reserveAddress: Address,
+        reserveConfiguration: ReserveConfiguration,
+        contents: ATokenDTokenContents,
         interestRateStrategy: ReserveInterestRateStrategy
     ) {
         self.validateAddReserve(reserveAddress, reserveConfiguration);
