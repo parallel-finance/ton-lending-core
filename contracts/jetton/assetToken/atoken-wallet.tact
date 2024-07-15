@@ -65,7 +65,7 @@ contract ATokenDefaultWallet
         require(ctx.sender == self.owner, "Invalid sender");
         // TODO: Gas checks
         // check balance
-        require(self.balance > msg.amount, "Invalid balance");
+        require(self.balance >= msg.amount, "Invalid balance");
         send(SendParameters{
                 to: self.pool,
                 value: 0,

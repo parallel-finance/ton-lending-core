@@ -4,59 +4,8 @@ import "@stdlib/stoppable";
 import "./user-account";
 import "./jetton/assetToken/atoken";
 import "./jetton/assetToken/atoken-wallet";
-
-struct ReserveConfiguration {
-    // token addresses
-    poolWalletAddress: Address;
-    aTokenAddress: Address;
-    dTokenAddress: Address;
-
-    // liquidation configuration
-    ltv: Int as uint16;
-    liquidationThreshold: Int as uint16;
-    liquidationBonus: Int as uint16;
-    reserveFactor: Int as uint16;
-    liquidationProtocolFee: Int as uint16;
-
-    // supply and borrow configuration
-    isActive: Bool;
-    isFrozen: Bool;
-    borrowingEnabled: Bool;
-    supplyCap: Int as uint32;
-    borrowCap: Int as uint32;
-}
-
-struct ReserveInterestRateStrategy {
-    optimalUsageRatio: Int as uint128;
-    maxUsageRatio: Int as uint128;
-    baseBorrowRate: Int as uint128;
-    slope1: Int as uint128;
-    slope2: Int as uint128;
-}
-
-struct ATokenDTokenContents {
-    aTokenContent: Cell;
-    dTokenContent: Cell;
-}
-
-struct ATokenDTokenAddress {
-    aToken: Address;
-    dToken: Address;
-}
-
-// Warning: The struct value must fit in a cell or the compiler will throw an error
-// So we have to split the reserve configuration out
-struct ReserveData {
-    liquidityIndex: Int as uint128;
-    currentLiquidityRate: Int as uint128;
-    borrowIndex: Int as uint128;
-    currentBorrowRate: Int as uint128;
-    totalSupply: Int as coins;
-    availableLiquidity: Int as coins;
-    accruedToTreasury: Int as coins;
-    totalBorrow: Int as coins;
-    lastUpdateTimestamp: Int as uint32;
-}
+import "./types/struct";
+import "./libraries/logic/reserve-logic";
 
 // TODO: update the message id
 message(0x66660001) AddReserve {
@@ -165,7 +114,7 @@ contract Pool with Deployable, Ownable, Resumable {
     fun processTokenNotification(msg: TokenNotification) {
         let matchedReserve: Address? = self.findMatchedReserve(context().sender);
         require(matchedReserve != null, "Reserve not found");
-
+        
         let forwardPayload: Cell = msg.forward_payload;
         let forwardPayloadSlice: Slice = forwardPayload.beginParse();
         let opCode: Int = forwardPayloadSlice.loadUint(32);
@@ -173,8 +122,24 @@ contract Pool with Deployable, Ownable, Resumable {
         if (opCode == 0x55b591ba) {
             let supplyAmount: Int = msg.amount;
             let reserveData: ReserveData = self.reserveData(matchedReserve!!);
-            let supplyIndex: Int = reserveData.liquidityIndex;
-            self.updateUserAccountPosition(msg.queryId, msg.from, matchedReserve!!, supplyAmount/supplyIndex, 0);
+            let reserveConfigration: ReserveConfiguration = self.reservesConfiguration.get(matchedReserve!!)!!;
+            let reserveCache: ReserveCache = reserveData.cache(reserveConfigration);
+            // _updateIndexes and _accrueToTreasury
+            reserveCache = reserveData.updateState(reserveCache);
+            
+            // TODO: validateSupply
+
+            // updateInterestRates
+            let rateStrategy: ReserveInterestRateStrategy = self.reserveInterestRateStrategy.get(matchedReserve!!)!!;
+            reserveData.updateInterestRates(reserveCache, rateStrategy, supplyAmount, 0);
+            
+            // update liquidity and set reserveData to storage back;
+            let scaledSupplyAmount: Int = supplyAmount.rayDiv(reserveCache.nextLiquidityIndex);
+            reserveData.availableLiquidity += supplyAmount;
+            reserveData.totalSupply += scaledSupplyAmount;
+            self.reservesData.set(matchedReserve!!, reserveData);
+
+            self.updateUserAccountPosition(msg.queryId, msg.from, matchedReserve!!, scaledSupplyAmount, 0);
         }
     }
 
@@ -242,9 +207,9 @@ contract Pool with Deployable, Ownable, Resumable {
         self.validateAddReserve(reserveAddress, reserveConfiguration);
         let now: Int = now();
         let newReserveData: ReserveData = ReserveData{
-        liquidityIndex: 1,
+        liquidityIndex: RAY,
         currentLiquidityRate: 0,
-        borrowIndex: 1,
+        borrowIndex: RAY,
         currentBorrowRate: 0,
         totalSupply: 0,
         availableLiquidity: 0,
