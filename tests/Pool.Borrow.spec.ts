@@ -1,13 +1,14 @@
 import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
-import { address, beginCell, Cell, toNano } from '@ton/core';
+import { address, beginCell, Cell, contractAddress, toNano } from '@ton/core';
 import { ATokenDTokenContents, Pool, ReserveConfiguration, ReserveInterestRateStrategy } from '../wrappers/Pool';
 import '@ton/test-utils';
 import { SampleJetton } from '../build/SampleJetton/tact_SampleJetton';
 import { buildOnchainMetadata } from '../scripts/utils';
 import { JettonDefaultWallet } from '../build/SampleJetton/tact_JettonDefaultWallet';
 import { UserAccount } from '../build/Pool/tact_UserAccount';
-import { ATokenDefaultWallet } from '../build/AToken/tact_ATokenDefaultWallet';
+import { DTokenDefaultWallet } from '../build/DToken/tact_DTokenDefaultWallet';
 import { AToken } from '../wrappers/AToken';
+import { DToken } from '../wrappers/DToken';
 
 describe('Pool', () => {
     let blockchain: Blockchain;
@@ -16,6 +17,8 @@ describe('Pool', () => {
     let pool: SandboxContract<Pool>;
     let sampleJetton: SandboxContract<SampleJetton>;
     let aToken: SandboxContract<AToken>;
+    let dToken: SandboxContract<DToken>;
+    let contents: ATokenDTokenContents;
 
     const reserveAddress = address('UQAEJ7U1iaC1TzcFel5lc2-JaEm8I0k5Krui3fzz3_GeANWV');
 
@@ -45,7 +48,7 @@ describe('Pool', () => {
         slope2: BigInt(0.6 * 10 ** 27),
     };
 
-    const deployerSupply = async (amount: bigint) => {
+    const supplyFromDeployer = async (amount: bigint) => {
         // transfer jetton to pool
         const deployerWalletAddress = await sampleJetton.getGetWalletAddress(deployer.address);
         const deployerJettonDefaultWallet = blockchain.openContract(
@@ -123,10 +126,18 @@ describe('Pool', () => {
             symbol: 'aSAM',
         };
         let aTokenContent = buildOnchainMetadata(aTokenJettonParams);
-        const contents: ATokenDTokenContents = {
+
+        const dTokenJettonParams = {
+            name: 'SampleJetton DToken',
+            description: 'Sample Jetton dToken',
+            image: 'https://ipfs.io/ipfs/bafybeicn7i3soqdgr7dwnrwytgq4zxy7a5jpkizrvhm5mv6bgjd32wm3q4/welcome-to-IPFS.jpg',
+            symbol: 'dSAM',
+        };
+        let dTokenContent = buildOnchainMetadata(dTokenJettonParams);
+        contents = {
             $$type: 'ATokenDTokenContents',
             aTokenContent,
-            dTokenContent: Cell.EMPTY, // TODO
+            dTokenContent,
         };
 
         sampleJetton = blockchain.openContract(await SampleJetton.fromInit(deployer.address, content, max_supply));
@@ -166,10 +177,22 @@ describe('Pool', () => {
             sampleJetton.address,
         );
 
+        const calculateDTokenAddress = await pool.getCalculateDTokenAddress(
+            contents.dTokenContent,
+            sampleJetton.address,
+        );
+        console.log('calculateDTokenAddress', calculateDTokenAddress.toString());
+
         aToken = blockchain.openContract(AToken.fromAddress(calculateATokenAddress));
+        dToken = blockchain.openContract(DToken.fromAddress(calculateDTokenAddress));
+
         expect((await aToken.getOwner()).toString()).toEqual(pool.address.toString());
         expect((await aToken.getGetPoolData()).pool.toString()).toEqual(pool.address.toString());
         expect((await aToken.getGetPoolData()).asset.toString()).toEqual(sampleJetton.address.toString());
+
+        expect((await dToken.getOwner()).toString()).toEqual(pool.address.toString());
+        expect((await dToken.getGetPoolData()).pool.toString()).toEqual(pool.address.toString());
+        expect((await dToken.getGetPoolData()).asset.toString()).toEqual(sampleJetton.address.toString());
 
         // mint test jetton to deployer
         await sampleJetton.send(
@@ -186,7 +209,7 @@ describe('Pool', () => {
 
         // supply
         const amount = toNano(100n);
-        await deployerSupply(amount);
+        await supplyFromDeployer(amount);
     });
 
     describe('borrow', () => {
@@ -195,7 +218,7 @@ describe('Pool', () => {
             const result = await pool.send(
                 deployer.getSender(),
                 {
-                    value: toNano('0.05'),
+                    value: toNano('0.1'),
                 },
                 {
                     $$type: 'BorrowToken',
@@ -232,12 +255,26 @@ describe('Pool', () => {
                 success: true,
             });
 
+            // Mint dToken
+            expect(result.transactions).toHaveTransaction({
+                from: pool.address,
+                to: dToken.address,
+                success: true,
+            });
+
             const userAccountContract = blockchain.openContract(userAccountAddress);
             const accountData = await userAccountContract.getAccount();
             expect(accountData.positionsLength).toEqual(1n);
             expect(accountData.positions?.get(0n)!!.equals(sampleJetton.address)).toBeTruthy();
             expect(accountData.positionsDetail?.get(sampleJetton.address)!!.supply).toEqual(toNano(100n));
             expect(accountData.positionsDetail?.get(sampleJetton.address)!!.borrow).toEqual(toNano(50n));
+
+            const deployerDTokenDefaultWalletAddress = await dToken.getGetWalletAddress(deployer.address);
+            const deployerDTokenDefaultWallet = blockchain.openContract(DTokenDefaultWallet.fromAddress(deployerDTokenDefaultWalletAddress))
+
+            const walletData = await deployerDTokenDefaultWallet.getGetWalletData();
+            expect(walletData.balance).toEqual(toNano(50n));
+            expect(walletData.owner.toString()).toEqual(deployer.address.toString());
         });
     })
 

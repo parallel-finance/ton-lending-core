@@ -1,19 +1,19 @@
-import "./atoken-master";
+import "./dtoken-master";
 import "../messages";
 
-struct PoolDataInAToken {
+struct PoolDataInDToken {
     pool: Address;
     asset: Address;
 }
 
-contract AToken with ATokenJettonTrait {
+contract DToken with DTokenJettonTrait {
     owner: Address; // PoolAddress
     stopped: Bool;
 
     totalSupply: Int as coins;
     content: Cell;
     mintable: Bool;
-    asset: Address; // atoken underlying asset
+    asset: Address; // dToken underlying asset
     init(owner: Address, content: Cell, asset: Address){
         self.totalSupply = 0;
         self.owner = owner;
@@ -33,7 +33,7 @@ contract AToken with ATokenJettonTrait {
 
     // ====== Get Methods ====== //
 
-    get fun get_pool_data(): PoolDataInAToken {
-        return PoolDataInAToken{pool: self.owner, asset: self.asset};
+    get fun get_pool_data(): PoolDataInDToken {
+        return PoolDataInDToken{pool: self.owner, asset: self.asset};
     }
 }
