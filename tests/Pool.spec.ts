@@ -204,7 +204,7 @@ describe('Pool', () => {
 
     describe('dropReserve', () => {
         beforeEach(async () => {
-            await pool.send(
+            const result = await pool.send(
                 deployer.getSender(),
                 {
                     value: toNano('0.05'),
@@ -217,6 +217,12 @@ describe('Pool', () => {
                     reserveInterestRateStrategy,
                 },
             );
+
+            expect(result.transactions).toHaveTransaction({
+                from: deployer.address,
+                to: pool.address,
+                success: true,
+            });
         });
 
         it('should drop reserve successfully', async () => {

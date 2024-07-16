@@ -1,10 +1,8 @@
 import { Address, address, toNano } from '@ton/core';
-import { NetworkProvider } from '@ton/blueprint';
+import { NetworkProvider, sleep } from '@ton/blueprint';
 import { ATokenDTokenContents, Pool, ReserveConfiguration, ReserveInterestRateStrategy } from '../wrappers/Pool';
 import { SampleJetton } from '../wrappers/SampleJetton';
 import { buildOnchainMetadata } from './utils';
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const addFirstReserve = async (provider: NetworkProvider, poolAddress: Address) => {
     const pool = provider.open(await Pool.fromAddress(poolAddress));
@@ -22,20 +20,20 @@ const addFirstReserve = async (provider: NetworkProvider, poolAddress: Address) 
         dTokenAddress: reserveAddress,
 
         ltv: 6000n,
-        liquidationThreshold: 750n,
-        liquidationBonus: 500n,
+        liquidationThreshold: 7500n,
+        liquidationBonus: 10500n,
         reserveFactor: 1000n,
-        liquidationProtocolFee: 50n,
-        borrowingEnabled: true,
-        isFrozen: false,
+        liquidationProtocolFee: 500n,
         isActive: true,
+        isFrozen: false,
+        borrowingEnabled: true,
         supplyCap: 1000000n,
         borrowCap: 1000000n,
     };
 
     const aTokenJettonParams = {
         name: 'SAM AToken',
-        description: 'Sample Jetton aToken',
+        description: 'Sample Jetton aToken 2',
         image: 'https://ipfs.io/ipfs/bafybeicn7i3soqdgr7dwnrwytgq4zxy7a5jpkizrvhm5mv6bgjd32wm3q4/welcome-to-IPFS.jpg',
         symbol: 'aSAM',
     };
@@ -43,7 +41,7 @@ const addFirstReserve = async (provider: NetworkProvider, poolAddress: Address) 
 
     const dTokenJettonParams = {
         name: 'SAM DToken',
-        description: 'Sample Jetton dToken',
+        description: 'Sample Jetton dToken 2',
         image: 'https://ipfs.io/ipfs/bafybeicn7i3soqdgr7dwnrwytgq4zxy7a5jpkizrvhm5mv6bgjd32wm3q4/welcome-to-IPFS.jpg',
         symbol: 'dSAM',
     };
@@ -73,11 +71,11 @@ const addFirstReserve = async (provider: NetworkProvider, poolAddress: Address) 
 
     const reserveInterestRateStrategy: ReserveInterestRateStrategy = {
         $$type: 'ReserveInterestRateStrategy',
-        optimalUsageRatio: 9000n,
-        maxUsageRatio: 1000n,
-        baseBorrowRate: 200n,
-        slope1: 2000n,
-        slope2: 80000n,
+        optimalUsageRatio: BigInt(0.9 * 10 ** 27),
+        maxUsageRatio: BigInt(10 ** 27) - BigInt(0.9 * 10 ** 27),
+        baseBorrowRate: 0n,
+        slope1: BigInt(0.04 * 10 ** 27),
+        slope2: BigInt(0.6 * 10 ** 27),
     };
     await sleep(2000);
     console.log('send AddReserve...');
@@ -127,20 +125,20 @@ const addSecondReserve = async (provider: NetworkProvider, poolAddress: Address)
         dTokenAddress: reserveAddress,
 
         ltv: 6000n,
-        liquidationThreshold: 750n,
-        liquidationBonus: 500n,
+        liquidationThreshold: 7500n,
+        liquidationBonus: 10500n,
         reserveFactor: 1000n,
-        liquidationProtocolFee: 50n,
-        borrowingEnabled: true,
-        isFrozen: false,
+        liquidationProtocolFee: 500n,
         isActive: true,
+        isFrozen: false,
+        borrowingEnabled: true,
         supplyCap: 1000000n,
         borrowCap: 1000000n,
     };
 
     const aTokenJettonParams = {
         name: 'MAS AToken',
-        description: 'Sample Jetton MAS aToken',
+        description: 'Sample Jetton MAS aToken 2',
         image: 'https://ipfs.io/ipfs/bafybeicn7i3soqdgr7dwnrwytgq4zxy7a5jpkizrvhm5mv6bgjd32wm3q4/welcome-to-IPFS.jpg',
         symbol: 'aMAS',
     };
@@ -148,7 +146,7 @@ const addSecondReserve = async (provider: NetworkProvider, poolAddress: Address)
 
     const dTokenJettonParams = {
         name: 'MAS DToken',
-        description: 'Sample Jetton MAS dToken',
+        description: 'Sample Jetton MAS dToken 2',
         image: 'https://ipfs.io/ipfs/bafybeicn7i3soqdgr7dwnrwytgq4zxy7a5jpkizrvhm5mv6bgjd32wm3q4/welcome-to-IPFS.jpg',
         symbol: 'dMAS',
     };
@@ -178,11 +176,11 @@ const addSecondReserve = async (provider: NetworkProvider, poolAddress: Address)
 
     const reserveInterestRateStrategy: ReserveInterestRateStrategy = {
         $$type: 'ReserveInterestRateStrategy',
-        optimalUsageRatio: 9000n,
-        maxUsageRatio: 1000n,
-        baseBorrowRate: 200n,
-        slope1: 2000n,
-        slope2: 10000n,
+        optimalUsageRatio: BigInt(0.9 * 10 ** 27),
+        maxUsageRatio: BigInt(10 ** 27) - BigInt(0.9 * 10 ** 27),
+        baseBorrowRate: 0n,
+        slope1: BigInt(0.04 * 10 ** 27),
+        slope2: BigInt(0.6 * 10 ** 27),
     };
 
     await sleep(2000);
@@ -220,7 +218,7 @@ const printCurrentReserveLength = async (provider: NetworkProvider, poolAddress:
 }
 
 export async function run(provider: NetworkProvider) {
-    const poolAddress = address('EQBD3bhuWfqt4R4fJNR0VFCla3xMJqSFKDtrAhxybOiyzjKn');
+    const poolAddress = address('EQDtBATSpYPnbTit8CwFcTNLWS9fHMDdhwq7yRALGQ6SAbYP');
     const pool = provider.open(await Pool.fromAddress(poolAddress));
     await sleep(1000);
 

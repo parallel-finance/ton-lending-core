@@ -399,10 +399,13 @@ contract Pool with Deployable, Ownable, Resumable {
         self.validateDropReserve(reserveData);
         let lastReserveIndex: Int = self.reservesLength - 1;
         let lastReserveAddress: Address =  self.reserves.get(lastReserveIndex)!!;
-        self.reserves.set(reserveIndex, lastReserveAddress);
+        if (reserveIndex != lastReserveIndex) {
+            self.reserves.set(reserveIndex, lastReserveAddress);
+        }
         self.reserves.set(lastReserveIndex, null);
         self.reservesData.set(reserveAddress, null);
         self.reservesConfiguration.set(reserveAddress, null);
+        self.reserveInterestRateStrategy.set(reserveAddress, null);
         self.reservesLength -= 1;
     }
 

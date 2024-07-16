@@ -8,34 +8,29 @@ export async function run(provider: NetworkProvider) {
     const poolAddress = address('EQDtBATSpYPnbTit8CwFcTNLWS9fHMDdhwq7yRALGQ6SAbYP');
     const pool = provider.open(await Pool.fromAddress(poolAddress));
     console.log(`Using Pool at ${pool.address.toString()}`);
-    // MAS
-    const reserveAddress = address('EQCP_v_hh0uTHIG_j6jpynQhazw3m1ZyEPR_aQMQTAsHMPxA');
-    const sampleJetton = provider.open(SampleJetton.fromAddress(reserveAddress));
+    //
+    const tokenAddress = address('EQAFy5Wqx0HmUVQFcSTNpceFAVa8WikjyIUvWxdbqd0BsE6D');
+    const sampleJetton = provider.open(SampleJetton.fromAddress(tokenAddress));
     const providerJettonWalletAddress = await sampleJetton.getGetWalletAddress(provider.sender().address!!);
     const providerJettonWallet = provider.open(JettonDefaultWallet.fromAddress(providerJettonWalletAddress));
     const walletDataBefore = await providerJettonWallet.getGetWalletData();
     console.log(`Provider Jetton Wallet balance(before): ${walletDataBefore.balance.toString()}`);
 
-    const amount = toNano(100n);
+    const amount = toNano(1n);
 
     const forward_payload: Cell = beginCell()
         .storeUint(0x55b591ba, 32)
         .endCell();
 
-    await providerJettonWallet.send(
+    await pool.send(
         provider.sender(),
         {
             value: toNano('0.15')
         },
         {
-            $$type: 'TokenTransfer',
-            queryId: 0n,
+            $$type: 'BorrowToken',
+            tokenAddress,
             amount: amount,
-            destination: pool.address,
-            response_destination: providerJettonWalletAddress,
-            custom_payload: null,
-            forward_ton_amount: toNano('0.05'),
-            forward_payload: forward_payload
         }
     );
 
@@ -47,6 +42,7 @@ export async function run(provider: NetworkProvider) {
         walletData = await providerJettonWallet.getGetWalletData();
         i++;
     }
+    console.log(`Current Jetton Wallet balance: ${walletData.balance.toString()}`);
 
-    console.log(`Supply Jetton: ${amount.toString()} to Pool at ${pool.address.toString()}`);
+    console.log(`Borrow Jetton: ${amount.toString()} to Pool at ${pool.address.toString()}`);
 }
