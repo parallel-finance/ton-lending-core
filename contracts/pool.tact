@@ -275,9 +275,8 @@ contract Pool with Deployable, Ownable, Resumable {
     }
 
     fun burnAToken(asset: Address, user: Address, amount: Int) {
-        let aTokenAddress: Address = self.reservesConfiguration.get(asset)!!.aTokenAddress;
         send(SendParameters{
-            to: aTokenAddress,
+            to: self.userATokenWalletAddress(asset, user),
             value: 0,
             bounce: true,
             mode: SendRemainingValue,
