@@ -35,6 +35,7 @@ struct ReserveData {
     accruedToTreasury: Int as coins;
     totalBorrow: Int as coins;
     lastUpdateTimestamp: Int as uint32;
+    price: Int as uint64;
 }
 struct ReserveCache {
     currentScaledDebt: Int;
@@ -66,4 +67,18 @@ struct CalculateInterestRatesParams {
 struct LiquidityRateAndBorrowRate {
     liquidityRate: Int;
     borrowRate: Int;
+}
+struct UserAccountHealthInfo {
+    // base in 10000
+    avgLtv: Int as uint16;
+    // base in 10000
+    avgLiquidationThreshold: Int as uint16;
+    // base in oracle price decimal: 10**9
+    totalSupplyInBaseCurrency: Int as uint128;
+    // base in oracle price decimal: 10**9
+    totalCollateralInBaseCurrency: Int as uint128;
+    // base in oracle price decimal: 10**9
+    totalDebtInBaseCurrency: Int as uint128;
+    // base in RAY
+    healthFactorInRay: Int as uint256;
 }

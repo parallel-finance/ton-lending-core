@@ -96,14 +96,16 @@ contract Pool with Deployable, Ownable, Resumable {
 
     receive(msg: UserAccountDataResponse) {
         // check if the request is for borrow
-        if(msg.action == 0) {
+        if(msg.action == ACTION_BORROW) {
+            let reserveAddress: Address = msg.tokenAddress;
+            let reserveConfigration: ReserveConfiguration = self.reservesConfiguration.get(reserveAddress)!!;
+            require(reserveConfigration.borrowingEnabled, "Borrowing disable for this token");
+
             let userAccountData: UserAccountData = msg.accountData;
-            let isHealthy: Bool = self.isHealthyForAction(msg.action, msg.amount, userAccountData, self.reservesData);
+            let isHealthy: Bool = self.isHealthyForAction(msg.action, msg.tokenAddress, msg.amount, userAccountData);
             if (isHealthy) {
                 let borrowAmount: Int = msg.amount;
-                let reserveAddress: Address = msg.tokenAddress;
                 let reserveData: ReserveData = self.reservesData.get(reserveAddress)!!;
-                let reserveConfigration: ReserveConfiguration = self.reservesConfiguration.get(reserveAddress)!!;
                 let reserveCache: ReserveCache = reserveData.cache(reserveConfigration);
                 // _updateIndexes and _accrueToTreasury
                 reserveCache = reserveData.updateState(reserveCache);
@@ -122,8 +124,77 @@ contract Pool with Deployable, Ownable, Resumable {
         }
     }
 
-    fun isHealthyForAction(action: Int, amount: Int, userAccountData: UserAccountData, reservesData: map<Address, ReserveData>): Bool {
+    // Notice: Only for Test
+    receive(msg: SetMockOraclePrice) {
+        let reserveData: ReserveData = self.reservesData.get(msg.asset)!!;
+        reserveData.price = msg.price;
+        self.reservesData.set(msg.asset, reserveData);
+    }
+
+    fun isHealthyForAction(
+        action: Int, 
+        reserve: Address,
+        amount: Int, 
+        userAccountData: UserAccountData
+    ): Bool {
+        let healthInfo: UserAccountHealthInfo = self.userAccountHealthInfo(userAccountData);
+        let reserveData: ReserveData = self.reservesData.get(reserve)!!;
+        if (action == ACTION_BORROW) {
+            require(healthInfo.healthFactorInRay >= RAY, "HF < 1");
+            let borrowAmountValue: Int = amount * reserveData.price / JETTON_UNIT;
+            let collateralNeeded: Int = borrowAmountValue.percentDiv(healthInfo.avgLtv);
+            require(healthInfo.totalDebtInBaseCurrency + collateralNeeded <= healthInfo.totalCollateralInBaseCurrency, "collateral can't cover new borrow");
+        }
+        if (action == ACTION_WITHDRAW) {
+            require(healthInfo.healthFactorInRay >= RAY, "HF < 1");
+        }
+        if (action == ACTION_LIQUIDATION) {
+            require(healthInfo.healthFactorInRay < RAY, "HF >= 1");
+        }
+
         return true;
+    }
+
+    get fun userAccountHealthInfo(userAccountData: UserAccountData): UserAccountHealthInfo {
+        // sum(reserve supply amount * reserve price)
+        let totalSupply: Int = 0;
+        // sum(reserve Collateral amount * reserve price)
+        let totalCollateral: Int = 0;
+        // sum(reserve Collateral amount * reserve price * reserve ltv)
+        let totalCollateralMulLtv: Int = 0;
+        // sum(reserve Collateral amount * reserve price * reserve LiquidationThreshold)
+        let totalCollateralMulLT: Int = 0;
+        // sum(reserve borrow amount * reserve price)
+        let totalDebt: Int = 0;
+
+        foreach (reserve, tokenData in userAccountData.positionsDetail) {
+            let reserveData: ReserveData = self.reservesData.get(reserve)!!;
+            let reserveConfiguration: ReserveConfiguration = self.reservesConfiguration.get(reserve)!!;
+            
+            if (tokenData.supply > 0) {
+                let normalizedIncome: Int = reserveData.getNormalizedIncome();
+                let supplyValue: Int = tokenData.supply.rayMul(normalizedIncome) * reserveData.price / JETTON_UNIT;
+                totalSupply += supplyValue;
+                if (tokenData.asCollateral) {
+                    totalCollateral += supplyValue;
+                    totalCollateralMulLtv += supplyValue * reserveConfiguration.ltv;
+                    totalCollateralMulLT += supplyValue  * reserveConfiguration.liquidationThreshold;
+                }
+            }
+            if (tokenData.borrow > 0) {
+                let normalizedDebt: Int = reserveData.getNormalizedDebt();
+                let borrowValue: Int = tokenData.borrow.rayMul(normalizedDebt) * reserveData.price / JETTON_UNIT;
+                totalDebt += borrowValue;
+            }
+        }
+        return UserAccountHealthInfo{
+            avgLtv: totalCollateralMulLtv / totalCollateral,
+            avgLiquidationThreshold: totalCollateralMulLT / totalCollateral,
+            totalSupplyInBaseCurrency: totalSupply,
+            totalCollateralInBaseCurrency: totalCollateral,
+            totalDebtInBaseCurrency: totalDebt,
+            healthFactorInRay: totalDebt != 0 ? (totalCollateralMulLT / PERCENTAGE_FACTOR).rayDiv(totalDebt) : UINT256_MAX // base in RAY
+        };
     }
 
     fun mintAToken(asset: Address, user: Address, amount: Int) {
@@ -304,7 +375,8 @@ contract Pool with Deployable, Ownable, Resumable {
         availableLiquidity: 0,
         accruedToTreasury: 0,
         totalBorrow: 0,
-        lastUpdateTimestamp: now
+        lastUpdateTimestamp: now,
+        price: 0
         };
         self.reserveInterestRateStrategy.set(reserveAddress, interestRateStrategy);
         self.reserves.set(self.reservesLength, reserveAddress);

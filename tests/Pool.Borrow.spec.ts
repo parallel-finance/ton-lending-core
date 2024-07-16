@@ -9,6 +9,7 @@ import { UserAccount } from '../build/Pool/tact_UserAccount';
 import { DTokenDefaultWallet } from '../build/DToken/tact_DTokenDefaultWallet';
 import { AToken } from '../wrappers/AToken';
 import { DToken } from '../wrappers/DToken';
+import { PERCENTAGE_FACTOR, RAY } from '../helpers/constant';
 
 describe('Pool', () => {
     let blockchain: Blockchain;
@@ -19,6 +20,8 @@ describe('Pool', () => {
     let aToken: SandboxContract<AToken>;
     let dToken: SandboxContract<DToken>;
     let contents: ATokenDTokenContents;
+
+    let rst;
 
     const reserveAddress = address('UQAEJ7U1iaC1TzcFel5lc2-JaEm8I0k5Krui3fzz3_GeANWV');
 
@@ -172,6 +175,25 @@ describe('Pool', () => {
             },
         );
 
+        rst = await pool.send(
+            deployer.getSender(),
+            {
+                value: toNano('0.2'),
+            },
+            {
+                $$type: 'SetMockOraclePrice',
+                asset: sampleJetton.address,
+                price: toNano('1'),
+            },
+        );
+
+        // SetMockOraclePrice
+        expect(rst.transactions).toHaveTransaction({
+            from: deployer.address,
+            to: pool.address,
+            success: true,
+        });
+
         const calculateATokenAddress = await pool.getCalculateATokenAddress(
             contents.aTokenContent,
             sampleJetton.address,
@@ -218,7 +240,7 @@ describe('Pool', () => {
             const result = await pool.send(
                 deployer.getSender(),
                 {
-                    value: toNano('0.1'),
+                    value: toNano('0.2'),
                 },
                 {
                     $$type: 'BorrowToken',
@@ -270,13 +292,117 @@ describe('Pool', () => {
             expect(accountData.positionsDetail?.get(sampleJetton.address)!!.borrow).toEqual(toNano(50n));
 
             const deployerDTokenDefaultWalletAddress = await dToken.getGetWalletAddress(deployer.address);
-            const deployerDTokenDefaultWallet = blockchain.openContract(DTokenDefaultWallet.fromAddress(deployerDTokenDefaultWalletAddress))
+            const deployerDTokenDefaultWallet = blockchain.openContract(
+                DTokenDefaultWallet.fromAddress(deployerDTokenDefaultWalletAddress),
+            );
 
             const walletData = await deployerDTokenDefaultWallet.getGetWalletData();
             expect(walletData.balance).toEqual(toNano(50n));
             expect(walletData.owner.toString()).toEqual(deployer.address.toString());
         });
-    })
+        it('check hf successfully', async () => {
+            const userAccountAddress = await UserAccount.fromInit(pool.address, deployer.address);
+            const borrowAmount = toNano(60n);
+
+            const result = await pool.send(
+                deployer.getSender(),
+                {
+                    value: toNano('0.2'),
+                },
+                {
+                    $$type: 'BorrowToken',
+                    tokenAddress: sampleJetton.address,
+                    amount: borrowAmount,
+                },
+            );
+
+            // BorrowToken
+            expect(result.transactions).toHaveTransaction({
+                from: deployer.address,
+                to: pool.address,
+                success: true,
+            });
+
+            // GetUserAccountData
+            expect(result.transactions).toHaveTransaction({
+                from: pool.address,
+                to: userAccountAddress.address,
+                success: true,
+            });
+
+            // UserAccountDataResponse
+            expect(result.transactions).toHaveTransaction({
+                from: userAccountAddress.address,
+                to: pool.address,
+                success: true,
+            });
+
+            // UpdateUserAccountData
+            expect(result.transactions).toHaveTransaction({
+                from: pool.address,
+                to: userAccountAddress.address,
+                success: true,
+            });
+
+            // Mint dToken
+            expect(result.transactions).toHaveTransaction({
+                from: pool.address,
+                to: dToken.address,
+                success: true,
+            });
+
+            const userAccountContract = blockchain.openContract(userAccountAddress);
+            const accountData = await userAccountContract.getAccount();
+
+            let userHealthInfo = await pool.getUserAccountHealthInfo(accountData);
+            expect(userHealthInfo.avgLtv).toEqual(reserveConfiguration.ltv);
+            expect(userHealthInfo.avgLiquidationThreshold).toEqual(reserveConfiguration.liquidationThreshold);
+            expect(userHealthInfo.totalCollateralInBaseCurrency).toEqual(100n * toNano(1));
+            expect(userHealthInfo.totalSupplyInBaseCurrency).toEqual(100n * toNano(1));
+            expect(userHealthInfo.totalDebtInBaseCurrency).toEqual(60n * toNano(1));
+            expect(userHealthInfo.healthFactorInRay).toEqual(
+                (100n * toNano(1) * reserveConfiguration.liquidationThreshold * RAY) /
+                    (PERCENTAGE_FACTOR * 60n * toNano(1)),
+            );
+        });
+
+        it('should borrow failed', async () => {
+            const userAccountAddress = await UserAccount.fromInit(pool.address, deployer.address);
+            const borrowAmount = toNano(60n) + 1n;
+            const result = await pool.send(
+                deployer.getSender(),
+                {
+                    value: toNano('0.2'),
+                },
+                {
+                    $$type: 'BorrowToken',
+                    tokenAddress: sampleJetton.address,
+                    amount: borrowAmount,
+                },
+            );
+
+            // BorrowToken
+            expect(result.transactions).toHaveTransaction({
+                from: deployer.address,
+                to: pool.address,
+                success: true,
+            });
+
+            // GetUserAccountData
+            expect(result.transactions).toHaveTransaction({
+                from: pool.address,
+                to: userAccountAddress.address,
+                success: true,
+            });
+
+            // UserAccountDataResponse
+            expect(result.transactions).toHaveTransaction({
+                from: userAccountAddress.address,
+                to: pool.address,
+                success: false,
+            });
+        });
+    });
 
     it('should bounce if the borrowed asset is not configured for borrowing', async () => {
         const result = await pool.send(
@@ -288,7 +414,7 @@ describe('Pool', () => {
                 $$type: 'BorrowToken',
                 tokenAddress: deployer.address,
                 amount: toNano(50n),
-            }
+            },
         );
 
         expect(result.transactions).toHaveTransaction({
@@ -296,5 +422,5 @@ describe('Pool', () => {
             to: pool.address,
             success: false,
         });
-    })
+    });
 });
