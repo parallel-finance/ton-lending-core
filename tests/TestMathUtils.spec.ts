@@ -10,9 +10,9 @@ describe('TestMathUtils', () => {
     let mathUtils: SandboxContract<TestMathUtils>;
     let testWadRayPercentageMath: SandboxContract<TestWadRayPercentageMath>;
 
-    const WAD = BigInt(10 ** 18);
-    const RAY = BigInt(10 ** 27);
-    const SECONDS_PER_YEAR = BigInt(365 * 24 * 3600);
+    const WAD = 10n ** 18n;
+    const RAY = 10n ** 27n;
+    const SECONDS_PER_YEAR = 365n * 24n * 60n * 60n;
 
     beforeEach(async () => {
         blockchain = await Blockchain.create();
