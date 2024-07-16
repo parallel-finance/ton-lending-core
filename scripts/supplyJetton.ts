@@ -5,8 +5,9 @@ import { SampleJetton } from '../build/SampleJetton/tact_SampleJetton';
 import { JettonDefaultWallet } from '../build/SampleJetton/tact_JettonDefaultWallet';
 
 export async function run(provider: NetworkProvider) {
-    const pool = provider.open(await Pool.fromInit());
-    console.log(`Deployed Pool at ${pool.address.toString()}`);
+    const poolAddress = address('EQBD3bhuWfqt4R4fJNR0VFCla3xMJqSFKDtrAhxybOiyzjKn');
+    const pool = provider.open(await Pool.fromAddress(poolAddress));
+    console.log(`Using Pool at ${pool.address.toString()}`);
     const reserveAddress = address('EQAFy5Wqx0HmUVQFcSTNpceFAVa8WikjyIUvWxdbqd0BsE6D');
     const sampleJetton = provider.open(SampleJetton.fromAddress(reserveAddress));
     const providerJettonWalletAddress = await sampleJetton.getGetWalletAddress(provider.sender().address!!);
@@ -23,7 +24,7 @@ export async function run(provider: NetworkProvider) {
     await providerJettonWallet.send(
         provider.sender(),
         {
-            value: toNano('0.1')
+            value: toNano('0.15')
         },
         {
             $$type: 'TokenTransfer',
