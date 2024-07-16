@@ -7,4 +7,5 @@ export const config: Config = {
         version: 'v2',
         key: '' // Your API key here,
     },
+    separateCompilables: true
 };
