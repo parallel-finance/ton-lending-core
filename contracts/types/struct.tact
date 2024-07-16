@@ -11,7 +11,7 @@ struct ReserveConfiguration {
     liquidationProtocolFee: Int as uint16;
     // supply and borrow configuration
     isActive: Bool;
-    isFrozen: Bool;
+    isFrozen: Bool; // disable supply and borrow
     borrowingEnabled: Bool;
     supplyCap: Int as coins;
     borrowCap: Int as coins;

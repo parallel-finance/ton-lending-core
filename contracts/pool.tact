@@ -63,6 +63,9 @@ contract Pool with Deployable, Ownable, Resumable {
             self.mintAToken(msg.asset, msg.user, msg.supply);
         }
         // for withdraw
+        if (msg.supply < 0) {
+            self.burnAToken(msg.asset, msg.user, -msg.supply);
+        }
         // for repay
         // for borrow
         if (msg.borrow > 0) {
@@ -94,33 +97,68 @@ contract Pool with Deployable, Ownable, Resumable {
         self.queryId += 1;
     }
 
+    receive(msg: WithdrawToken) {
+        // send message to get user account data
+        let userAccountInit: StateInit = initOf UserAccount(myAddress(), sender());
+        let userAccountAddress: Address = contractAddress(userAccountInit);
+        let reserveAddress: Address = msg.tokenAddress;
+        let reserveConfiguration: ReserveConfiguration? = self.reservesConfiguration.get(reserveAddress);
+        require(reserveConfiguration != null, "Reserve not found");
+
+        send(SendParameters{
+            to: userAccountAddress,
+            value: 0,
+            bounce: false,
+            mode: SendRemainingValue,
+            body: GetUserAccountData{
+                queryId: self.queryId,
+                user: context().sender,
+                action: ACTION_WITHDRAW,
+                tokenAddress: msg.tokenAddress,
+                amount: msg.amount
+            }.toCell()
+        });
+        self.queryId += 1;
+    }
+
     receive(msg: UserAccountDataResponse) {
-        // check if the request is for borrow
+        let reserveAddress: Address = msg.tokenAddress;
+        let userAccountData: UserAccountData = msg.accountData;
+
+        self.validateForAction(msg.action, msg.tokenAddress, msg.amount, userAccountData);
+
+        let reserveData: ReserveData = self.reservesData.get(reserveAddress)!!;
+        let reserveConfigration: ReserveConfiguration = self.reservesConfiguration.get(reserveAddress)!!;
+        let reserveCache: ReserveCache = reserveData.cache(reserveConfigration);
+        // _updateIndexes and _accrueToTreasury
+        reserveCache = reserveData.updateState(reserveCache);
+
+        let rateStrategy: ReserveInterestRateStrategy = self.reserveInterestRateStrategy.get(reserveAddress)!!;
+
         if(msg.action == ACTION_BORROW) {
-            let reserveAddress: Address = msg.tokenAddress;
-            let reserveConfigration: ReserveConfiguration = self.reservesConfiguration.get(reserveAddress)!!;
-            require(reserveConfigration.borrowingEnabled, "Borrowing disable for this token");
+            let borrowAmount: Int = msg.amount;
+            // updateInterestRates
+            reserveData.updateInterestRates(reserveCache, rateStrategy, 0, borrowAmount);
 
-            let userAccountData: UserAccountData = msg.accountData;
-            let isHealthy: Bool = self.isHealthyForAction(msg.action, msg.tokenAddress, msg.amount, userAccountData);
-            if (isHealthy) {
-                let borrowAmount: Int = msg.amount;
-                let reserveData: ReserveData = self.reservesData.get(reserveAddress)!!;
-                let reserveCache: ReserveCache = reserveData.cache(reserveConfigration);
-                // _updateIndexes and _accrueToTreasury
-                reserveCache = reserveData.updateState(reserveCache);
+            // update liquidity and set reserveData to storage back;
+            let scaledBorrowAmount: Int = borrowAmount.rayDiv(reserveCache.nextBorrowIndex);
+            reserveData.availableLiquidity -= borrowAmount;
+            reserveData.totalBorrow += scaledBorrowAmount;
+            self.reservesData.set(reserveAddress, reserveData);
+            self.updateUserAccountPosition(msg.queryId, msg.user, msg.tokenAddress, 0, scaledBorrowAmount);   
+        }
 
-                // updateInterestRates
-                let rateStrategy: ReserveInterestRateStrategy = self.reserveInterestRateStrategy.get(reserveAddress)!!;
-                reserveData.updateInterestRates(reserveCache, rateStrategy, 0, borrowAmount);
+        if(msg.action == ACTION_WITHDRAW) {
+            let withdrawAmount: Int = msg.amount;
+            // updateInterestRates
+            reserveData.updateInterestRates(reserveCache, rateStrategy, 0, withdrawAmount);
 
-                // update liquidity and set reserveData to storage back;
-                let scaledBorrowAmount: Int = borrowAmount.rayDiv(reserveCache.nextBorrowIndex);
-                reserveData.availableLiquidity -= borrowAmount;
-                reserveData.totalBorrow += scaledBorrowAmount;
-                self.reservesData.set(reserveAddress, reserveData);
-                self.updateUserAccountPosition(msg.queryId, msg.user, msg.tokenAddress, 0, scaledBorrowAmount);
-            }
+            // update liquidity and set reserveData to storage back;
+            let scaledWithdrawAmount: Int = withdrawAmount.rayDiv(reserveCache.nextLiquidityIndex);
+            reserveData.availableLiquidity -= withdrawAmount;
+            reserveData.totalSupply -= scaledWithdrawAmount;
+            self.reservesData.set(reserveAddress, reserveData);
+            self.updateUserAccountPosition(msg.queryId, msg.user, msg.tokenAddress, -scaledWithdrawAmount, 0);   
         }
     }
 
@@ -131,7 +169,7 @@ contract Pool with Deployable, Ownable, Resumable {
         self.reservesData.set(msg.asset, reserveData);
     }
 
-    fun isHealthyForAction(
+    fun validateForAction(
         action: Int, 
         reserve: Address,
         amount: Int, 
@@ -139,14 +177,39 @@ contract Pool with Deployable, Ownable, Resumable {
     ): Bool {
         let healthInfo: UserAccountHealthInfo = self.userAccountHealthInfo(userAccountData);
         let reserveData: ReserveData = self.reservesData.get(reserve)!!;
+        let reserveConfigration: ReserveConfiguration = self.reservesConfiguration.get(reserve)!!;
         if (action == ACTION_BORROW) {
+            // 1. check borrowingEnabled
+            // 2. check reserve isActive / isFrozen
+            // 3. check reserve availableLiquidity
+            // 4. check HF for borrow
+            require(reserveConfigration.borrowingEnabled, "Borrowing disable for this token");
+            require(reserveConfigration.isActive, "Token inactive");
+            require(!reserveConfigration.isFrozen, "Token Frozen");
+            require(reserveData.availableLiquidity >= amount, "invalid available liquidity");
+
             require(healthInfo.healthFactorInRay >= RAY, "HF < 1");
             let borrowAmountValue: Int = amount * reserveData.price / JETTON_UNIT;
             let collateralNeeded: Int = borrowAmountValue.percentDiv(healthInfo.avgLtv);
             require(healthInfo.totalDebtInBaseCurrency + collateralNeeded <= healthInfo.totalCollateralInBaseCurrency, "collateral can't cover new borrow");
         }
         if (action == ACTION_WITHDRAW) {
+            // 1. check reserve isActive
+            // 2. check reserve availableLiquidity
+            // 3. check withdraw amount <= supply position
+            // 4. check HF
+            require(reserveConfigration.isActive, "Token inactive");
+            require(reserveData.availableLiquidity >= amount, "invalid available liquidity");
+            
+            let userReservePosition: TokenData = userAccountData.positionsDetail.get(reserve)!!;
+            let normalizedIncome: Int = reserveData.getNormalizedIncome();
+            require(userReservePosition.supply.rayMul(normalizedIncome) >= amount, "invalid user supply position");
+
             require(healthInfo.healthFactorInRay >= RAY, "HF < 1");
+            let withdrawValue: Int = amount * reserveData.price / JETTON_UNIT;
+            let withdrawValueMulLT: Int = withdrawValue.percentMul(reserveConfigration.liquidationThreshold);
+            let totalCollateralMulLT: Int = healthInfo.totalCollateralInBaseCurrency.percentMul(healthInfo.avgLiquidationThreshold);
+            require(totalCollateralMulLT - withdrawValueMulLT >= healthInfo.totalDebtInBaseCurrency, "the left collateral can't cover debt");
         }
         if (action == ACTION_LIQUIDATION) {
             require(healthInfo.healthFactorInRay < RAY, "HF >= 1");
@@ -207,6 +270,22 @@ contract Pool with Deployable, Ownable, Resumable {
             body: Mint{
                 amount: amount,
                 receiver: user
+            }.toCell()
+        });
+    }
+
+    fun burnAToken(asset: Address, user: Address, amount: Int) {
+        let aTokenAddress: Address = self.reservesConfiguration.get(asset)!!.aTokenAddress;
+        send(SendParameters{
+            to: aTokenAddress,
+            value: 0,
+            bounce: true,
+            mode: SendRemainingValue,
+            body: TokenBurn{
+                queryId: self.queryId,
+                amount: amount,
+                owner: user,
+                response_destination: user // This field isn't used in TokenBurn
             }.toCell()
         });
     }
