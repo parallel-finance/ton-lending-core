@@ -158,6 +158,19 @@ describe('Pool', () => {
 
         // add reserve
         const poolWalletAddress = await sampleJetton.getGetWalletAddress(pool.address);
+
+        const calculateATokenAddress = await pool.getCalculateATokenAddress(
+            contents.aTokenContent,
+            sampleJetton.address,
+        );
+
+        const calculateDTokenAddress = await pool.getCalculateDTokenAddress(
+            contents.dTokenContent,
+            sampleJetton.address,
+        );
+        reserveConfiguration.aTokenAddress = calculateATokenAddress;
+        reserveConfiguration.dTokenAddress = calculateDTokenAddress
+
         const result = await pool.send(
             deployer.getSender(),
             {
@@ -193,17 +206,6 @@ describe('Pool', () => {
             to: pool.address,
             success: true,
         });
-
-        const calculateATokenAddress = await pool.getCalculateATokenAddress(
-            contents.aTokenContent,
-            sampleJetton.address,
-        );
-
-        const calculateDTokenAddress = await pool.getCalculateDTokenAddress(
-            contents.dTokenContent,
-            sampleJetton.address,
-        );
-        console.log('calculateDTokenAddress', calculateDTokenAddress.toString());
 
         aToken = blockchain.openContract(AToken.fromAddress(calculateATokenAddress));
         dToken = blockchain.openContract(DToken.fromAddress(calculateDTokenAddress));

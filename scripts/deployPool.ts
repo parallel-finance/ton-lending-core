@@ -16,6 +16,7 @@ export async function run(provider: NetworkProvider) {
         }
     );
 
-    // EQBYOuZE7FA9LUvxSXaeQBB0O64ihtEJQPkvvLmcFbUNKPl-
+    // latest: EQBD3bhuWfqt4R4fJNR0VFCla3xMJqSFKDtrAhxybOiyzjKn
     await provider.waitForDeploy(pool.address);
+    console.log(`Deployed at ${pool.address.toString()}`);
 }
