@@ -17,16 +17,16 @@ message(0x66660003) BorrowToken {
 }
 message(0x66660004) GetUserAccountData {
     queryId: Int as uint64;
-    borrower: Address;
+    user: Address;
     // 0: borrow, 1: withdraw, 2: transfer aToken, 3: liquidation
     action: Int as uint8;
     tokenAddress: Address;
     amount: Int as coins;
 }
 // TODO: update the message id
-message(0x66660004) UserAccountDataResponse {
+message(0x66660005) UserAccountDataResponse {
     queryId: Int as uint64;
-    borrower: Address;
+    user: Address;
     // 0: borrow, 1: withdraw, 2: transfer aToken, 3: liquidation
     action: Int as uint8;
     tokenAddress: Address;

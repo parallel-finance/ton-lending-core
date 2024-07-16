@@ -1,11 +1,12 @@
-import { Address, address, toNano } from '@ton/core';
+import { Address, address, OpenedContract, toNano } from '@ton/core';
 import { NetworkProvider, sleep } from '@ton/blueprint';
 import { ATokenDTokenContents, Pool, ReserveConfiguration, ReserveInterestRateStrategy } from '../wrappers/Pool';
 import { SampleJetton } from '../wrappers/SampleJetton';
 import { buildOnchainMetadata } from './utils';
 
-const addFirstReserve = async (provider: NetworkProvider, poolAddress: Address) => {
-    const pool = provider.open(await Pool.fromAddress(poolAddress));
+const RAY = 10n ** 27n;
+
+const addFirstReserve = async (provider: NetworkProvider, pool: OpenedContract<Pool>) => {
     // Add SAM
     const reserveAddress = address('EQAFy5Wqx0HmUVQFcSTNpceFAVa8WikjyIUvWxdbqd0BsE6D');
     const sampleJetton = provider.open(SampleJetton.fromAddress(reserveAddress));
@@ -27,8 +28,8 @@ const addFirstReserve = async (provider: NetworkProvider, poolAddress: Address) 
         isActive: true,
         isFrozen: false,
         borrowingEnabled: true,
-        supplyCap: 1000000n,
-        borrowCap: 1000000n,
+        supplyCap: toNano(1000000n),
+        borrowCap: toNano(1000000n),
     };
 
     const aTokenJettonParams = {
@@ -52,30 +53,24 @@ const addFirstReserve = async (provider: NetworkProvider, poolAddress: Address) 
         dTokenContent,
     };
 
-    const calculateATokenAddress = await pool.getCalculateATokenAddress(
-        contents.aTokenContent,
-        sampleJetton.address,
-    );
+    const calculateATokenAddress = await pool.getCalculateATokenAddress(contents.aTokenContent, sampleJetton.address);
     await sleep(2000);
     console.log(`calculateATokenAddress: ${calculateATokenAddress.toString()}`);
 
-    const calculateDTokenAddress = await pool.getCalculateDTokenAddress(
-        contents.dTokenContent,
-        sampleJetton.address,
-    );
+    const calculateDTokenAddress = await pool.getCalculateDTokenAddress(contents.dTokenContent, sampleJetton.address);
     await sleep(2000);
     console.log(`calculateDTokenAddress: ${calculateDTokenAddress.toString()}`);
 
     reserveConfiguration.aTokenAddress = calculateATokenAddress;
-    reserveConfiguration.dTokenAddress = calculateDTokenAddress
+    reserveConfiguration.dTokenAddress = calculateDTokenAddress;
 
     const reserveInterestRateStrategy: ReserveInterestRateStrategy = {
         $$type: 'ReserveInterestRateStrategy',
-        optimalUsageRatio: BigInt(0.9 * 10 ** 27),
-        maxUsageRatio: BigInt(10 ** 27) - BigInt(0.9 * 10 ** 27),
+        optimalUsageRatio: (RAY * 9n) / 10n,
+        maxUsageRatio: RAY / 10n,
         baseBorrowRate: 0n,
-        slope1: BigInt(0.04 * 10 ** 27),
-        slope2: BigInt(0.6 * 10 ** 27),
+        slope1: (RAY * 4n) / 100n,
+        slope2: (RAY * 6n) / 10n,
     };
     await sleep(2000);
     console.log('send AddReserve...');
@@ -103,14 +98,10 @@ const addFirstReserve = async (provider: NetworkProvider, poolAddress: Address) 
         i++;
         console.log(`Waiting for first reserve to be added... ${i}`);
     }
-    console.log('First reserve added')
+    console.log('First reserve added');
+};
 
-
-}
-
-const addSecondReserve = async (provider: NetworkProvider, poolAddress: Address) => {
-    await sleep(2000);
-    const pool = provider.open(await Pool.fromAddress(poolAddress));
+const addSecondReserve = async (provider: NetworkProvider, pool: OpenedContract<Pool>) => {
     // add MAS
     const reserveAddress = address('EQCP_v_hh0uTHIG_j6jpynQhazw3m1ZyEPR_aQMQTAsHMPxA');
     const sampleJetton = provider.open(SampleJetton.fromAddress(reserveAddress));
@@ -132,8 +123,8 @@ const addSecondReserve = async (provider: NetworkProvider, poolAddress: Address)
         isActive: true,
         isFrozen: false,
         borrowingEnabled: true,
-        supplyCap: 1000000n,
-        borrowCap: 1000000n,
+        supplyCap: toNano(1000000n),
+        borrowCap: toNano(1000000n),
     };
 
     const aTokenJettonParams = {
@@ -157,30 +148,24 @@ const addSecondReserve = async (provider: NetworkProvider, poolAddress: Address)
         dTokenContent,
     };
 
-    const calculateATokenAddress = await pool.getCalculateATokenAddress(
-        contents.aTokenContent,
-        sampleJetton.address,
-    );
+    const calculateATokenAddress = await pool.getCalculateATokenAddress(contents.aTokenContent, sampleJetton.address);
     await sleep(2000);
     console.log(`calculateATokenAddress: ${calculateATokenAddress.toString()}`);
 
-    const calculateDTokenAddress = await pool.getCalculateDTokenAddress(
-        contents.dTokenContent,
-        sampleJetton.address,
-    );
+    const calculateDTokenAddress = await pool.getCalculateDTokenAddress(contents.dTokenContent, sampleJetton.address);
     await sleep(2000);
     console.log(`calculateATokenAddress: ${calculateDTokenAddress.toString()}`);
 
     reserveConfiguration.aTokenAddress = calculateATokenAddress;
-    reserveConfiguration.dTokenAddress = calculateDTokenAddress
+    reserveConfiguration.dTokenAddress = calculateDTokenAddress;
 
     const reserveInterestRateStrategy: ReserveInterestRateStrategy = {
         $$type: 'ReserveInterestRateStrategy',
-        optimalUsageRatio: BigInt(0.9 * 10 ** 27),
-        maxUsageRatio: BigInt(10 ** 27) - BigInt(0.9 * 10 ** 27),
+        optimalUsageRatio: (RAY * 9n) / 10n,
+        maxUsageRatio: RAY / 10n,
         baseBorrowRate: 0n,
-        slope1: BigInt(0.04 * 10 ** 27),
-        slope2: BigInt(0.6 * 10 ** 27),
+        slope1: (RAY * 4n) / 100n,
+        slope2: (RAY * 6n) / 10n,
     };
 
     await sleep(2000);
@@ -207,22 +192,28 @@ const addSecondReserve = async (provider: NetworkProvider, poolAddress: Address)
         i++;
         console.log(`Waiting for second reserve to be added... ${i}`);
     }
-    console.log('Second reserve added')
-}
+    console.log('Second reserve added');
+};
 
-const printCurrentReserveLength = async (provider: NetworkProvider, poolAddress: Address) => {
-    await sleep(2000);
-    const pool = provider.open(await Pool.fromAddress(poolAddress));
+const printCurrentReserveLength = async (provider: NetworkProvider, pool: OpenedContract<Pool>) => {
     const currentReserveLength = await pool.getReservesLength();
     console.log(`Current reserve length: ${currentReserveLength}`);
-}
+};
 
 export async function run(provider: NetworkProvider) {
-    const poolAddress = address('EQDtBATSpYPnbTit8CwFcTNLWS9fHMDdhwq7yRALGQ6SAbYP');
-    const pool = provider.open(await Pool.fromAddress(poolAddress));
+    const pool = provider.open(await Pool.fromInit());
     await sleep(1000);
 
-    await addFirstReserve(provider, poolAddress);
-    await addSecondReserve(provider, poolAddress);
-    await printCurrentReserveLength(provider, poolAddress);
+    const beforeReserveLength = await pool.getReservesLength();
+    if (beforeReserveLength > 0) {
+        console.log(`Reserves already added, current reserve length: ${beforeReserveLength}`);
+        return;
+    }
+    console.log(`Before reserve length: ${beforeReserveLength}`);
+
+    await sleep(1000);
+    await addFirstReserve(provider, pool);
+    await addSecondReserve(provider, pool);
+    const currentReserveLength = await pool.getReservesLength();
+    console.log(`Current reserve length: ${currentReserveLength}`);
 }

@@ -13,8 +13,8 @@ struct ReserveConfiguration {
     isActive: Bool;
     isFrozen: Bool;
     borrowingEnabled: Bool;
-    supplyCap: Int as uint32;
-    borrowCap: Int as uint32;
+    supplyCap: Int as coins;
+    borrowCap: Int as coins;
 }
 struct ReserveInterestRateStrategy {
     optimalUsageRatio: Int as uint128;

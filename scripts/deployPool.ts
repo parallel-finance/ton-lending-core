@@ -1,8 +1,6 @@
 import { toNano } from '@ton/core';
 import { Pool } from '../wrappers/Pool';
-import { NetworkProvider } from '@ton/blueprint';
-
-const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+import { NetworkProvider, sleep } from '@ton/blueprint';
 
 export async function run(provider: NetworkProvider) {
     console.log('Deploying pool...')
@@ -20,7 +18,7 @@ export async function run(provider: NetworkProvider) {
         }
     );
     await sleep(2000);
-    // latest: EQDtBATSpYPnbTit8CwFcTNLWS9fHMDdhwq7yRALGQ6SAbYP
+    // latest: EQAc4cOJOD_xftw0yzTUPviPpc3v24c_bJsXQPeipl1bKsqO
     await provider.waitForDeploy(pool.address);
     console.log(`Deployed at ${pool.address.toString()}`);
 }

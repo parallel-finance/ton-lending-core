@@ -85,7 +85,7 @@ contract Pool with Deployable, Ownable, Resumable {
             mode: SendRemainingValue,
             body: GetUserAccountData{
                 queryId: self.queryId,
-                borrower: context().sender,
+                user: context().sender,
                 action: ACTION_BORROW,
                 tokenAddress: msg.tokenAddress,
                 amount: msg.amount
@@ -119,7 +119,7 @@ contract Pool with Deployable, Ownable, Resumable {
                 reserveData.availableLiquidity -= borrowAmount;
                 reserveData.totalBorrow += scaledBorrowAmount;
                 self.reservesData.set(reserveAddress, reserveData);
-                self.updateUserAccountPosition(msg.queryId, msg.borrower, msg.tokenAddress, 0, scaledBorrowAmount);
+                self.updateUserAccountPosition(msg.queryId, msg.user, msg.tokenAddress, 0, scaledBorrowAmount);
             }
         }
     }

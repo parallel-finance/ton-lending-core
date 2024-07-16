@@ -5,9 +5,7 @@ import { SampleJetton } from '../build/SampleJetton/tact_SampleJetton';
 import { JettonDefaultWallet } from '../build/SampleJetton/tact_JettonDefaultWallet';
 
 export async function run(provider: NetworkProvider) {
-    const poolAddress = address('EQDtBATSpYPnbTit8CwFcTNLWS9fHMDdhwq7yRALGQ6SAbYP');
-    const pool = provider.open(await Pool.fromAddress(poolAddress));
-    console.log(`Using Pool at ${pool.address.toString()}`);
+    const pool = provider.open(await Pool.fromInit());
     // MAS
     const reserveAddress = address('EQCP_v_hh0uTHIG_j6jpynQhazw3m1ZyEPR_aQMQTAsHMPxA');
     const sampleJetton = provider.open(SampleJetton.fromAddress(reserveAddress));
@@ -16,7 +14,7 @@ export async function run(provider: NetworkProvider) {
     const walletDataBefore = await providerJettonWallet.getGetWalletData();
     console.log(`Provider Jetton Wallet balance(before): ${walletDataBefore.balance.toString()}`);
 
-    const amount = toNano(100n);
+    const amount = toNano(10n);
 
     const forward_payload: Cell = beginCell()
         .storeUint(0x55b591ba, 32)
@@ -25,16 +23,17 @@ export async function run(provider: NetworkProvider) {
     await providerJettonWallet.send(
         provider.sender(),
         {
-            value: toNano('0.15')
+            value: toNano('0.25')
         },
         {
             $$type: 'TokenTransfer',
             queryId: 0n,
             amount: amount,
             destination: pool.address,
+            // Should we use null or handle the Excess message?
             response_destination: providerJettonWalletAddress,
             custom_payload: null,
-            forward_ton_amount: toNano('0.05'),
+            forward_ton_amount: toNano('0.15'),
             forward_payload: forward_payload
         }
     );
