@@ -1,9 +1,11 @@
 import { toNano } from '@ton/core';
 import { Pool } from '../wrappers/Pool';
-import { NetworkProvider } from '@ton/blueprint';
+import { NetworkProvider, sleep } from '@ton/blueprint';
 
 export async function run(provider: NetworkProvider) {
+    console.log('Deploying pool...')
     const pool = provider.open(await Pool.fromInit());
+    await sleep(2000);
 
     await pool.send(
         provider.sender(),
@@ -15,8 +17,8 @@ export async function run(provider: NetworkProvider) {
             queryId: 0n,
         }
     );
-
-    // latest: EQBD3bhuWfqt4R4fJNR0VFCla3xMJqSFKDtrAhxybOiyzjKn
+    await sleep(2000);
+    // latest: EQAc4cOJOD_xftw0yzTUPviPpc3v24c_bJsXQPeipl1bKsqO
     await provider.waitForDeploy(pool.address);
     console.log(`Deployed at ${pool.address.toString()}`);
 }

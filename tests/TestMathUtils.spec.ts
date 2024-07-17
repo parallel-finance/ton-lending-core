@@ -2,21 +2,24 @@ import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
 import { toNano } from '@ton/core';
 import '@ton/test-utils';
 import { TestMathUtils } from '../build/TestMathUtils/tact_TestMathUtils';
+import { TestWadRayPercentageMath } from '../build/TestWadRayPercentageMath/tact_TestWadRayPercentageMath';
 
 describe('TestMathUtils', () => {
     let blockchain: Blockchain;
     let deployer: SandboxContract<TreasuryContract>;
     let mathUtils: SandboxContract<TestMathUtils>;
+    let testWadRayPercentageMath: SandboxContract<TestWadRayPercentageMath>;
 
-    const WAD = BigInt(10 ** 18);
-    const RAY = BigInt(10 ** 27);
-    const SECONDS_PER_YEAR = BigInt(365 * 24 * 3600);
+    const WAD = 10n ** 18n;
+    const RAY = 10n ** 27n;
+    const SECONDS_PER_YEAR = 365n * 24n * 60n * 60n;
 
     beforeEach(async () => {
         blockchain = await Blockchain.create();
         deployer = await blockchain.treasury('deployer');
 
         mathUtils = blockchain.openContract(await TestMathUtils.fromInit());
+        testWadRayPercentageMath = blockchain.openContract(await TestWadRayPercentageMath.fromInit());
 
         const deployResult = await mathUtils.send(
             deployer.getSender(),
@@ -32,6 +35,24 @@ describe('TestMathUtils', () => {
         expect(deployResult.transactions).toHaveTransaction({
             from: deployer.address,
             to: mathUtils.address,
+            deploy: true,
+            success: true,
+        });
+
+        const result = await testWadRayPercentageMath.send(
+            deployer.getSender(),
+            {
+                value: toNano('0.05'),
+            },
+            {
+                $$type: 'Deploy',
+                queryId: 0n,
+            },
+        );
+
+        expect(result.transactions).toHaveTransaction({
+            from: deployer.address,
+            to: testWadRayPercentageMath.address,
             deploy: true,
             success: true,
         });

@@ -16,5 +16,8 @@ export async function run(provider: NetworkProvider) {
         }
     );
 
-    await provider.waitForDeploy(pool.address);
+    const currentLength = await pool.getReservesLength();
+    console.log(`Current reserve length: ${currentLength.toString()}`);
+    const reserveAddress = await pool.getReserveAddress(0n);
+    console.log(`[0] Reserve address: ${reserveAddress.toString()}`);
 }

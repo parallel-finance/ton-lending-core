@@ -85,7 +85,7 @@ contract Pool with Deployable, Ownable, Resumable {
             mode: SendRemainingValue,
             body: GetUserAccountData{
                 queryId: self.queryId,
-                borrower: context().sender,
+                user: context().sender,
                 action: ACTION_BORROW,
                 tokenAddress: msg.tokenAddress,
                 amount: msg.amount
@@ -119,7 +119,7 @@ contract Pool with Deployable, Ownable, Resumable {
                 reserveData.availableLiquidity -= borrowAmount;
                 reserveData.totalBorrow += scaledBorrowAmount;
                 self.reservesData.set(reserveAddress, reserveData);
-                self.updateUserAccountPosition(msg.queryId, msg.borrower, msg.tokenAddress, 0, scaledBorrowAmount);
+                self.updateUserAccountPosition(msg.queryId, msg.user, msg.tokenAddress, 0, scaledBorrowAmount);
             }
         }
     }
@@ -399,10 +399,13 @@ contract Pool with Deployable, Ownable, Resumable {
         self.validateDropReserve(reserveData);
         let lastReserveIndex: Int = self.reservesLength - 1;
         let lastReserveAddress: Address =  self.reserves.get(lastReserveIndex)!!;
-        self.reserves.set(reserveIndex, lastReserveAddress);
+        if (reserveIndex != lastReserveIndex) {
+            self.reserves.set(reserveIndex, lastReserveAddress);
+        }
         self.reserves.set(lastReserveIndex, null);
         self.reservesData.set(reserveAddress, null);
         self.reservesConfiguration.set(reserveAddress, null);
+        self.reserveInterestRateStrategy.set(reserveAddress, null);
         self.reservesLength -= 1;
     }
 

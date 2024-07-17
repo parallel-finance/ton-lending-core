@@ -78,7 +78,7 @@ contract UserAccount with Deployable {
             bounce: false,
             body: UserAccountDataResponse{
                 queryId: msg.queryId,
-                borrower: msg.borrower,
+                user: msg.user,
                 tokenAddress: msg.tokenAddress,
                 action: msg.action,
                 amount: msg.amount,
