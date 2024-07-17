@@ -85,26 +85,17 @@ extends mutates fun updateInterestRates(
 }
 
 extends fun getNormalizedIncome(self: ReserveData): Int {
-    dump("getNormalizedIncome");
-    dump(now());
-    dump(self.lastUpdateTimestamp);
     if (now() == self.lastUpdateTimestamp) {
         return self.liquidityIndex;
     } else {
-        dump("calculateLinearInterest");
         return calculateLinearInterest(self.currentLiquidityRate, self.lastUpdateTimestamp).rayMul(self.liquidityIndex);
     }
 }
 
 extends fun getNormalizedDebt(self: ReserveData): Int {
-    dump("getNormalizedDebt");
-    dump(now());
-    dump(self.lastUpdateTimestamp);
-
     if (now() == self.lastUpdateTimestamp) {
         return self.borrowIndex;
     } else {
-        dump("calculateCompoundedInterest");
         return calculateCompoundedInterest(self.currentBorrowRate, self.lastUpdateTimestamp).rayMul(self.borrowIndex);
     }
 }

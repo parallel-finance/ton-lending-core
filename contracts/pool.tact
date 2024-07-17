@@ -104,8 +104,6 @@ contract Pool with Deployable, Ownable, Resumable {
         let reserveAddress: Address = msg.tokenAddress;
         let reserveConfiguration: ReserveConfiguration? = self.reservesConfiguration.get(reserveAddress);
         require(reserveConfiguration != null, "Reserve not found");
-        dump("WithdrawToken");
-        dump(now());
         send(SendParameters{
             to: userAccountAddress,
             value: 0,
@@ -138,68 +136,37 @@ contract Pool with Deployable, Ownable, Resumable {
 
         if(msg.action == ACTION_BORROW) {
             let borrowAmount: Int = msg.amount;
-            // update liquidity
+            // update (scaled) total debt
             let scaledBorrowAmount: Int = borrowAmount.rayDiv(reserveCache.nextBorrowIndex);
             reserveData.totalBorrow += scaledBorrowAmount;
             reserveCache.nextScaledDebt = reserveData.totalBorrow;
-            
             // updateInterestRates
             reserveData.updateInterestRates(reserveCache, rateStrategy, 0, borrowAmount);
-            dump("ACTION_BORROW reserveCache.nextBorrowIndex");
-            dump(reserveCache.nextBorrowIndex);
-            dump("ACTION_BORROW reserveCache.nextLiquidityIndex");
-            dump(reserveCache.nextLiquidityIndex);
-            dump("reserveData.getNormalizedIncome()");
-            dump(reserveData.getNormalizedIncome());
-            dump("reserveData.getNormalizedDebt()");
-            dump(reserveData.getNormalizedDebt());
-            dump("reserveData.availableLiquidity");
-            dump(reserveData.availableLiquidity);
-            dump("borrowAmount");
-            dump(borrowAmount);
-
+            // update available liquidity
             reserveData.availableLiquidity -= borrowAmount;
-
-            dump("reserveData.availableLiquidity");
-            dump(reserveData.availableLiquidity);
-            dump("reserveData");
-            dump(reserveData.liquidityIndex);
-            dump(reserveData.currentLiquidityRate);
-            dump(reserveData.borrowIndex);
-            dump(reserveData.currentBorrowRate);
-            dump(reserveData.totalSupply);
-            dump(reserveData.totalBorrow);
-            dump(reserveData.availableLiquidity);
-            dump(reserveData.accruedToTreasury);
-            dump(reserveData.lastUpdateTimestamp);
-            dump(reserveData.price);
             // set reserveData to storage back
             self.reservesData.set(reserveAddress, reserveData);
             // Transfer borrowAmount Token(tokenAddress) to the user.
             let poolWalletAddress: Address = reserveConfigration.poolWalletAddress;
             self.sendTokenTransferByPool(msg.queryId, poolWalletAddress, msg.user, borrowAmount);
             // TODO: calculate fees and Ton to send
-            dump("set reserveData to storage back");
             self.updateUserAccountPosition(msg.queryId, msg.user, msg.tokenAddress, 0, scaledBorrowAmount); 
-            dump("updateUserAccountPosition");
         }
 
         if(msg.action == ACTION_WITHDRAW) {
-            dump("ACTION_WITHDRAW");
-            dump(now());
             let withdrawAmount: Int = msg.amount;
             // updateInterestRates
             reserveData.updateInterestRates(reserveCache, rateStrategy, 0, withdrawAmount);
-            dump("ACTION_WITHDRAW reserveCache.nextLiquidityIndex");
-            dump(reserveCache.nextLiquidityIndex);
-            // update liquidity and set reserveData to storage back;
+            // update (scaled) total supply and available liquidity
             let scaledWithdrawAmount: Int = withdrawAmount.rayDiv(reserveCache.nextLiquidityIndex);
             reserveData.availableLiquidity -= withdrawAmount;
             reserveData.totalSupply -= scaledWithdrawAmount;
+            // set reserveData to storage back
             self.reservesData.set(reserveAddress, reserveData);
             // Transfer withdrawAmount Token(tokenAddress) to the user.
             let poolWalletAddress: Address = reserveConfigration.poolWalletAddress;
             self.sendTokenTransferByPool(msg.queryId, poolWalletAddress, msg.user, withdrawAmount);
+            // TODO: calculate fees and Ton to send
             self.updateUserAccountPosition(msg.queryId, msg.user, msg.tokenAddress, -scaledWithdrawAmount, 0);
         }
     }
@@ -259,10 +226,6 @@ contract Pool with Deployable, Ownable, Resumable {
             require(healthInfo.totalDebtInBaseCurrency + collateralNeeded <= healthInfo.totalCollateralInBaseCurrency, "collateral can't cover new borrow");
         }
         if (action == ACTION_WITHDRAW) {
-            dump("validateForAction ACTION_WITHDRAW");
-            dump("reserveData.availableLiquidity");
-            dump(reserveData.availableLiquidity);
-            dump(amount);
             // 1. check reserve isActive
             // 2. check reserve availableLiquidity
             // 3. check withdraw amount <= supply position
@@ -272,9 +235,6 @@ contract Pool with Deployable, Ownable, Resumable {
 
             let userReservePosition: TokenData = userAccountData.positionsDetail.get(reserve)!!;
             let normalizedIncome: Int = reserveData.getNormalizedIncome();
-            dump("validateForAction ACTION_WITHDRAW normalizedIncome");
-            dump(normalizedIncome);
-            dump(userReservePosition.supply.rayMul(normalizedIncome));
             require(userReservePosition.supply.rayMul(normalizedIncome) >= amount, "invalid user supply position");
 
             require(healthInfo.healthFactorInRay >= RAY, "HF < 1");
@@ -322,7 +282,6 @@ contract Pool with Deployable, Ownable, Resumable {
                 totalDebt += borrowValue;
             }
         }
-        dump("userAccountHealthInfo over");
         return UserAccountHealthInfo{
             avgLtv: totalCollateralMulLtv / totalCollateral,
             avgLiquidationThreshold: totalCollateralMulLT / totalCollateral,
@@ -425,17 +384,11 @@ contract Pool with Deployable, Ownable, Resumable {
             // updateInterestRates
             let rateStrategy: ReserveInterestRateStrategy = self.reserveInterestRateStrategy.get(matchedReserve!!)!!;
             reserveData.updateInterestRates(reserveCache, rateStrategy, supplyAmount, 0);
-            dump("reserveCache.nextLiquidityIndex");
-            dump(reserveCache.nextLiquidityIndex);
             // update liquidity and set reserveData to storage back;
             let scaledSupplyAmount: Int = supplyAmount.rayDiv(reserveCache.nextLiquidityIndex);
             reserveData.availableLiquidity += supplyAmount;
             reserveData.totalSupply += scaledSupplyAmount;
-            dump("supply");
-            dump(now());
-            dump(reserveData.lastUpdateTimestamp);
             self.reservesData.set(matchedReserve!!, reserveData);
-
 
             self.updateUserAccountPosition(msg.queryId, msg.from, matchedReserve!!, scaledSupplyAmount, 0);
         }
