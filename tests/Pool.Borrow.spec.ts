@@ -226,7 +226,7 @@ describe('Pool', () => {
             },
             {
                 $$type: 'Mint',
-                amount: 100000000000n,
+                amount: toNano(100n),
                 receiver: deployer.address,
             },
         );
@@ -238,6 +238,15 @@ describe('Pool', () => {
 
     describe('borrow', () => {
         it('should borrow successfully', async () => {
+            const deployerWalletAddress = await sampleJetton.getGetWalletAddress(deployer.address);
+            const deployerJettonDefaultWallet = blockchain.openContract(
+                JettonDefaultWallet.fromAddress(deployerWalletAddress),
+            );
+            const poolWalletAddress = await sampleJetton.getGetWalletAddress(pool.address);
+
+            const walletDataBefore = await deployerJettonDefaultWallet.getGetWalletData();
+            const walletBalanceBefore = walletDataBefore.balance;
+            expect(walletBalanceBefore).toEqual(toNano(0));
             const userAccountAddress = await UserAccount.fromInit(pool.address, deployer.address);
             const result = await pool.send(
                 deployer.getSender(),
@@ -286,6 +295,20 @@ describe('Pool', () => {
                 success: true,
             });
 
+            // Pool send the TransferToken message to the jetton contract
+            expect(result.transactions).toHaveTransaction({
+                from: pool.address,
+                to: poolWalletAddress,
+                success: true,
+            });
+
+            // Pool wallet transfer borrowed jetton to user
+            expect(result.transactions).toHaveTransaction({
+                from: poolWalletAddress,
+                to: deployerJettonDefaultWallet.address,
+                success: true,
+            });
+
             const userAccountContract = blockchain.openContract(userAccountAddress);
             const accountData = await userAccountContract.getAccount();
             expect(accountData.positionsLength).toEqual(1n);
@@ -301,6 +324,10 @@ describe('Pool', () => {
             const walletData = await deployerDTokenDefaultWallet.getGetWalletData();
             expect(walletData.balance).toEqual(toNano(50n));
             expect(walletData.owner.toString()).toEqual(deployer.address.toString());
+
+            const walletDataAfter = await deployerJettonDefaultWallet.getGetWalletData();
+            const walletBalanceAfter = walletDataAfter.balance;
+            expect(walletBalanceAfter).toEqual(toNano(50));
         });
         it('check hf successfully', async () => {
             const userAccountAddress = await UserAccount.fromInit(pool.address, deployer.address);
@@ -309,7 +336,7 @@ describe('Pool', () => {
             const result = await pool.send(
                 deployer.getSender(),
                 {
-                    value: toNano('0.2'),
+                    value: toNano('0.3'),
                 },
                 {
                     $$type: 'BorrowToken',
