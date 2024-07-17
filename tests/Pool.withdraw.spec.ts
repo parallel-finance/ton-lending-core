@@ -1,5 +1,5 @@
 import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
-import { address, beginCell, Cell, contractAddress, toNano } from '@ton/core';
+import { address, beginCell, Cell, contractAddress, fromNano, toNano } from '@ton/core';
 import { ATokenDTokenContents, Pool, ReserveConfiguration, ReserveInterestRateStrategy } from '../wrappers/Pool';
 import '@ton/test-utils';
 import { SampleJetton } from '../build/SampleJetton/tact_SampleJetton';
@@ -11,6 +11,7 @@ import { AToken } from '../wrappers/AToken';
 import { DToken } from '../wrappers/DToken';
 import { PERCENTAGE_FACTOR, RAY } from '../helpers/constant';
 import { ATokenDefaultWallet } from '../build/AToken/tact_ATokenDefaultWallet';
+import { sleep } from '@ton/blueprint';
 
 describe('Pool Withdraw', () => {
     let blockchain: Blockchain;
@@ -21,8 +22,10 @@ describe('Pool Withdraw', () => {
     let aToken: SandboxContract<AToken>;
     let dToken: SandboxContract<DToken>;
     let contents: ATokenDTokenContents;
+    let deployerJettonDefaultWallet: SandboxContract<JettonDefaultWallet>;
     let deployerATokenDefaultWallet: SandboxContract<ATokenDefaultWallet>;
     let deployerDTokenDefaultWallet: SandboxContract<DTokenDefaultWallet>;
+    let poolWallet: SandboxContract<JettonDefaultWallet>;
 
     let rst;
 
@@ -59,9 +62,7 @@ describe('Pool Withdraw', () => {
     const supplyFromDeployer = async (amount: bigint) => {
         // transfer jetton to pool
         const deployerWalletAddress = await sampleJetton.getGetWalletAddress(deployer.address);
-        const deployerJettonDefaultWallet = blockchain.openContract(
-            JettonDefaultWallet.fromAddress(deployerWalletAddress),
-        );
+        deployerJettonDefaultWallet = blockchain.openContract(JettonDefaultWallet.fromAddress(deployerWalletAddress));
         const forward_payload: Cell = beginCell().storeUint(0x55b591ba, 32).endCell();
 
         const userAccountContract = blockchain.openContract(await UserAccount.fromInit(pool.address, deployer.address));
@@ -142,6 +143,8 @@ describe('Pool Withdraw', () => {
         });
     };
 
+    jest.setTimeout(20 * 1000);
+
     beforeEach(async () => {
         blockchain = await Blockchain.create();
 
@@ -215,6 +218,7 @@ describe('Pool Withdraw', () => {
 
         // add reserve
         const poolWalletAddress = await sampleJetton.getGetWalletAddress(pool.address);
+        poolWallet = blockchain.openContract(JettonDefaultWallet.fromAddress(poolWalletAddress));
         const result = await pool.send(
             deployer.getSender(),
             {
@@ -299,6 +303,8 @@ describe('Pool Withdraw', () => {
     it('withdraw successfully with no debt', async () => {
         const userAccountAddress = await UserAccount.fromInit(pool.address, deployer.address);
         const withdrawAmount = toNano(50n);
+        const deployerJettonBalanceBefore = (await deployerJettonDefaultWallet.getGetWalletData()).balance;
+
         const result = await pool.send(
             deployer.getSender(),
             {
@@ -329,6 +335,13 @@ describe('Pool Withdraw', () => {
         expect(result.transactions).toHaveTransaction({
             from: userAccountAddress.address,
             to: pool.address,
+            success: true,
+        });
+
+        // sendTokenTransferByPool TokenTransfer
+        expect(result.transactions).toHaveTransaction({
+            from: pool.address,
+            to: poolWallet.address,
             success: true,
         });
 
@@ -367,12 +380,15 @@ describe('Pool Withdraw', () => {
 
         const walletData = await deployerATokenDefaultWallet.getGetWalletData();
         expect(walletData.balance).toEqual(supplyAmount - withdrawAmount);
-        expect(walletData.owner.toString()).toEqual(deployer.address.toString());
+        expect((await deployerJettonDefaultWallet.getGetWalletData()).balance).toEqual(
+            deployerJettonBalanceBefore + withdrawAmount,
+        );
     });
 
     it('withdraw max amount successfully with no debt', async () => {
         const userAccountAddress = await UserAccount.fromInit(pool.address, deployer.address);
         const withdrawAmount = supplyAmount;
+        const deployerJettonBalanceBefore = (await deployerJettonDefaultWallet.getGetWalletData()).balance;
         const result = await pool.send(
             deployer.getSender(),
             {
@@ -403,6 +419,13 @@ describe('Pool Withdraw', () => {
         expect(result.transactions).toHaveTransaction({
             from: userAccountAddress.address,
             to: pool.address,
+            success: true,
+        });
+
+        // sendTokenTransferByPool TokenTransfer
+        expect(result.transactions).toHaveTransaction({
+            from: pool.address,
+            to: poolWallet.address,
             success: true,
         });
 
@@ -443,7 +466,9 @@ describe('Pool Withdraw', () => {
 
         const walletData = await deployerATokenDefaultWallet.getGetWalletData();
         expect(walletData.balance).toEqual(supplyAmount - withdrawAmount);
-        expect(walletData.owner.toString()).toEqual(deployer.address.toString());
+        expect((await deployerJettonDefaultWallet.getGetWalletData()).balance).toEqual(
+            deployerJettonBalanceBefore + withdrawAmount,
+        );
     });
 
     it('withdraw max amount when user have the debt and check HF successfully', async () => {
@@ -451,11 +476,15 @@ describe('Pool Withdraw', () => {
         const userAccountContract = blockchain.openContract(userAccountAddress);
 
         const borrowAmount = toNano(60n);
-        await borrowFromDeployer(borrowAmount);
+        await borrowFromDeployer(borrowAmount / 2n);
+        await sleep(5 * 1000);
+        await borrowFromDeployer(borrowAmount / 2n);
 
         const maxWithdrawAmount =
             supplyAmount - (borrowAmount * PERCENTAGE_FACTOR) / reserveConfiguration.liquidationThreshold;
         // withdraw
+        const withdrawAmount = maxWithdrawAmount - toNano('0.01');
+        const deployerJettonBalanceBefore = (await deployerJettonDefaultWallet.getGetWalletData()).balance;
         let result = await pool.send(
             deployer.getSender(),
             {
@@ -464,7 +493,7 @@ describe('Pool Withdraw', () => {
             {
                 $$type: 'WithdrawToken',
                 tokenAddress: sampleJetton.address,
-                amount: maxWithdrawAmount,
+                amount: withdrawAmount,
             },
         );
 
@@ -486,6 +515,13 @@ describe('Pool Withdraw', () => {
         expect(result.transactions).toHaveTransaction({
             from: userAccountAddress.address,
             to: pool.address,
+            success: true,
+        });
+
+        // sendTokenTransferByPool TokenTransfer
+        expect(result.transactions).toHaveTransaction({
+            from: pool.address,
+            to: poolWallet.address,
             success: true,
         });
 
@@ -518,19 +554,25 @@ describe('Pool Withdraw', () => {
         });
 
         let accountData = await userAccountContract.getAccount();
-        expect(accountData.positionsDetail?.get(sampleJetton.address)!!.supply).toEqual(
-            supplyAmount - maxWithdrawAmount,
+
+        expect(Number(fromNano(accountData.positionsDetail?.get(sampleJetton.address)!!.supply))).toBeCloseTo(
+            Number(fromNano(supplyAmount - withdrawAmount)),
+            5,
         );
-        expect(accountData.positionsDetail?.get(sampleJetton.address)!!.borrow).toEqual(borrowAmount);
+        expect(Number(fromNano(accountData.positionsDetail?.get(sampleJetton.address)!!.borrow))).toBeCloseTo(
+            Number(fromNano(borrowAmount)),
+            5,
+        );
 
         const walletData = await deployerATokenDefaultWallet.getGetWalletData();
-        expect(walletData.balance).toEqual(supplyAmount - maxWithdrawAmount);
-        expect(walletData.owner.toString()).toEqual(deployer.address.toString());
+        expect(Number(fromNano(walletData.balance))).toBeCloseTo(Number(fromNano(supplyAmount - withdrawAmount)), 5);
+        expect((await deployerJettonDefaultWallet.getGetWalletData()).balance).toEqual(
+            deployerJettonBalanceBefore + withdrawAmount,
+        );
     });
 
     it('should bounce if the left supply position cant cover the debt', async () => {
         const userAccountAddress = await UserAccount.fromInit(pool.address, deployer.address);
-        const userAccountContract = blockchain.openContract(userAccountAddress);
 
         const borrowAmount = toNano(60n);
         await borrowFromDeployer(borrowAmount);

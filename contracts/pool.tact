@@ -104,7 +104,6 @@ contract Pool with Deployable, Ownable, Resumable {
         let reserveAddress: Address = msg.tokenAddress;
         let reserveConfiguration: ReserveConfiguration? = self.reservesConfiguration.get(reserveAddress);
         require(reserveConfiguration != null, "Reserve not found");
-
         send(SendParameters{
             to: userAccountAddress,
             value: 0,
@@ -137,31 +136,37 @@ contract Pool with Deployable, Ownable, Resumable {
 
         if(msg.action == ACTION_BORROW) {
             let borrowAmount: Int = msg.amount;
+            // update (scaled) total debt
+            let scaledBorrowAmount: Int = borrowAmount.rayDiv(reserveCache.nextBorrowIndex);
+            reserveData.totalBorrow += scaledBorrowAmount;
+            reserveCache.nextScaledDebt = reserveData.totalBorrow;
             // updateInterestRates
             reserveData.updateInterestRates(reserveCache, rateStrategy, 0, borrowAmount);
-
-            // update liquidity and set reserveData to storage back;
-            let scaledBorrowAmount: Int = borrowAmount.rayDiv(reserveCache.nextBorrowIndex);
+            // update available liquidity
             reserveData.availableLiquidity -= borrowAmount;
-            reserveData.totalBorrow += scaledBorrowAmount;
+            // set reserveData to storage back
             self.reservesData.set(reserveAddress, reserveData);
             // Transfer borrowAmount Token(tokenAddress) to the user.
             let poolWalletAddress: Address = reserveConfigration.poolWalletAddress;
             self.sendTokenTransferByPool(msg.queryId, poolWalletAddress, msg.user, borrowAmount);
             // TODO: calculate fees and Ton to send
-            self.updateUserAccountPosition(msg.queryId, msg.user, msg.tokenAddress, 0, scaledBorrowAmount);
+            self.updateUserAccountPosition(msg.queryId, msg.user, msg.tokenAddress, 0, scaledBorrowAmount); 
         }
 
         if(msg.action == ACTION_WITHDRAW) {
             let withdrawAmount: Int = msg.amount;
             // updateInterestRates
             reserveData.updateInterestRates(reserveCache, rateStrategy, 0, withdrawAmount);
-
-            // update liquidity and set reserveData to storage back;
+            // update (scaled) total supply and available liquidity
             let scaledWithdrawAmount: Int = withdrawAmount.rayDiv(reserveCache.nextLiquidityIndex);
             reserveData.availableLiquidity -= withdrawAmount;
             reserveData.totalSupply -= scaledWithdrawAmount;
+            // set reserveData to storage back
             self.reservesData.set(reserveAddress, reserveData);
+            // Transfer withdrawAmount Token(tokenAddress) to the user.
+            let poolWalletAddress: Address = reserveConfigration.poolWalletAddress;
+            self.sendTokenTransferByPool(msg.queryId, poolWalletAddress, msg.user, withdrawAmount);
+            // TODO: calculate fees and Ton to send
             self.updateUserAccountPosition(msg.queryId, msg.user, msg.tokenAddress, -scaledWithdrawAmount, 0);
         }
     }
@@ -379,13 +384,11 @@ contract Pool with Deployable, Ownable, Resumable {
             // updateInterestRates
             let rateStrategy: ReserveInterestRateStrategy = self.reserveInterestRateStrategy.get(matchedReserve!!)!!;
             reserveData.updateInterestRates(reserveCache, rateStrategy, supplyAmount, 0);
-
             // update liquidity and set reserveData to storage back;
             let scaledSupplyAmount: Int = supplyAmount.rayDiv(reserveCache.nextLiquidityIndex);
             reserveData.availableLiquidity += supplyAmount;
             reserveData.totalSupply += scaledSupplyAmount;
             self.reservesData.set(matchedReserve!!, reserveData);
-
 
             self.updateUserAccountPosition(msg.queryId, msg.from, matchedReserve!!, scaledSupplyAmount, 0);
         }

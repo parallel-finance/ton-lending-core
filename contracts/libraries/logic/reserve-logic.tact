@@ -55,7 +55,7 @@ extends mutates fun _accrueToTreasury(self: ReserveData, cache: ReserveCache): R
     }
     let prevTotalDebt: Int = cache.currentScaledDebt.rayMul(cache.currentBorrowIndex);
     let currTotalDebt: Int = cache.currentScaledDebt.rayMul(cache.nextBorrowIndex);
-    let totalDebtAccrued: Int = (prevTotalDebt - currTotalDebt);
+    let totalDebtAccrued: Int = (currTotalDebt - prevTotalDebt);
     let amountToMint: Int = totalDebtAccrued.percentMul(cache.reserveFactor);
     if (amountToMint != 0) {
         self.accruedToTreasury += amountToMint.rayDiv(cache.nextLiquidityIndex);
