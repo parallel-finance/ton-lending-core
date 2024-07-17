@@ -145,7 +145,11 @@ contract Pool with Deployable, Ownable, Resumable {
             reserveData.availableLiquidity -= borrowAmount;
             reserveData.totalBorrow += scaledBorrowAmount;
             self.reservesData.set(reserveAddress, reserveData);
-            self.updateUserAccountPosition(msg.queryId, msg.user, msg.tokenAddress, 0, scaledBorrowAmount);   
+            // Transfer borrowAmount Token(tokenAddress) to the user.
+            let poolWalletAddress: Address = reserveConfigration.poolWalletAddress;
+            self.sendTokenTransferByPool(msg.queryId, poolWalletAddress, msg.user, borrowAmount);
+            // TODO: calculate fees and Ton to send
+            self.updateUserAccountPosition(msg.queryId, msg.user, msg.tokenAddress, 0, scaledBorrowAmount);
         }
 
         if(msg.action == ACTION_WITHDRAW) {
@@ -158,7 +162,7 @@ contract Pool with Deployable, Ownable, Resumable {
             reserveData.availableLiquidity -= withdrawAmount;
             reserveData.totalSupply -= scaledWithdrawAmount;
             self.reservesData.set(reserveAddress, reserveData);
-            self.updateUserAccountPosition(msg.queryId, msg.user, msg.tokenAddress, -scaledWithdrawAmount, 0);   
+            self.updateUserAccountPosition(msg.queryId, msg.user, msg.tokenAddress, -scaledWithdrawAmount, 0);
         }
     }
 
@@ -169,10 +173,33 @@ contract Pool with Deployable, Ownable, Resumable {
         self.reservesData.set(msg.asset, reserveData);
     }
 
+    receive(msg: TokenExcesses) {
+        // accept excesses and do nothing
+        // TODO: consider store the token transfer data and transfer token here
+    }
+
+    fun sendTokenTransferByPool(queryId: Int, poolWalletAddress: Address, toAddress: Address, amount: Int) {
+        send(SendParameters{
+            to: poolWalletAddress,
+            value: ton("0.05"),
+            bounce: true,
+            mode: SendPayGasSeparately,
+            body: TokenTransfer{
+                queryId: queryId,
+                amount: amount,
+                destination: toAddress,
+                response_destination: toAddress,
+                custom_payload: emptyCell(),
+                forward_ton_amount: 0,
+                forward_payload: emptyCell()
+            }.toCell()
+        });
+    }
+
     fun validateForAction(
-        action: Int, 
+        action: Int,
         reserve: Address,
-        amount: Int, 
+        amount: Int,
         userAccountData: UserAccountData
     ): Bool {
         let healthInfo: UserAccountHealthInfo = self.userAccountHealthInfo(userAccountData);
@@ -200,7 +227,7 @@ contract Pool with Deployable, Ownable, Resumable {
             // 4. check HF
             require(reserveConfigration.isActive, "Token inactive");
             require(reserveData.availableLiquidity >= amount, "invalid available liquidity");
-            
+
             let userReservePosition: TokenData = userAccountData.positionsDetail.get(reserve)!!;
             let normalizedIncome: Int = reserveData.getNormalizedIncome();
             require(userReservePosition.supply.rayMul(normalizedIncome) >= amount, "invalid user supply position");
@@ -233,7 +260,7 @@ contract Pool with Deployable, Ownable, Resumable {
         foreach (reserve, tokenData in userAccountData.positionsDetail) {
             let reserveData: ReserveData = self.reservesData.get(reserve)!!;
             let reserveConfiguration: ReserveConfiguration = self.reservesConfiguration.get(reserve)!!;
-            
+
             if (tokenData.supply > 0) {
                 let normalizedIncome: Int = reserveData.getNormalizedIncome();
                 let supplyValue: Int = tokenData.supply.rayMul(normalizedIncome) * reserveData.price / JETTON_UNIT;
@@ -358,6 +385,7 @@ contract Pool with Deployable, Ownable, Resumable {
             reserveData.availableLiquidity += supplyAmount;
             reserveData.totalSupply += scaledSupplyAmount;
             self.reservesData.set(matchedReserve!!, reserveData);
+
 
             self.updateUserAccountPosition(msg.queryId, msg.from, matchedReserve!!, scaledSupplyAmount, 0);
         }
