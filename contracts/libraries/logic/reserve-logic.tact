@@ -55,7 +55,7 @@ extends mutates fun _accrueToTreasury(self: ReserveData, cache: ReserveCache): R
     }
     let prevTotalDebt: Int = cache.currentScaledDebt.rayMul(cache.currentBorrowIndex);
     let currTotalDebt: Int = cache.currentScaledDebt.rayMul(cache.nextBorrowIndex);
-    let totalDebtAccrued: Int = (prevTotalDebt - currTotalDebt);
+    let totalDebtAccrued: Int = (currTotalDebt - prevTotalDebt);
     let amountToMint: Int = totalDebtAccrued.percentMul(cache.reserveFactor);
     if (amountToMint != 0) {
         self.accruedToTreasury += amountToMint.rayDiv(cache.nextLiquidityIndex);
@@ -85,17 +85,26 @@ extends mutates fun updateInterestRates(
 }
 
 extends fun getNormalizedIncome(self: ReserveData): Int {
+    dump("getNormalizedIncome");
+    dump(now());
+    dump(self.lastUpdateTimestamp);
     if (now() == self.lastUpdateTimestamp) {
         return self.liquidityIndex;
     } else {
+        dump("calculateLinearInterest");
         return calculateLinearInterest(self.currentLiquidityRate, self.lastUpdateTimestamp).rayMul(self.liquidityIndex);
     }
 }
 
 extends fun getNormalizedDebt(self: ReserveData): Int {
+    dump("getNormalizedDebt");
+    dump(now());
+    dump(self.lastUpdateTimestamp);
+
     if (now() == self.lastUpdateTimestamp) {
         return self.borrowIndex;
     } else {
+        dump("calculateCompoundedInterest");
         return calculateCompoundedInterest(self.currentBorrowRate, self.lastUpdateTimestamp).rayMul(self.borrowIndex);
     }
 }
