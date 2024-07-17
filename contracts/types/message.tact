@@ -33,6 +33,11 @@ message(0x66660005) UserAccountDataResponse {
     amount: Int as coins;
     accountData: UserAccountData;
 }
+// TODO: update the message id
+message(0x66660006) WithdrawToken {
+    tokenAddress: Address;
+    amount: Int as coins;
+}
 message UpdatePosition {
     queryId: Int as uint64;
     address: Address;
