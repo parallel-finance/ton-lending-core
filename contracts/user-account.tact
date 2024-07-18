@@ -42,9 +42,10 @@ contract UserAccount with Deployable {
             self.positionsLength += 1;
         } else {
             let currentTokenData: TokenData = self.positionsDetail.get(position.address)!!;
+            let newBorrow: Int = currentTokenData.borrow + position.borrow;
             let updatedTokenData: TokenData = TokenData{
                 supply: currentTokenData.supply + position.supply,
-                borrow: currentTokenData.borrow + position.borrow,
+                borrow: newBorrow > 0 ? newBorrow : 0,
                 asCollateral: currentTokenData.asCollateral
             };
             self.positionsDetail.set(position.address, updatedTokenData);

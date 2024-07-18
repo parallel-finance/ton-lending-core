@@ -76,8 +76,9 @@ contract DTokenDefaultWallet
         let ctx: Context = context();
         require(ctx.sender == self.pool, "Invalid sender"); // Check sender
 
+        // TODO: consider allow the msg.amount is greater than balance and burn the whole balance
         require(self.balance >= msg.amount, "Invalid amount");
-        self.balance = self.balance - msg.amount; // Update balance
+        self.balance = (self.balance - msg.amount); // Update balance
 
         let fwdFee: Int = ctx.readForwardFee(); // Gas checks
         require(ctx.value > ((fwdFee + 2 * self.gasConsumption) + self.minTonsForStorage), "Invalid value - Burn");

@@ -67,6 +67,9 @@ contract Pool with Deployable, Ownable, Resumable {
             self.burnAToken(msg.asset, msg.user, -msg.supply);
         }
         // for repay
+        if (msg.borrow < 0) {
+            self.burnDToken(msg.asset, msg.user, -msg.borrow);
+        }
         // for borrow
         if (msg.borrow > 0) {
             self.mintDToken(msg.asset, msg.user, msg.borrow);
@@ -321,6 +324,21 @@ contract Pool with Deployable, Ownable, Resumable {
         });
     }
 
+    fun burnDToken(asset: Address, user: Address, amount: Int) {
+        send(SendParameters{
+            to: self.userDTokenWalletAddress(asset, user),
+            value: 0,
+            bounce: true,
+            mode: SendRemainingValue,
+            body: TokenBurn{
+                queryId: self.queryId,
+                amount: amount,
+                owner: user,
+                response_destination: user // This field isn't used in TokenBurn
+            }.toCell()
+        });
+    }
+
     // TODO: handle bounce message
     fun mintDToken(asset: Address, user: Address, amount: Int) {
         let dTokenAddress: Address = self.reservesConfiguration.get(asset)!!.dTokenAddress;
@@ -370,15 +388,15 @@ contract Pool with Deployable, Ownable, Resumable {
         let forwardPayload: Cell = msg.forward_payload;
         let forwardPayloadSlice: Slice = forwardPayload.beginParse();
         let opCode: Int = forwardPayloadSlice.loadUint(32);
+        let reserveData: ReserveData = self.reserveData(matchedReserve!!);
+        let reserveConfigration: ReserveConfiguration = self.reservesConfiguration.get(matchedReserve!!)!!;
+        let reserveCache: ReserveCache = reserveData.cache(reserveConfigration);
+        // _updateIndexes and _accrueToTreasury
+        reserveCache = reserveData.updateState(reserveCache);
+
         // use crc32 code of 'Supply': utils.calculateRequestOpcode_1('Supply')
         if (opCode == 0x55b591ba) {
             let supplyAmount: Int = msg.amount;
-            let reserveData: ReserveData = self.reserveData(matchedReserve!!);
-            let reserveConfigration: ReserveConfiguration = self.reservesConfiguration.get(matchedReserve!!)!!;
-            let reserveCache: ReserveCache = reserveData.cache(reserveConfigration);
-            // _updateIndexes and _accrueToTreasury
-            reserveCache = reserveData.updateState(reserveCache);
-
             // TODO: validateSupply
 
             // updateInterestRates
@@ -391,6 +409,24 @@ contract Pool with Deployable, Ownable, Resumable {
             self.reservesData.set(matchedReserve!!, reserveData);
 
             self.updateUserAccountPosition(msg.queryId, msg.from, matchedReserve!!, scaledSupplyAmount, 0);
+        }
+
+        // use crc32 code of 'Repay': utils.calculateRequestOpcode_1('Repay')
+        if (opCode == 0x9c797a9) {
+            let repayAmount: Int = msg.amount;
+            // TODO: validate repay
+            // reserve.totalBorrow >= scaledBorrowAmount?
+
+            // updateInterestRates
+            let rateStrategy: ReserveInterestRateStrategy = self.reserveInterestRateStrategy.get(matchedReserve!!)!!;
+            reserveData.updateInterestRates(reserveCache, rateStrategy, repayAmount, 0);
+            // update liquidity and set reserveData to storage back;
+            let scaledBorrowAmount: Int = repayAmount.rayDiv(reserveCache.nextBorrowIndex);
+            reserveData.availableLiquidity += repayAmount;
+            reserveData.totalBorrow -= scaledBorrowAmount;
+            self.reservesData.set(matchedReserve!!, reserveData);
+
+            self.updateUserAccountPosition(msg.queryId, msg.from, matchedReserve!!, 0, -scaledBorrowAmount);
         }
     }
 
@@ -566,6 +602,12 @@ contract Pool with Deployable, Ownable, Resumable {
     get fun userATokenWalletAddress(asset: Address, user: Address): Address {
         let aToken: Address = self.reservesConfiguration.get(asset)!!.aTokenAddress;
         let sinit: StateInit = initOf ATokenDefaultWallet(aToken, myAddress(), asset, user);
+        return contractAddress(sinit);
+    }
+
+    get fun userDTokenWalletAddress(asset: Address, user: Address): Address {
+        let dToken: Address = self.reservesConfiguration.get(asset)!!.dTokenAddress;
+        let sinit: StateInit = initOf DTokenDefaultWallet(dToken, myAddress(), asset, user);
         return contractAddress(sinit);
     }
 }
