@@ -7,7 +7,7 @@ extends fun cache(self: ReserveData, reserveConfigration: ReserveConfiguration):
     return
         ReserveCache{
             currentScaledDebt: self.totalBorrow,
-            nextScaledDebt: 0,
+            nextScaledDebt: self.totalBorrow,
             currentLiquidityIndex: self.liquidityIndex,
             nextLiquidityIndex: 0,
             currentBorrowIndex: self.borrowIndex,
