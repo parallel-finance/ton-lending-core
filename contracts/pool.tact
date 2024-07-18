@@ -547,6 +547,24 @@ contract Pool with Deployable, Ownable, Resumable {
         return self.reservesData.get(reserveAddress)!!;
     }
 
+    get fun reserveDataForUI(reserveAddress: Address): ReserveDataForUI {
+        let reserveData: ReserveData = self.reservesData.get(reserveAddress)!!;
+        return ReserveDataForUI{
+            liquidityIndex: reserveData.liquidityIndex,
+            currentLiquidityRate: reserveData.currentLiquidityRate,
+            borrowIndex: reserveData.borrowIndex,
+            currentBorrowRate: reserveData.currentBorrowRate,
+            totalSupply: reserveData.totalSupply,
+            availableLiquidity: reserveData.availableLiquidity,
+            accruedToTreasury: reserveData.accruedToTreasury,
+            totalBorrow: reserveData.totalBorrow,
+            lastUpdateTimestamp: reserveData.lastUpdateTimestamp,
+            price: reserveData.price,
+            normalizedIncome: reserveData.getNormalizedIncome(),
+            normalizedDebt: reserveData.getNormalizedDebt(),
+        };
+    }
+
     get fun reserveConfiguration(reserveAddress: Address): ReserveConfiguration {
         return self.reservesConfiguration.get(reserveAddress)!!;
     }
