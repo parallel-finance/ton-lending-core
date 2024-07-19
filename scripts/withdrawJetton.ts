@@ -13,7 +13,7 @@ export async function run(provider: NetworkProvider) {
     const walletDataBefore = await providerJettonWallet.getGetWalletData();
     console.log(`Provider Jetton Wallet balance(before): ${walletDataBefore.balance.toString()}`);
 
-    const amount = toNano(100n);
+    const amount = toNano(2n);
 
     await pool.send(
         provider.sender(),
