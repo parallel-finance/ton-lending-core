@@ -1,6 +1,6 @@
-import {Sha256} from "@aws-crypto/sha256-js";
-import {beginCell, Cell} from "@ton/ton";
-import {Dictionary} from '@ton/core';
+import { Sha256 } from '@aws-crypto/sha256-js';
+import { beginCell, Cell } from '@ton/ton';
+import { Dictionary } from '@ton/core';
 import * as crc32 from 'crc-32';
 
 const ONCHAIN_CONTENT_PREFIX = 0x00;
@@ -40,27 +40,16 @@ const sha256 = (str: string) => {
 };
 
 export const toKey = (key: string) => {
-    return BigInt(`0x${sha256(key).toString("hex")}`);
+    return BigInt(`0x${sha256(key).toString('hex')}`);
 };
 
-export function buildOnchainMetadata(data: {
-    name: string;
-    description: string;
-    image: string;
-    symbol: string;
-}): Cell {
-    let dict = Dictionary.empty(
-        Dictionary.Keys.BigUint(256),
-        Dictionary.Values.Cell()
-    );
+export function buildOnchainMetadata(data: { name: string; description: string; image: string; symbol: string }): Cell {
+    let dict = Dictionary.empty(Dictionary.Keys.BigUint(256), Dictionary.Values.Cell());
     Object.entries(data).forEach(([key, value]) => {
-        dict.set(toKey(key), makeSnakeCell(Buffer.from(value, "utf8")));
+        dict.set(toKey(key), makeSnakeCell(Buffer.from(value, 'utf8')));
     });
 
-    return beginCell()
-        .storeInt(ONCHAIN_CONTENT_PREFIX, 8)
-        .storeDict(dict)
-        .endCell();
+    return beginCell().storeInt(ONCHAIN_CONTENT_PREFIX, 8).storeDict(dict).endCell();
 }
 
 function calculateRequestOpcode_1(str: string): string {
