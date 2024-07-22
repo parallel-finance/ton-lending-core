@@ -5,7 +5,7 @@ message(0xf8a7ea5) TokenTransfer {
     response_destination: Address;
     custom_payload: Cell?;
     forward_ton_amount: Int as coins;
-    forward_payload: Cell; // Cell Value to include everything
+    forward_payload: Slice as remaining;
 }
 message(0x178d4519) TokenTransferInternal {
     queryId: Int as uint64;
@@ -13,13 +13,13 @@ message(0x178d4519) TokenTransferInternal {
     from: Address;
     response_destination: Address;
     forward_ton_amount: Int as coins;
-    forward_payload: Cell; // Cell Value to include everything
+    forward_payload: Slice as remaining;
 }
 message(0x7362d09c) TokenNotification {
     queryId: Int as uint64;
     amount: Int as coins;
     from: Address;
-    forward_payload: Cell; //Cell Value to include everything
+    forward_payload: Slice as remaining;
 }
 message(0x595f07bc) TokenBurn {
     queryId: Int as uint64;
@@ -46,7 +46,7 @@ message TokenTransferByPool {
     response_destination: Address;
     custom_payload: Cell?;
     forward_ton_amount: Int as coins;
-    forward_payload: Cell; // Cell Value to include everything
+    forward_payload: Slice as remaining;
 }
 message CheckAndTransferAToken {
     asset: Address;
@@ -57,9 +57,8 @@ message CheckAndTransferAToken {
     response_destination: Address;
     custom_payload: Cell?;
     forward_ton_amount: Int as coins;
-    forward_payload: Cell; // Cell Value to include everything
+    forward_payload: Slice as remaining;
 }
-
 message Mint {
     amount: Int;
     receiver: Address;

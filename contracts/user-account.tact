@@ -2,8 +2,8 @@ import "@stdlib/deploy";
 import "./types/message";
 
 struct TokenData {
-    supply: Int as int128;
-    borrow: Int as int128;
+    supply: Int as coins;
+    borrow: Int as coins;
     asCollateral: Bool;
 }
 
@@ -73,17 +73,17 @@ contract UserAccount with Deployable {
     receive(msg: GetUserAccountData) {
         self.requireMaster();
         send(SendParameters{
-            to: context().sender,
-            value: 0,
-            mode: SendRemainingValue,
-            bounce: false,
-            body: UserAccountDataResponse{
-                queryId: msg.queryId,
-                user: msg.user,
-                tokenAddress: msg.tokenAddress,
-                action: msg.action,
-                amount: msg.amount,
-                accountData: UserAccountData{
+                to: context().sender,
+                value: 0,
+                mode: SendRemainingValue,
+                bounce: false,
+                body: UserAccountDataResponse{
+                    queryId: msg.queryId,
+                    user: msg.user,
+                    tokenAddress: msg.tokenAddress,
+                    action: msg.action,
+                    amount: msg.amount,
+                    accountData: UserAccountData{
                     positions: self.positions,
                     positionsLength: self.positionsLength,
                     positionsDetail: self.positionsDetail
