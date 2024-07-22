@@ -197,9 +197,9 @@ contract Pool with Deployable, Ownable, Resumable {
                 amount: amount,
                 destination: toAddress,
                 response_destination: toAddress,
-                custom_payload: emptyCell(),
+                custom_payload: null,
                 forward_ton_amount: 0,
-                forward_payload: emptyCell()
+                forward_payload: emptySlice()
             }.toCell()
         });
     }
@@ -385,9 +385,8 @@ contract Pool with Deployable, Ownable, Resumable {
         let matchedReserve: Address? = self.findReserveByPoolWalletAddress(context().sender);
         require(matchedReserve != null, "Reserve not found");
 
-        let forwardPayload: Cell = msg.forward_payload;
-        let forwardPayloadSlice: Slice = forwardPayload.beginParse();
-        let opCode: Int = forwardPayloadSlice.loadUint(32);
+        let forwardPayload: Slice = msg.forward_payload;
+        let opCode: Int = forwardPayload.loadUint(32);
         let reserveData: ReserveData = self.reserveData(matchedReserve!!);
         let reserveConfigration: ReserveConfiguration = self.reservesConfiguration.get(matchedReserve!!)!!;
         let reserveCache: ReserveCache = reserveData.cache(reserveConfigration);

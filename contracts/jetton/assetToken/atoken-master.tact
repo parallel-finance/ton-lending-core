@@ -8,7 +8,6 @@ import "../types";
 trait ATokenJettonTrait with Ownable, Deployable, Resumable {
     owner: Address; // PoolAddress
     stopped: Bool;
-
     totalSupply: Int;
     mintable: Bool;
     content: Cell;
@@ -56,7 +55,7 @@ trait ATokenJettonTrait with Ownable, Deployable, Resumable {
                     from: myAddress(),
                     response_destination: response_destination,
                     forward_ton_amount: 0,
-                    forward_payload: emptyCell()
+                    forward_payload: emptySlice()
                 }.toCell(),
                 code: winit.code,
                 data: winit.data

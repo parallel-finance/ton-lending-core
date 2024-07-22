@@ -4,12 +4,10 @@ import "@stdlib/stoppable";
 import "./dtoken-wallet";
 import "../messages";
 import "../types";
-
 @interface("org.ton.jetton.master")
 trait DTokenJettonTrait with Ownable, Deployable, Resumable {
     owner: Address; // PoolAddress
     stopped: Bool;
-
     totalSupply: Int;
     mintable: Bool;
     content: Cell;
@@ -57,7 +55,7 @@ trait DTokenJettonTrait with Ownable, Deployable, Resumable {
                     from: myAddress(),
                     response_destination: response_destination,
                     forward_ton_amount: 0,
-                    forward_payload: emptyCell()
+                    forward_payload: emptySlice()
                 }.toCell(),
                 code: winit.code,
                 data: winit.data

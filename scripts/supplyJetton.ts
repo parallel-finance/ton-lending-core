@@ -1,4 +1,4 @@
-import { address, beginCell, Cell, toNano } from '@ton/core';
+import { address, beginCell, Cell, Slice, toNano } from '@ton/core';
 import { Pool } from '../wrappers/Pool';
 import { NetworkProvider } from '@ton/blueprint';
 import { SampleJetton } from '../build/SampleJetton/tact_SampleJetton';
@@ -16,9 +16,9 @@ export async function run(provider: NetworkProvider) {
 
     const amount = toNano(10n);
 
-    const forward_payload: Cell = beginCell()
+    const forward_payload: Slice = beginCell()
         .storeUint(0x55b591ba, 32)
-        .endCell();
+        .endCell().asSlice();
 
     await providerJettonWallet.send(
         provider.sender(),
