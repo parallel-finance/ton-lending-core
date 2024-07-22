@@ -227,6 +227,8 @@ describe('Pool', () => {
             },
             {
                 $$type: 'Mint',
+                queryId: 0n,
+                token: sampleJetton.address,
                 amount: toNano(100n),
                 receiver: deployer.address,
             },
@@ -387,9 +389,18 @@ describe('Pool', () => {
             let userHealthInfo = await pool.getUserAccountHealthInfo(accountData);
             expect(userHealthInfo.avgLtv).toEqual(reserveConfiguration.ltv);
             expect(userHealthInfo.avgLiquidationThreshold).toEqual(reserveConfiguration.liquidationThreshold);
-            expect(Number(fromNano(userHealthInfo.totalCollateralInBaseCurrency))).toBeCloseTo(Number(fromNano(100n * toNano(1))), 7);
-            expect(Number(fromNano(userHealthInfo.totalSupplyInBaseCurrency))).toBeCloseTo(Number(fromNano(100n * toNano(1))), 7);
-            expect(Number(fromNano(userHealthInfo.totalDebtInBaseCurrency))).toBeCloseTo(Number(fromNano(60n * toNano(1))), 7);
+            expect(Number(fromNano(userHealthInfo.totalCollateralInBaseCurrency))).toBeCloseTo(
+                Number(fromNano(100n * toNano(1))),
+                7,
+            );
+            expect(Number(fromNano(userHealthInfo.totalSupplyInBaseCurrency))).toBeCloseTo(
+                Number(fromNano(100n * toNano(1))),
+                7,
+            );
+            expect(Number(fromNano(userHealthInfo.totalDebtInBaseCurrency))).toBeCloseTo(
+                Number(fromNano(60n * toNano(1))),
+                7,
+            );
             expect(userHealthInfo.healthFactorInRay).toEqual(
                 (100n * toNano(1) * reserveConfiguration.liquidationThreshold * RAY) /
                     (PERCENTAGE_FACTOR * 60n * toNano(1)),

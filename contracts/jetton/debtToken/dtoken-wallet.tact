@@ -1,4 +1,4 @@
-import "../abtoken-messages";
+import "../messages";
 import "../types";
 
 @interface("org.ton.jetton.wallet")

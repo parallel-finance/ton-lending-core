@@ -53,6 +53,8 @@ describe('TestJettonReceive', () => {
             },
             {
                 $$type: 'Mint',
+                queryId: 0n,
+                token: sampleJetton.address,
                 receiver: deployer.getSender().address,
                 amount: toNano(100000),
             },
@@ -160,6 +162,5 @@ describe('TestJettonReceive', () => {
         );
 
         expect((await testJettonReceiveJettonWallet.getGetWalletData()).balance).toEqual(toNano(100));
-
     });
 });

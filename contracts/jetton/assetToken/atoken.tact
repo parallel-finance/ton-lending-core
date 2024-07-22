@@ -1,5 +1,5 @@
 import "./atoken-master";
-import "../abtoken-messages";
+import "../messages";
 
 struct PoolDataInAToken {
     pool: Address;
