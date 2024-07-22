@@ -1,5 +1,5 @@
 import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
-import { address, beginCell, Cell, contractAddress, toNano } from '@ton/core';
+import { address, beginCell, Cell, toNano } from '@ton/core';
 import { ATokenDTokenContents, Pool, ReserveConfiguration, ReserveInterestRateStrategy } from '../wrappers/Pool';
 import '@ton/test-utils';
 import { SampleJetton } from '../build/SampleJetton/tact_SampleJetton';
@@ -112,6 +112,7 @@ describe('Pool', () => {
         const jettonParams = {
             name: 'SampleJetton',
             description: 'Sample Jetton for testing purposes',
+            decimals: '9',
             image: 'https://ipfs.io/ipfs/bafybeicn7i3soqdgr7dwnrwytgq4zxy7a5jpkizrvhm5mv6bgjd32wm3q4/welcome-to-IPFS.jpg',
             symbol: 'SAM',
         };
@@ -121,6 +122,7 @@ describe('Pool', () => {
         const aTokenJettonParams = {
             name: 'SampleJetton AToken',
             description: 'Sample Jetton aToken',
+            decimals: '9',
             image: 'https://ipfs.io/ipfs/bafybeicn7i3soqdgr7dwnrwytgq4zxy7a5jpkizrvhm5mv6bgjd32wm3q4/welcome-to-IPFS.jpg',
             symbol: 'aSAM',
         };
@@ -129,6 +131,7 @@ describe('Pool', () => {
         const dTokenJettonParams = {
             name: 'SampleJetton DToken',
             description: 'Sample Jetton dToken',
+            decimals: '9',
             image: 'https://ipfs.io/ipfs/bafybeicn7i3soqdgr7dwnrwytgq4zxy7a5jpkizrvhm5mv6bgjd32wm3q4/welcome-to-IPFS.jpg',
             symbol: 'dSAM',
         };
@@ -165,7 +168,7 @@ describe('Pool', () => {
             sampleJetton.address,
         );
         reserveConfiguration.aTokenAddress = calculateATokenAddress;
-        reserveConfiguration.dTokenAddress = calculateDTokenAddress
+        reserveConfiguration.dTokenAddress = calculateDTokenAddress;
 
         const result = await pool.send(
             deployer.getSender(),
@@ -228,9 +231,7 @@ describe('Pool', () => {
     describe('Repay', () => {
         it('should repay successfully', async () => {
             const userWalletAddress = await sampleJetton.getGetWalletAddress(deployer.address);
-            const userJettonDefaultWallet = blockchain.openContract(
-                JettonDefaultWallet.fromAddress(userWalletAddress),
-            );
+            const userJettonDefaultWallet = blockchain.openContract(JettonDefaultWallet.fromAddress(userWalletAddress));
             const poolWalletAddress = await sampleJetton.getGetWalletAddress(pool.address);
 
             const walletDataBefore = await userJettonDefaultWallet.getGetWalletData();
@@ -257,9 +258,7 @@ describe('Pool', () => {
             expect(walletData.balance).toEqual(toNano(50n));
             expect(walletData.owner.toString()).toEqual(deployer.address.toString());
 
-            const forward_payload: Cell = beginCell()
-                .storeUint(0x9c797a9, 32)
-                .endCell();
+            const forward_payload: Cell = beginCell().storeUint(0x9c797a9, 32).endCell();
 
             const result = await userJettonDefaultWallet.send(
                 deployer.getSender(),
@@ -297,7 +296,7 @@ describe('Pool', () => {
 
             // Update UserAccountData
             expect(result.transactions).toHaveTransaction({
-                from:  pool.address,
+                from: pool.address,
                 to: userAccountAddress.address,
                 success: true,
             });

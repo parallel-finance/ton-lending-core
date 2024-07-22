@@ -1,5 +1,5 @@
 import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
-import { address, beginCell, Cell, contractAddress, toNano } from '@ton/core';
+import { address, beginCell, Cell, toNano } from '@ton/core';
 import { ATokenDTokenContents, Pool, ReserveConfiguration, ReserveInterestRateStrategy } from '../wrappers/Pool';
 import '@ton/test-utils';
 import { SampleJetton } from '../build/SampleJetton/tact_SampleJetton';
@@ -14,7 +14,6 @@ import { PERCENTAGE_FACTOR, RAY } from '../helpers/constant';
 describe('Pool', () => {
     let blockchain: Blockchain;
     let deployer: SandboxContract<TreasuryContract>;
-    let secondUser: SandboxContract<TreasuryContract>;
     let pool: SandboxContract<Pool>;
     let sampleJetton: SandboxContract<SampleJetton>;
     let aToken: SandboxContract<AToken>;
@@ -61,7 +60,7 @@ describe('Pool', () => {
 
         const userAccountContract = blockchain.openContract(await UserAccount.fromInit(pool.address, deployer.address));
 
-        const result = await deployerJettonDefaultWallet.send(
+        await deployerJettonDefaultWallet.send(
             deployer.getSender(),
             {
                 value: toNano('3'),
@@ -91,7 +90,6 @@ describe('Pool', () => {
         pool = blockchain.openContract(await Pool.fromInit());
 
         deployer = await blockchain.treasury('deployer');
-        secondUser = (await blockchain.createWallets(2))[1];
 
         // deploy pool
         const deployResult = await pool.send(
@@ -116,6 +114,7 @@ describe('Pool', () => {
         const jettonParams = {
             name: 'SampleJetton',
             description: 'Sample Jetton for testing purposes',
+            decimals: '9',
             image: 'https://ipfs.io/ipfs/bafybeicn7i3soqdgr7dwnrwytgq4zxy7a5jpkizrvhm5mv6bgjd32wm3q4/welcome-to-IPFS.jpg',
             symbol: 'SAM',
         };
@@ -125,6 +124,7 @@ describe('Pool', () => {
         const aTokenJettonParams = {
             name: 'SampleJetton AToken',
             description: 'Sample Jetton aToken',
+            decimals: '9',
             image: 'https://ipfs.io/ipfs/bafybeicn7i3soqdgr7dwnrwytgq4zxy7a5jpkizrvhm5mv6bgjd32wm3q4/welcome-to-IPFS.jpg',
             symbol: 'aSAM',
         };
@@ -133,6 +133,7 @@ describe('Pool', () => {
         const dTokenJettonParams = {
             name: 'SampleJetton DToken',
             description: 'Sample Jetton dToken',
+            decimals: '9',
             image: 'https://ipfs.io/ipfs/bafybeicn7i3soqdgr7dwnrwytgq4zxy7a5jpkizrvhm5mv6bgjd32wm3q4/welcome-to-IPFS.jpg',
             symbol: 'dSAM',
         };
@@ -169,9 +170,9 @@ describe('Pool', () => {
             sampleJetton.address,
         );
         reserveConfiguration.aTokenAddress = calculateATokenAddress;
-        reserveConfiguration.dTokenAddress = calculateDTokenAddress
+        reserveConfiguration.dTokenAddress = calculateDTokenAddress;
 
-        const result = await pool.send(
+        await pool.send(
             deployer.getSender(),
             {
                 value: toNano('0.2'),

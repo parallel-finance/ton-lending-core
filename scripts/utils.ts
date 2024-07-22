@@ -43,7 +43,15 @@ export const toKey = (key: string) => {
     return BigInt(`0x${sha256(key).toString('hex')}`);
 };
 
-export function buildOnchainMetadata(data: { name: string; description: string; image: string; symbol: string }): Cell {
+export type JettonMetaData = {
+    name: string;
+    description: string;
+    image: string;
+    symbol: string;
+    decimals: string;
+};
+
+export function buildOnchainMetadata(data: JettonMetaData): Cell {
     let dict = Dictionary.empty(Dictionary.Keys.BigUint(256), Dictionary.Values.Cell());
     Object.entries(data).forEach(([key, value]) => {
         dict.set(toKey(key), makeSnakeCell(Buffer.from(value, 'utf8')));

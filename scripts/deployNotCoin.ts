@@ -6,12 +6,13 @@ import { SampleJetton } from '../wrappers/SampleJetton';
 export async function run(provider: NetworkProvider) {
     const owner = provider.sender().address!!;
     const jettonParams = {
-        name: 'SampleJetton',
-        description: 'Sample Jetton for testing purposes',
-        image: 'https://ipfs.io/ipfs/bafybeicn7i3soqdgr7dwnrwytgq4zxy7a5jpkizrvhm5mv6bgjd32wm3q4/welcome-to-IPFS.jpg',
-        symbol: 'SAM',
-        decimals: '9',
-    };
+        "name": "Notcoin",
+        "description": "Notcoin is a token that is not a coin.",
+        "symbol": "NOT",
+        "decimals": "9",
+        "image": "https://cache.tonapi.io/imgproxy/4KCMNm34jZLXt0rqeFm4rH-BK4FoK76EVX9r0cCIGDg/rs:fill:200:200:1/g:no/aHR0cHM6Ly9jZG4uam9pbmNvbW11bml0eS54eXovY2xpY2tlci9ub3RfbG9nby5wbmc.webp"
+    }
+
     let max_supply = (1n << 120n) - 1n;
     let content = buildOnchainMetadata(jettonParams);
 
@@ -28,7 +29,7 @@ export async function run(provider: NetworkProvider) {
         }
     );
 
-    // EQCP_v_hh0uTHIG_j6jpynQhazw3m1ZyEPR_aQMQTAsHMPxA MAS no max_supply
+    // EQBqFJkn_DoBFcNPQ0ble53CD92X_XsDgPr1_WAajYceJMHi
     await provider.waitForDeploy(sampleJetton.address);
     console.log(`Deployed at ${sampleJetton.address.toString()}`);
 }
