@@ -43,6 +43,7 @@ describe('UserAccoount', () => {
                 {
                     $$type: 'UpdatePosition',
                     queryId: 1n,
+                    user: deployer.getSender().address,
                     address: reserveAddress,
                     supply: toNano('100'),
                     borrow: 0n,
@@ -71,6 +72,7 @@ describe('UserAccoount', () => {
                 {
                     $$type: 'UpdatePosition',
                     queryId: 1n,
+                    user: deployer.getSender().address,
                     address: reserveAddress,
                     supply: toNano('100'),
                     borrow: 0n,
@@ -85,6 +87,7 @@ describe('UserAccoount', () => {
                 {
                     $$type: 'UpdatePosition',
                     queryId: 1n,
+                    user: deployer.getSender().address,
                     address: reserveAddress,
                     supply: -toNano('50'),
                     borrow: toNano(20n),

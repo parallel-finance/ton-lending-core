@@ -28,6 +28,10 @@ contract Pool with Deployable, Ownable, Resumable {
     reservesConfiguration: map<Address, ReserveConfiguration>;
     reserveInterestRateStrategy: map<Address, ReserveInterestRateStrategy>;
 
+    // bounce messages
+    updatePositionMsg: map<Int, UpdatePosition>;
+    mintMsg: map<Int, Mint>;
+
     init() {
         self.owner = sender();
         self.stopped = false;
@@ -58,6 +62,12 @@ contract Pool with Deployable, Ownable, Resumable {
     }
 
     receive(msg: UserPositionUpdated) {
+        // TODO: check ctx sender is user's userAccount address
+        let userAccount: Address = self.userAccountAddress(msg.user);
+        require(userAccount == context().sender, "Not from the user account");
+        // delete stored updatePositionMsg
+        self.updatePositionMsg.del(self.queryId);
+
         // for supply
         if (msg.supply > 0) {
             self.mintAToken(msg.asset, msg.user, msg.supply);
@@ -78,8 +88,7 @@ contract Pool with Deployable, Ownable, Resumable {
 
     receive(msg: BorrowToken) {
         // send message to get user account data
-        let userAccountInit: StateInit = initOf UserAccount(myAddress(), sender());
-        let userAccountAddress: Address = contractAddress(userAccountInit);
+        let userAccountAddress: Address = self.userAccountAddress(sender());
         let reserveAddress: Address = msg.tokenAddress;
         let reserveConfiguration: ReserveConfiguration? = self.reservesConfiguration.get(reserveAddress);
         require(reserveConfiguration != null, "Reserve not found");
@@ -102,8 +111,7 @@ contract Pool with Deployable, Ownable, Resumable {
 
     receive(msg: WithdrawToken) {
         // send message to get user account data
-        let userAccountInit: StateInit = initOf UserAccount(myAddress(), sender());
-        let userAccountAddress: Address = contractAddress(userAccountInit);
+        let userAccountAddress: Address = self.userAccountAddress(sender());
         let reserveAddress: Address = msg.tokenAddress;
         let reserveConfiguration: ReserveConfiguration? = self.reservesConfiguration.get(reserveAddress);
         require(reserveConfiguration != null, "Reserve not found");
@@ -182,8 +190,20 @@ contract Pool with Deployable, Ownable, Resumable {
     }
 
     receive(msg: TokenExcesses) {
-        // accept excesses and do nothing
         // TODO: consider store the token transfer data and transfer token here
+        // because `self.queryId` is globally increment, 
+        // we can delete the key of the queryId from `mintMsg` map and `tokenTransferMsg` map in the same time,
+        // And only one map will be updated.
+        self.mintMsg.del(msg.queryId);
+    }
+
+    receive(msg: RerunBounceMsg) {
+        if (msg.action == RERUN_ACTION_UPDATE_POSITION) {
+            self.rerunUpdatePositionMsg(msg.queryId);
+        }
+        if (msg.action == RERUN_ACTION_MINT) {
+            self.rerunMintMsg(msg.queryId);
+        }
     }
 
     fun sendTokenTransferByPool(queryId: Int, poolWalletAddress: Address, toAddress: Address, amount: Int) {
@@ -297,15 +317,24 @@ contract Pool with Deployable, Ownable, Resumable {
 
     fun mintAToken(asset: Address, user: Address, amount: Int) {
         let aTokenAddress: Address = self.reservesConfiguration.get(asset)!!.aTokenAddress;
+
+        // store mintMsg
+        let queryId: Int = self.queryId;
+        let mintMsg: Mint = Mint{
+            queryId: queryId,
+            token: aTokenAddress,
+            amount: amount,
+            receiver: user
+        };
+        self.mintMsg.set(queryId, mintMsg);
+        self.queryId += 1;
+
         send(SendParameters{
             to: aTokenAddress,
             value: 0,
             bounce: true,
             mode: SendRemainingValue,
-            body: Mint{
-                amount: amount,
-                receiver: user
-            }.toCell()
+            body: mintMsg.toCell()
         });
     }
 
@@ -348,9 +377,23 @@ contract Pool with Deployable, Ownable, Resumable {
             bounce: true,
             mode: SendRemainingValue,
             body: Mint{
+                queryId: self.queryId,
+                token: dTokenAddress,
                 amount: amount,
                 receiver: user
             }.toCell()
+        });
+        self.queryId += 1;
+    }
+
+    fun rerunMintMsg(queryId: Int) {
+        let msg: Mint = self.mintMsg.get(queryId)!!;
+        send(SendParameters{
+            to: msg.token,
+            value: 0,
+            bounce: true,
+            mode: SendRemainingValue,
+            body: msg.toCell()
         });
     }
 
@@ -430,21 +473,45 @@ contract Pool with Deployable, Ownable, Resumable {
     }
 
     fun updateUserAccountPosition(queryId: Int, ownerAddress: Address, reserveAddress: Address, supply: Int, borrow: Int) {
-        let userAccountInit: StateInit = initOf UserAccount(myAddress(), ownerAddress);
+        let userAccountInit: StateInit = self.getUserAccountInit(ownerAddress);
         let userAccountAddress: Address = contractAddress(userAccountInit);
-        send(SendParameters{
-        to: userAccountAddress,
-        value: 0,
-        bounce: true,
-        mode: SendRemainingValue,
-        body: UpdatePosition{
+        
+        let msg: UpdatePosition = UpdatePosition{
             queryId: queryId,
+            user: ownerAddress,
             address: reserveAddress,
             supply: supply,
             borrow: borrow
-        }.toCell(),
-        code: userAccountInit.code,
-        data: userAccountInit.data
+        };
+        self.updatePositionMsg.set(queryId, msg);
+        self.queryId += 1;
+        
+        send(SendParameters{
+            to: userAccountAddress,
+            value: 0,
+            bounce: true,
+            mode: SendRemainingValue,
+            body: msg.toCell(),
+            code: userAccountInit.code,
+            data: userAccountInit.data
+        });
+    }
+
+    // rerun the stored UpdatePositionMsg which isn't deleted in the UserPositionUpdated.
+    fun rerunUpdatePositionMsg(queryId: Int) {
+        let msg: UpdatePosition = self.updatePositionMsg.get(queryId)!!;
+
+        let userAccountInit: StateInit = self.getUserAccountInit(msg.user);
+        let userAccountAddress: Address = contractAddress(userAccountInit);
+
+        send(SendParameters{
+            to: userAccountAddress,
+            value: 0,
+            bounce: true,
+            mode: SendRemainingValue,
+            body: msg.toCell(),
+            code: userAccountInit.code,
+            data: userAccountInit.data
         });
     }
 
@@ -625,6 +692,11 @@ contract Pool with Deployable, Ownable, Resumable {
     get fun userDTokenWalletAddress(asset: Address, user: Address): Address {
         let dToken: Address = self.reservesConfiguration.get(asset)!!.dTokenAddress;
         let sinit: StateInit = initOf DTokenDefaultWallet(dToken, myAddress(), asset, user);
+        return contractAddress(sinit);
+    }
+    
+    get fun userAccountAddress(user: Address): Address {
+        let sinit: StateInit = self.getUserAccountInit(user);
         return contractAddress(sinit);
     }
 }

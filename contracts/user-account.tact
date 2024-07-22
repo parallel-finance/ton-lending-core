@@ -55,13 +55,13 @@ contract UserAccount with Deployable {
     receive(msg: UpdatePosition) {
         self.requireMaster();
         self.processUpdatePosition(msg);
-        // TODO: consider return the updated position data?
         send(SendParameters{
             to: self.master,
             value: 0,
             mode: SendRemainingValue,
             bounce: true,
             body: UserPositionUpdated{
+                queryId: msg.queryId,
                 user: self.owner,
                 asset: msg.address,
                 supply: msg.supply,

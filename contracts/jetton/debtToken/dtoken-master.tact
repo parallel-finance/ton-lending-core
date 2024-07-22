@@ -2,7 +2,7 @@ import "@stdlib/ownable";
 import "@stdlib/deploy";
 import "@stdlib/stoppable";
 import "./dtoken-wallet";
-import "../messages";
+import "../abtoken-messages";
 import "../types";
 @interface("org.ton.jetton.master")
 trait DTokenJettonTrait with Ownable, Deployable, Resumable {

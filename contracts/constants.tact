@@ -3,6 +3,9 @@ const ACTION_WITHDRAW: Int = 1;
 const ACTION_TRANSFER_ATOKEN: Int = 2;
 const ACTION_LIQUIDATION: Int = 3;
 
+const RERUN_ACTION_UPDATE_POSITION: Int = 100;
+const RERUN_ACTION_MINT: Int = 101;
+
 const JETTON_UNIT: Int = pow(10, 9);
 // Mock zero address
 const ZERO_ADDRESS: Address = newAddress(0, sha256("0"));
