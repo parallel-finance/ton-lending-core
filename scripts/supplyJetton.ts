@@ -16,14 +16,12 @@ export async function run(provider: NetworkProvider) {
 
     const amount = toNano(10n);
 
-    const forward_payload: Slice = beginCell()
-        .storeUint(0x55b591ba, 32)
-        .endCell().asSlice();
+    const forward_payload: Cell = beginCell().storeUint(0x55b591ba, 32).endCell();
 
     await providerJettonWallet.send(
         provider.sender(),
         {
-            value: toNano('0.25')
+            value: toNano('0.25'),
         },
         {
             $$type: 'TokenTransfer',
@@ -34,14 +32,14 @@ export async function run(provider: NetworkProvider) {
             response_destination: providerJettonWalletAddress,
             custom_payload: null,
             forward_ton_amount: toNano('0.15'),
-            forward_payload: forward_payload
-        }
+            forward_payload: forward_payload,
+        },
     );
 
     let walletData = await providerJettonWallet.getGetWalletData();
     let i = 0;
     while (walletData.balance === walletDataBefore.balance && i < 20) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise((resolve) => setTimeout(resolve, 1000));
         console.log('Waiting for balance update...');
         walletData = await providerJettonWallet.getGetWalletData();
         i++;
