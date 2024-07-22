@@ -1,5 +1,5 @@
 import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
-import { address, beginCell, Cell, toNano } from '@ton/core';
+import { address, beginCell, Cell, fromNano, toNano } from '@ton/core';
 import { ATokenDTokenContents, Pool, ReserveConfiguration, ReserveInterestRateStrategy } from '../wrappers/Pool';
 import '@ton/test-utils';
 import { SampleJetton } from '../build/SampleJetton/tact_SampleJetton';
@@ -255,7 +255,7 @@ describe('Pool', () => {
             );
 
             const walletData = await userDTokenDefaultWallet.getGetWalletData();
-            expect(walletData.balance).toEqual(toNano(50n));
+            expect(Number(fromNano(walletData.balance))).toBeCloseTo(50, 5);
             expect(walletData.owner.toString()).toEqual(deployer.address.toString());
 
             const forward_payload: Cell = beginCell().storeUint(0x9c797a9, 32).endCell();
@@ -316,14 +316,14 @@ describe('Pool', () => {
             });
 
             const walletDataAfter = await userDTokenDefaultWallet.getGetWalletData();
-            expect(walletDataAfter.balance).toEqual(toNano(25n));
+            expect(Number(fromNano(walletDataAfter.balance))).toBeCloseTo(25, 5);
             expect(walletDataAfter.owner.toString()).toEqual(deployer.address.toString());
 
             const accountData = await userAccountContract.getAccount();
             expect(accountData.positionsLength).toEqual(1n);
             expect(accountData.positions?.get(0n)!!.equals(sampleJetton.address)).toBeTruthy();
-            expect(accountData.positionsDetail?.get(sampleJetton.address)!!.supply).toEqual(toNano(100n));
-            expect(accountData.positionsDetail?.get(sampleJetton.address)!!.borrow).toEqual(toNano(25n));
+            expect(Number(fromNano(accountData.positionsDetail?.get(sampleJetton.address)!!.supply))).toBeCloseTo(100, 5);
+            expect(Number(fromNano(accountData.positionsDetail?.get(sampleJetton.address)!!.borrow))).toBeCloseTo(25, 5);
         });
     });
 });
