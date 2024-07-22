@@ -6,12 +6,13 @@ import { SampleJetton } from '../wrappers/SampleJetton';
 export async function run(provider: NetworkProvider) {
     const owner = provider.sender().address!!;
     const jettonParams = {
-        name: 'SampleJetton',
-        description: 'Sample Jetton for testing purposes',
-        image: 'https://ipfs.io/ipfs/bafybeicn7i3soqdgr7dwnrwytgq4zxy7a5jpkizrvhm5mv6bgjd32wm3q4/welcome-to-IPFS.jpg',
-        symbol: 'SAM',
-        decimals: '9',
-    };
+        "name": "Tether USD",
+        "description": "Tether Token for Tether USD",
+        "symbol": "USD₮",
+        "decimals": "6",
+        "image": "https://cache.tonapi.io/imgproxy/T3PB4s7oprNVaJkwqbGg54nexKE0zzKhcrPv8jcWYzU/rs:fill:200:200:1/g:no/aHR0cHM6Ly90ZXRoZXIudG8vaW1hZ2VzL2xvZ29DaXJjbGUucG5n.webp",
+    }
+
     let max_supply = (1n << 120n) - 1n;
     let content = buildOnchainMetadata(jettonParams);
 
@@ -28,7 +29,7 @@ export async function run(provider: NetworkProvider) {
         }
     );
 
-    // EQCP_v_hh0uTHIG_j6jpynQhazw3m1ZyEPR_aQMQTAsHMPxA MAS no max_supply
+    // EQAXwaSn8OPKA08QgSBPVGvP5n_stP9PhuRvynayN-pnjKXb
     await provider.waitForDeploy(sampleJetton.address);
     console.log(`Deployed at ${sampleJetton.address.toString()}`);
 }

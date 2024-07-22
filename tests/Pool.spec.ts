@@ -2,7 +2,6 @@ import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
 import { address, toNano } from '@ton/core';
 import { ATokenDTokenContents, Pool, ReserveConfiguration, ReserveInterestRateStrategy } from '../wrappers/Pool';
 import '@ton/test-utils';
-import { SampleJetton } from '../build/SampleJetton/tact_SampleJetton';
 import { buildOnchainMetadata } from '../scripts/utils';
 import { AToken } from '../wrappers/AToken';
 import { RAY } from '../helpers/constant';
@@ -11,12 +10,12 @@ describe('Pool', () => {
     let blockchain: Blockchain;
     let deployer: SandboxContract<TreasuryContract>;
     let pool: SandboxContract<Pool>;
-    let sampleJetton: SandboxContract<SampleJetton>;
 
     const reserveAddress = address('UQAEJ7U1iaC1TzcFel5lc2-JaEm8I0k5Krui3fzz3_GeANWV');
     const aTokenJettonParams = {
         name: 'SampleJetton AToken',
         description: 'Sample Jetton aToken',
+        decimals: '9',
         image: 'https://ipfs.io/ipfs/bafybeicn7i3soqdgr7dwnrwytgq4zxy7a5jpkizrvhm5mv6bgjd32wm3q4/welcome-to-IPFS.jpg',
         symbol: 'aSAM',
     };
@@ -25,6 +24,7 @@ describe('Pool', () => {
     const dTokenJettonParams = {
         name: 'SampleJetton DToken',
         description: 'Sample Jetton dToken',
+        decimals: '9',
         image: 'https://ipfs.io/ipfs/bafybeicn7i3soqdgr7dwnrwytgq4zxy7a5jpkizrvhm5mv6bgjd32wm3q4/welcome-to-IPFS.jpg',
         symbol: 'dSAM',
     };

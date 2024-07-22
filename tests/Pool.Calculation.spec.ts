@@ -1,15 +1,13 @@
 import { Blockchain, BlockchainSnapshot, SandboxContract, Treasury, TreasuryContract } from '@ton/sandbox';
-import { Address, address, beginCell, Cell, fromNano, toNano } from '@ton/core';
+import { Address, beginCell, Cell, fromNano, toNano } from '@ton/core';
 import { ATokenDTokenContents, Pool, ReserveConfiguration, ReserveInterestRateStrategy } from '../wrappers/Pool';
 import '@ton/test-utils';
 import { SampleJetton } from '../build/SampleJetton/tact_SampleJetton';
 import { buildOnchainMetadata } from '../scripts/utils';
 import { JettonDefaultWallet } from '../build/SampleJetton/tact_JettonDefaultWallet';
 import { UserAccount } from '../build/Pool/tact_UserAccount';
-import { ATokenDefaultWallet } from '../build/AToken/tact_ATokenDefaultWallet';
 import { AToken } from '../wrappers/AToken';
 import { DToken } from '../wrappers/DToken';
-import { DTokenDefaultWallet } from '../build/DToken/tact_DTokenDefaultWallet';
 import { sleep } from '@ton/blueprint';
 import { PERCENTAGE_FACTOR, RAY } from '../helpers/constant';
 import { TestMathUtils } from '../wrappers/TestMathUtils';
@@ -72,6 +70,7 @@ describe('Pool indexes calculation', () => {
         const jettonParams = {
             name: 'SampleJetton',
             description: 'Sample Jetton for testing purposes',
+            decimals: '9',
             image: 'https://ipfs.io/ipfs/bafybeicn7i3soqdgr7dwnrwytgq4zxy7a5jpkizrvhm5mv6bgjd32wm3q4/welcome-to-IPFS.jpg',
             symbol: 'SAM',
         };
@@ -80,6 +79,7 @@ describe('Pool indexes calculation', () => {
         const aTokenJettonParams = {
             name: 'SampleJetton AToken',
             description: 'Sample Jetton aToken',
+            decimals: '9',
             image: 'https://ipfs.io/ipfs/bafybeicn7i3soqdgr7dwnrwytgq4zxy7a5jpkizrvhm5mv6bgjd32wm3q4/welcome-to-IPFS.jpg',
             symbol: 'aSAM',
         };
@@ -87,6 +87,7 @@ describe('Pool indexes calculation', () => {
         const dTokenJettonParams = {
             name: 'SampleJetton DToken',
             description: 'Sample Jetton dToken',
+            decimals: '9',
             image: 'https://ipfs.io/ipfs/bafybeicn7i3soqdgr7dwnrwytgq4zxy7a5jpkizrvhm5mv6bgjd32wm3q4/welcome-to-IPFS.jpg',
             symbol: 'dSAM',
         };
@@ -214,7 +215,7 @@ describe('Pool indexes calculation', () => {
 
     beforeEach(async () => {
         snapshot = blockchain.snapshot();
-        priceAddresses();
+        // priceAddresses();
     });
     afterEach(async () => {
         await blockchain.loadFrom(snapshot);
@@ -365,7 +366,6 @@ describe('Pool indexes calculation', () => {
         expect(reserveData.currentBorrowRate).toEqual(0n);
 
         await supply(secondUser.getSender(), supplyAmount);
-        console.log(await pool.getReserveDataForUi(sampleJetton.address));
         reserveData = await pool.getReserveDataForUi(sampleJetton.address);
         // no debts, no rates
         expect(reserveData.liquidityIndex).toEqual(RAY);
@@ -396,8 +396,8 @@ describe('Pool indexes calculation', () => {
                 (((currentBorrowRate * supplyUsageRatio) / RAY) *
                     (PERCENTAGE_FACTOR - reserveConfiguration.reserveFactor)) /
                 PERCENTAGE_FACTOR;
-            expect(reserveData.currentLiquidityRate).toEqual(currentLiquidityRate)
-            expect(reserveData.currentBorrowRate).toEqual(currentBorrowRate)
+            expect(reserveData.currentLiquidityRate).toEqual(currentLiquidityRate);
+            expect(reserveData.currentBorrowRate).toEqual(currentBorrowRate);
         }
 
         // non-zero debts, non-zero rates
@@ -417,11 +417,10 @@ describe('Pool indexes calculation', () => {
         );
         const normalizedIncomeBefore = reserveData.normalizedIncome;
         const normalizedDebtBefore = reserveData.normalizedDebt;
-        reserveDataBefore = reserveData
+        reserveDataBefore = reserveData;
         await supply(deployer.getSender(), supplyAmount);
         await sleep(5 * 1000);
         reserveData = await pool.getReserveDataForUi(sampleJetton.address);
-        // console.log(reserveData);
         // after the first borrow, the other action will update the indexes.
         expect(reserveData.liquidityIndex).toEqual(normalizedIncomeBefore);
         expect(reserveData.borrowIndex).toEqual(normalizedDebtBefore);
@@ -439,8 +438,8 @@ describe('Pool indexes calculation', () => {
                 (((currentBorrowRate * supplyUsageRatio) / RAY) *
                     (PERCENTAGE_FACTOR - reserveConfiguration.reserveFactor)) /
                 PERCENTAGE_FACTOR;
-            expect(reserveData.currentLiquidityRate).toEqual(currentLiquidityRate)
-            expect(reserveData.currentBorrowRate).toEqual(currentBorrowRate)
+            expect(reserveData.currentLiquidityRate).toEqual(currentLiquidityRate);
+            expect(reserveData.currentBorrowRate).toEqual(currentBorrowRate);
         }
 
         //  check: totalSupplyInUnderlying, available liquidity, totalBorrowInUnderlying, accToTreasury

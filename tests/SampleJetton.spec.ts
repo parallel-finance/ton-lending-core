@@ -16,6 +16,7 @@ describe('SampleJetton', () => {
         const jettonParams = {
             name: 'SampleJetton',
             description: 'Sample Jetton for testing purposes',
+            decimals: '9',
             image: 'https://ipfs.io/ipfs/bafybeicn7i3soqdgr7dwnrwytgq4zxy7a5jpkizrvhm5mv6bgjd32wm3q4/welcome-to-IPFS.jpg',
             symbol: 'SAM'
         };

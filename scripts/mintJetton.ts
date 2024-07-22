@@ -6,7 +6,10 @@ export async function run(provider: NetworkProvider, args: string[]) {
     const userAddress = Address.parse(provider.sender().address?.toString() || '');
     const ui= provider.ui();
 
-    // testnet free mint SAM: EQAFy5Wqx0HmUVQFcSTNpceFAVa8WikjyIUvWxdbqd0BsE6D
+    // MAS: EQCP_v_hh0uTHIG_j6jpynQhazw3m1ZyEPR_aQMQTAsHMPxA
+    // NOT: EQBqFJkn_DoBFcNPQ0ble53CD92X_XsDgPr1_WAajYceJMHi
+    // PTon: EQBdMo5ZwwVWhBMMSNbU9oNe3L5B8GBhl14OD8aR9am2lv2-
+    // USDT: EQAXwaSn8OPKA08QgSBPVGvP5n_stP9PhuRvynayN-pnjKXb
     const address = Address.parse(args.length > 0 ? args[0] : await ui.input('SampleJetton address'));
 
     if (!(await provider.isContractDeployed(address))) {
@@ -27,5 +30,5 @@ export async function run(provider: NetworkProvider, args: string[]) {
             amount: 1000000000000n,
         }
     );
-    console.log(`Minted 1000000000000n SAM to ${userAddress.toString()}`);
+    console.log(`Minted 1000000000000n token to ${userAddress.toString()}`);
 }

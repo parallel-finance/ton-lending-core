@@ -51,9 +51,7 @@ describe('Pool', () => {
         pool = blockchain.openContract(await Pool.fromInit());
 
         deployer = await blockchain.treasury('deployer');
-        console.log('deployer', deployer.address.toString());
         secondUser = (await blockchain.createWallets(2))[1];
-        console.log('secondUser', secondUser.address.toString());
 
         // deploy pool
         const deployResult = await pool.send(
@@ -66,7 +64,6 @@ describe('Pool', () => {
                 queryId: 0n,
             },
         );
-        console.log('pool', pool.address.toString());
 
         expect(deployResult.transactions).toHaveTransaction({
             from: deployer.address,
@@ -79,6 +76,7 @@ describe('Pool', () => {
         const jettonParams = {
             name: 'SampleJetton',
             description: 'Sample Jetton for testing purposes',
+            decimals: '9',
             image: 'https://ipfs.io/ipfs/bafybeicn7i3soqdgr7dwnrwytgq4zxy7a5jpkizrvhm5mv6bgjd32wm3q4/welcome-to-IPFS.jpg',
             symbol: 'SAM',
         };
@@ -88,6 +86,7 @@ describe('Pool', () => {
         const aTokenJettonParams = {
             name: 'SampleJetton AToken',
             description: 'Sample Jetton aToken',
+            decimals: '9',
             image: 'https://ipfs.io/ipfs/bafybeicn7i3soqdgr7dwnrwytgq4zxy7a5jpkizrvhm5mv6bgjd32wm3q4/welcome-to-IPFS.jpg',
             symbol: 'aSAM',
         };
@@ -110,11 +109,10 @@ describe('Pool', () => {
                 queryId: 0n,
             },
         );
-        console.log('sampleJetton', sampleJetton.address.toString());
 
         // add reserve
         const poolWalletAddress = await sampleJetton.getGetWalletAddress(pool.address);
-        const result = await pool.send(
+        await pool.send(
             deployer.getSender(),
             {
                 value: toNano('0.2'),
@@ -135,7 +133,6 @@ describe('Pool', () => {
             contents.aTokenContent,
             sampleJetton.address,
         );
-        console.log('calculateATokenAddress', calculateATokenAddress.toString());
 
         aToken = blockchain.openContract(AToken.fromAddress(calculateATokenAddress));
         expect((await aToken.getOwner()).toString()).toEqual(pool.address.toString());
@@ -163,7 +160,6 @@ describe('Pool', () => {
         const deployerJettonDefaultWallet = blockchain.openContract(
             JettonDefaultWallet.fromAddress(deployerWalletAddress),
         );
-        console.log('deployerJettonDefaultWallet', deployerJettonDefaultWallet.address.toString());
         const forward_payload: Cell = beginCell().storeUint(0x55b591ba, 32).endCell();
 
         const userAccountContract = blockchain.openContract(await UserAccount.fromInit(pool.address, deployer.address));
@@ -229,7 +225,6 @@ describe('Pool', () => {
                     await pool.getUserATokenWalletAddress(sampleJetton.address, deployer.getSender().address),
                 ),
             );
-            console.log('deployer aTokenWallet', aTokenWallet.address.toString());
             const walletData = await aTokenWallet.getGetWalletData();
             expect(walletData.balance).toEqual(amount);
             expect(walletData.owner.toString()).toEqual(deployer.address.toString());
@@ -237,7 +232,6 @@ describe('Pool', () => {
             const secondUserWallet = blockchain.openContract(
                 ATokenDefaultWallet.fromAddress(await aToken.getGetWalletAddress(secondUser.address)),
             );
-            console.log(`secondUserWallet`, secondUserWallet.address.toString());
 
             let rst = await aTokenWallet.send(
                 deployer.getSender(),
