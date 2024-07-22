@@ -1,5 +1,5 @@
 import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
-import { address, beginCell, Cell, toNano } from '@ton/core';
+import { address, beginCell, Cell, contractAddress, fromNano, toNano } from '@ton/core';
 import { ATokenDTokenContents, Pool, ReserveConfiguration, ReserveInterestRateStrategy } from '../wrappers/Pool';
 import '@ton/test-utils';
 import { SampleJetton } from '../build/SampleJetton/tact_SampleJetton';
@@ -387,9 +387,9 @@ describe('Pool', () => {
             let userHealthInfo = await pool.getUserAccountHealthInfo(accountData);
             expect(userHealthInfo.avgLtv).toEqual(reserveConfiguration.ltv);
             expect(userHealthInfo.avgLiquidationThreshold).toEqual(reserveConfiguration.liquidationThreshold);
-            expect(userHealthInfo.totalCollateralInBaseCurrency).toEqual(100n * toNano(1));
-            expect(userHealthInfo.totalSupplyInBaseCurrency).toEqual(100n * toNano(1));
-            expect(userHealthInfo.totalDebtInBaseCurrency).toEqual(60n * toNano(1));
+            expect(Number(fromNano(userHealthInfo.totalCollateralInBaseCurrency))).toBeCloseTo(Number(fromNano(100n * toNano(1))), 7);
+            expect(Number(fromNano(userHealthInfo.totalSupplyInBaseCurrency))).toBeCloseTo(Number(fromNano(100n * toNano(1))), 7);
+            expect(Number(fromNano(userHealthInfo.totalDebtInBaseCurrency))).toBeCloseTo(Number(fromNano(60n * toNano(1))), 7);
             expect(userHealthInfo.healthFactorInRay).toEqual(
                 (100n * toNano(1) * reserveConfiguration.liquidationThreshold * RAY) /
                     (PERCENTAGE_FACTOR * 60n * toNano(1)),
