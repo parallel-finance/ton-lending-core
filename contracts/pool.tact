@@ -95,7 +95,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
         let reserveAddress: Address = msg.tokenAddress;
         let reserveConfiguration: ReserveConfiguration? = self.reservesConfiguration.get(reserveAddress);
         require(reserveConfiguration != null, "Reserve not found");
-
+        // GetUserAccountData don't need do bounce
         send(SendParameters{
             to: userAccountAddress,
             value: 0,
@@ -375,21 +375,30 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
         });
     }
 
-    // TODO: handle bounce message
     fun mintDToken(asset: Address, user: Address, amount: Int) {
         let dTokenAddress: Address = self.reservesConfiguration.get(asset)!!.dTokenAddress;
+        // store mintMsg
+        let queryId: Int = self.queryId;
+        let mintMsg: Mint = Mint{
+            queryId: queryId,
+            amount: amount,
+            receiver: user
+        };
+        let bounce: MintBounce = MintBounce{
+            to: dTokenAddress,
+            user: user,
+            msg: mintMsg
+        };
+        self.mintMsg.set(queryId, bounce);
+        self.queryId += 1;
+
         send(SendParameters{
             to: dTokenAddress,
             value: 0,
             bounce: true,
             mode: SendRemainingValue,
-            body: Mint{
-                queryId: self.queryId,
-                amount: amount,
-                receiver: user
-            }.toCell()
+            body: mintMsg.toCell()
         });
-        self.queryId += 1;
     }
 
     fun rerunMintMsg(queryId: Int) {
