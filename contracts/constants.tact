@@ -5,6 +5,7 @@ const ACTION_LIQUIDATION: Int = 3;
 
 const RERUN_ACTION_UPDATE_POSITION: Int = 100;
 const RERUN_ACTION_MINT: Int = 101;
+const RERUN_ACTION_TOKEN_TRANSFER: Int = 102;
 
 const JETTON_UNIT: Int = pow(10, 9);
 // Mock zero address

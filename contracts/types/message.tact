@@ -1,4 +1,6 @@
 import "./struct";
+import "../jetton/messages";
+
 // TODO: update the message id
 message(0x66660001) AddReserve {
     reserveAddress: Address;
@@ -60,4 +62,9 @@ message SetMockOraclePrice {
 message RerunBounceMsg {
     queryId: Int as uint64;
     action: Int as uint8;
+}
+message TokenTransferBounce {
+    to: Address;
+    user: Address;
+    msg: TokenTransfer;
 }

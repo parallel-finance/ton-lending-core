@@ -32,6 +32,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
     // bounce messages
     updatePositionMsg: map<Int, UpdatePosition>;
     mintMsg: map<Int, Mint>;
+    tokenTransferMsg: map<Int, TokenTransferBounce>;
 
     init() {
         self.owner = sender();
@@ -116,6 +117,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
         let reserveAddress: Address = msg.tokenAddress;
         let reserveConfiguration: ReserveConfiguration? = self.reservesConfiguration.get(reserveAddress);
         require(reserveConfiguration != null, "Reserve not found");
+        // GetUserAccountData don't need to do bounce
         send(SendParameters{
             to: userAccountAddress,
             value: 0,
@@ -205,23 +207,47 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
         if (msg.action == RERUN_ACTION_MINT) {
             self.rerunMintMsg(msg.queryId);
         }
+        if (msg.action == RERUN_ACTION_TOKEN_TRANSFER) {
+            self.rerunSendTokenTransferByPool(msg.queryId);
+        }
     }
 
     fun sendTokenTransferByPool(queryId: Int, poolWalletAddress: Address, toAddress: Address, amount: Int) {
+        let tokenTransferMsg: TokenTransfer = TokenTransfer{
+            queryId: queryId,
+            amount: amount,
+            destination: toAddress,
+            response_destination: myAddress(), // Pool need to receive TokenExcesses message
+            custom_payload: null,
+            forward_ton_amount: 0,
+            forward_payload: emptySlice()
+        };
+        // store TokenTransferBounce
+        let bounceMsg: TokenTransferBounce = TokenTransferBounce{
+            to: poolWalletAddress,
+            user: toAddress,
+            msg: tokenTransferMsg
+        };
+        self.tokenTransferMsg.set(queryId, bounceMsg);
+        self.queryId += 1;
+        
         send(SendParameters{
             to: poolWalletAddress,
             value: ton("0.05"),
             bounce: true,
             mode: SendPayGasSeparately,
-            body: TokenTransfer{
-                queryId: queryId,
-                amount: amount,
-                destination: toAddress,
-                response_destination: toAddress,
-                custom_payload: null,
-                forward_ton_amount: 0,
-                forward_payload: emptySlice()
-            }.toCell()
+            body: tokenTransferMsg.toCell()
+        });
+    }
+
+    fun rerunSendTokenTransferByPool(queryId: Int) {
+        let bounce: TokenTransferBounce = self.tokenTransferMsg.get(queryId)!!;
+        send(SendParameters{
+            to: bounce.to,
+            value: ton("0.05"),
+            bounce: true,
+            mode: SendPayGasSeparately,
+            body: bounce.msg.toCell()
         });
     }
 

@@ -3,15 +3,14 @@ import { loadMint, loadUpdatePosition, Mint, UpdatePosition } from '../wrappers/
 
 export const parsePoolBounceMessage = (message: Cell | null): UpdatePosition | Mint | null => {
     if (message === null) return null;
-    const msgSlice = message.asSlice();
 
     try {
-        const updatePositionMsg = loadUpdatePosition(msgSlice);
+        const updatePositionMsg = loadUpdatePosition(message.asSlice());
         return updatePositionMsg;
     } catch (error) {}
 
     try {
-        const mintMsg = loadMint(msgSlice);
+        const mintMsg = loadMint(message.asSlice());
         return mintMsg;
     } catch (error) {}
     console.log('Failed to parse bounce message');
