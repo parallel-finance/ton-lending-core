@@ -38,17 +38,9 @@ struct ReserveData {
     price: Int as uint64;
 }
 
-struct ReserveDataForUI {
-    liquidityIndex: Int as uint128;
-    currentLiquidityRate: Int as uint128;
-    borrowIndex: Int as uint128;
-    currentBorrowRate: Int as uint128;
-    totalSupply: Int as coins;
-    availableLiquidity: Int as coins;
-    accruedToTreasury: Int as coins;
-    totalBorrow: Int as coins;
-    lastUpdateTimestamp: Int as uint32;
-    price: Int as uint64;
+struct ReserveDataAndConfiguration {
+    reserveData: ReserveData;
+    reserveConfiguration: ReserveConfiguration;
     normalizedIncome: Int as uint128;
     normalizedDebt: Int as uint128;
 }

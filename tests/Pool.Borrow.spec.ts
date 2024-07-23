@@ -229,7 +229,6 @@ describe('Pool', () => {
             {
                 $$type: 'Mint',
                 queryId: 0n,
-                token: sampleJetton.address,
                 amount: toNano(100n),
                 receiver: deployer.address,
             },
