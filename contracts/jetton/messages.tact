@@ -63,7 +63,6 @@ message CheckAndTransferAToken {
 // custom Mint message
 message Mint {
     queryId: Int as uint64;
-    token: Address;
     amount: Int;
     receiver: Address;
 }

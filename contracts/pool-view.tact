@@ -26,8 +26,10 @@ trait PoolView with Ownable, Resumable {
     reservesConfiguration: map<Address, ReserveConfiguration>;
     reserveInterestRateStrategy: map<Address, ReserveInterestRateStrategy>;
     // bounce messages
-    updatePositionMsg: map<Int, UpdatePosition>;
-    mintMsg: map<Int, Mint>;
+    updatePositionMsg: map<Int, UpdatePositionBounce>;
+    mintMsg: map<Int, MintBounce>;
+    tokenTransferMsg: map<Int, TokenTransferBounce>;
+    tokenBurnMsg: map<Int, TokenBurnBounce>;
 
     // ===== Get functions =====
 
@@ -101,20 +103,13 @@ trait PoolView with Ownable, Resumable {
         return self.reservesData.get(reserveAddress)!!;
     }
 
-    get fun reserveDataForUI(reserveAddress: Address): ReserveDataForUI {
+    get fun reserveDataAndConfiguration(reserveAddress: Address): ReserveDataAndConfiguration {
         let reserveData: ReserveData = self.reservesData.get(reserveAddress)!!;
+        let reserveConfiguration: ReserveConfiguration = self.reservesConfiguration.get(reserveAddress)!!;
         return
-            ReserveDataForUI{
-                liquidityIndex: reserveData.liquidityIndex,
-                currentLiquidityRate: reserveData.currentLiquidityRate,
-                borrowIndex: reserveData.borrowIndex,
-                currentBorrowRate: reserveData.currentBorrowRate,
-                totalSupply: reserveData.totalSupply,
-                availableLiquidity: reserveData.availableLiquidity,
-                accruedToTreasury: reserveData.accruedToTreasury,
-                totalBorrow: reserveData.totalBorrow,
-                lastUpdateTimestamp: reserveData.lastUpdateTimestamp,
-                price: reserveData.price,
+            ReserveDataAndConfiguration{
+                reserveData: reserveData,
+                reserveConfiguration: reserveConfiguration,
                 normalizedIncome: reserveData.getNormalizedIncome(),
                 normalizedDebt: reserveData.getNormalizedDebt()
             };
@@ -158,13 +153,21 @@ trait PoolView with Ownable, Resumable {
     }
 
     get fun bounceMsg(queryId: Int): Cell? {
-        let updatePositionMsg: UpdatePosition? = self.updatePositionMsg.get(queryId);
+        let updatePositionMsg: UpdatePositionBounce? = self.updatePositionMsg.get(queryId);
         if (updatePositionMsg != null) {
             return updatePositionMsg!!.toCell();
         }
-        let mintMsg: Mint? = self.mintMsg.get(queryId);
+        let mintMsg: MintBounce? = self.mintMsg.get(queryId);
         if (mintMsg != null) {
             return mintMsg!!.toCell();
+        }
+        let tokenTransferMsg: TokenTransferBounce? = self.tokenTransferMsg.get(queryId);
+        if (tokenTransferMsg != null) {
+            return tokenTransferMsg!!.toCell();
+        }
+        let tokenBurnMsg: TokenBurnBounce? = self.tokenBurnMsg.get(queryId);
+        if (tokenBurnMsg != null) {
+            return tokenBurnMsg!!.toCell();
         }
         return null;
     }

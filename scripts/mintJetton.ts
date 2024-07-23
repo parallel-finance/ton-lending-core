@@ -27,7 +27,6 @@ export async function run(provider: NetworkProvider, args: string[]) {
         {
             $$type: 'Mint',
             queryId: 0n,
-            token: sampleJetton.address,
             receiver: userAddress,
             amount: 1000000000000n,
         }

@@ -147,7 +147,7 @@ contract ATokenDefaultWallet
                     queryId: msg.queryId,
                     amount: msg.amount,
                     owner: self.owner,
-                    response_destination: self.owner
+                    response_destination: msg.response_destination
                 }.toCell()
             }
         );

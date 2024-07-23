@@ -9,3 +9,5 @@ export const ACTION_LIQUIDATION = 3n;
 
 export const RERUN_ACTION_UPDATE_POSITION = 100n;
 export const RERUN_ACTION_MINT = 101n;
+export const RERUN_ACTION_TOKEN_TRANSFER = 102n;
+export const RERUN_ACTION_TOKEN_BURN = 103n;
