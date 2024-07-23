@@ -42,7 +42,6 @@ message(0x66660006) WithdrawToken {
 }
 message UpdatePosition {
     queryId: Int as uint64;
-    user: Address;
     address: Address;
     supply: Int as int128;
     borrow: Int as int128;
@@ -62,6 +61,16 @@ message SetMockOraclePrice {
 message RerunBounceMsg {
     queryId: Int as uint64;
     action: Int as uint8;
+}
+message UpdatePositionBounce {
+    to: Address;
+    user: Address;
+    msg: UpdatePosition;
+}
+message MintBounce {
+    to: Address;
+    user: Address;
+    msg: Mint;
 }
 message TokenTransferBounce {
     to: Address;

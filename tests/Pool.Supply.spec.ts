@@ -6,6 +6,7 @@ import {
     ReserveConfiguration,
     ReserveInterestRateStrategy,
     UpdatePosition,
+    UpdatePositionBounce,
 } from '../wrappers/Pool';
 import '@ton/test-utils';
 import { SampleJetton } from '../build/SampleJetton/tact_SampleJetton';
@@ -156,7 +157,6 @@ describe('Pool Supply', () => {
             {
                 $$type: 'Mint',
                 queryId: 0n,
-                token: sampleJetton.address,
                 amount: 100000000000n,
                 receiver: deployer.address,
             },
@@ -400,13 +400,13 @@ describe('Pool Supply', () => {
             expect(accountData.positionsLength).toEqual(0n);
 
             let msgId = (await pool.getQueryId()) - 1n;
-            const updatePositionMsg = parsePoolBounceMessage(await pool.getBounceMsg(msgId)) as UpdatePosition;
-            expect(updatePositionMsg?.$$type).toEqual('UpdatePosition');
-            expect(updatePositionMsg?.queryId).toEqual(msgId);
+            const updatePositionMsg = parsePoolBounceMessage(await pool.getBounceMsg(msgId)) as UpdatePositionBounce;
+            expect(updatePositionMsg?.$$type).toEqual('UpdatePositionBounce');
+            expect(updatePositionMsg?.msg.queryId).toEqual(msgId);
             expect(updatePositionMsg?.user.toString()).toEqual(deployer.getSender().address.toString());
-            expect(updatePositionMsg?.address.toString()).toEqual(sampleJetton.address.toString());
-            expect(updatePositionMsg?.supply).toEqual(100000000000n);
-            expect(updatePositionMsg?.borrow).toEqual(0n);
+            expect(updatePositionMsg?.msg.address.toString()).toEqual(sampleJetton.address.toString());
+            expect(updatePositionMsg?.msg.supply).toEqual(100000000000n);
+            expect(updatePositionMsg?.msg.borrow).toEqual(0n);
 
             result = await pool.send(
                 deployer.getSender(),

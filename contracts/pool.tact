@@ -30,8 +30,8 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
     reserveInterestRateStrategy: map<Address, ReserveInterestRateStrategy>;
 
     // bounce messages
-    updatePositionMsg: map<Int, UpdatePosition>;
-    mintMsg: map<Int, Mint>;
+    updatePositionMsg: map<Int, UpdatePositionBounce>;
+    mintMsg: map<Int, MintBounce>;
     tokenTransferMsg: map<Int, TokenTransferBounce>;
 
     init() {
@@ -307,11 +307,15 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
         let queryId: Int = self.queryId;
         let mintMsg: Mint = Mint{
             queryId: queryId,
-            token: aTokenAddress,
             amount: amount,
             receiver: user
         };
-        self.mintMsg.set(queryId, mintMsg);
+        let bounce: MintBounce = MintBounce{
+            to: aTokenAddress,
+            user: user,
+            msg: mintMsg
+        };
+        self.mintMsg.set(queryId, bounce);
         self.queryId += 1;
 
         send(SendParameters{
@@ -363,7 +367,6 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
             mode: SendRemainingValue,
             body: Mint{
                 queryId: self.queryId,
-                token: dTokenAddress,
                 amount: amount,
                 receiver: user
             }.toCell()
@@ -372,13 +375,13 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
     }
 
     fun rerunMintMsg(queryId: Int) {
-        let msg: Mint = self.mintMsg.get(queryId)!!;
+        let bounce: MintBounce = self.mintMsg.get(queryId)!!;
         send(SendParameters{
-            to: msg.token,
+            to: bounce.to,
             value: 0,
             bounce: true,
             mode: SendRemainingValue,
-            body: msg.toCell()
+            body: bounce.msg.toCell()
         });
     }
 
@@ -460,15 +463,19 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
     fun updateUserAccountPosition(queryId: Int, ownerAddress: Address, reserveAddress: Address, supply: Int, borrow: Int) {
         let userAccountInit: StateInit = self.getUserAccountInit(ownerAddress);
         let userAccountAddress: Address = contractAddress(userAccountInit);
-        
         let msg: UpdatePosition = UpdatePosition{
             queryId: queryId,
-            user: ownerAddress,
             address: reserveAddress,
             supply: supply,
             borrow: borrow
         };
-        self.updatePositionMsg.set(queryId, msg);
+        let updatePositionBounce: UpdatePositionBounce = UpdatePositionBounce{
+            to: userAccountAddress,
+            user: ownerAddress,
+            msg: msg
+        };
+        
+        self.updatePositionMsg.set(queryId, updatePositionBounce);
         self.queryId += 1;
         
         send(SendParameters{
@@ -484,17 +491,17 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
 
     // rerun the stored UpdatePositionMsg which isn't deleted in the UserPositionUpdated.
     fun rerunUpdatePositionMsg(queryId: Int) {
-        let msg: UpdatePosition = self.updatePositionMsg.get(queryId)!!;
+        let bounce: UpdatePositionBounce = self.updatePositionMsg.get(queryId)!!;
 
-        let userAccountInit: StateInit = self.getUserAccountInit(msg.user);
+        let userAccountInit: StateInit = self.getUserAccountInit(bounce.user);
         let userAccountAddress: Address = contractAddress(userAccountInit);
 
         send(SendParameters{
-            to: userAccountAddress,
+            to: bounce.to,
             value: 0,
             bounce: true,
             mode: SendRemainingValue,
-            body: msg.toCell(),
+            body: bounce.msg.toCell(),
             code: userAccountInit.code,
             data: userAccountInit.data
         });

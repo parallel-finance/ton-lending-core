@@ -164,7 +164,6 @@ describe('Pool indexes calculation', () => {
             {
                 $$type: 'Mint',
                 queryId: 0n,
-                token: sampleJetton.address,
                 amount: toNano(10000n),
                 receiver: deployer.address,
             },
@@ -178,7 +177,6 @@ describe('Pool indexes calculation', () => {
             {
                 $$type: 'Mint',
                 queryId: 0n,
-                token: sampleJetton.address,
                 amount: toNano(10000n),
                 receiver: secondUser.address,
             },

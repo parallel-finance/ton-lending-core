@@ -295,7 +295,6 @@ describe('Pool Withdraw', () => {
             {
                 $$type: 'Mint',
                 queryId: 0n,
-                token: sampleJetton.address,
                 amount: 100000000000n,
                 receiver: deployer.address,
             },

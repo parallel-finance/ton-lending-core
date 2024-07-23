@@ -1,16 +1,16 @@
 import { Cell } from '@ton/core';
-import { loadMint, loadUpdatePosition, Mint, UpdatePosition } from '../wrappers/Pool';
+import { loadMintBounce, loadUpdatePositionBounce, MintBounce, UpdatePositionBounce } from '../wrappers/Pool';
 
-export const parsePoolBounceMessage = (message: Cell | null): UpdatePosition | Mint | null => {
+export const parsePoolBounceMessage = (message: Cell | null): UpdatePositionBounce | MintBounce | null => {
     if (message === null) return null;
 
     try {
-        const updatePositionMsg = loadUpdatePosition(message.asSlice());
+        const updatePositionMsg = loadUpdatePositionBounce(message.asSlice());
         return updatePositionMsg;
     } catch (error) {}
 
     try {
-        const mintMsg = loadMint(message.asSlice());
+        const mintMsg = loadMintBounce(message.asSlice());
         return mintMsg;
     } catch (error) {}
     console.log('Failed to parse bounce message');

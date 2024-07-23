@@ -26,8 +26,9 @@ trait PoolView with Ownable, Resumable {
     reservesConfiguration: map<Address, ReserveConfiguration>;
     reserveInterestRateStrategy: map<Address, ReserveInterestRateStrategy>;
     // bounce messages
-    updatePositionMsg: map<Int, UpdatePosition>;
-    mintMsg: map<Int, Mint>;
+    updatePositionMsg: map<Int, UpdatePositionBounce>;
+    mintMsg: map<Int, MintBounce>;
+    tokenTransferMsg: map<Int, TokenTransferBounce>;
 
     // ===== Get functions =====
 
@@ -158,11 +159,11 @@ trait PoolView with Ownable, Resumable {
     }
 
     get fun bounceMsg(queryId: Int): Cell? {
-        let updatePositionMsg: UpdatePosition? = self.updatePositionMsg.get(queryId);
+        let updatePositionMsg: UpdatePositionBounce? = self.updatePositionMsg.get(queryId);
         if (updatePositionMsg != null) {
             return updatePositionMsg!!.toCell();
         }
-        let mintMsg: Mint? = self.mintMsg.get(queryId);
+        let mintMsg: MintBounce? = self.mintMsg.get(queryId);
         if (mintMsg != null) {
             return mintMsg!!.toCell();
         }
