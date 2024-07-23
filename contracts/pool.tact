@@ -361,17 +361,28 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
     }
 
     fun burnDToken(asset: Address, user: Address, amount: Int) {
+        let queryId: Int = self.queryId;
+        let tokenBurnMsg: TokenBurn = TokenBurn{
+            queryId: queryId,
+            amount: amount,
+            owner: user,
+            response_destination: myAddress() // Pool need to receive TokenExcesses message
+        };
+        let to: Address = self.userDTokenWalletAddress(asset, user);
+        let bounce: TokenBurnBounce = TokenBurnBounce{
+            to: to,
+            user: user,
+            msg: tokenBurnMsg
+        };
+        self.tokenBurnMsg.set(queryId, bounce);
+        self.queryId += 1;
+
         send(SendParameters{
-            to: self.userDTokenWalletAddress(asset, user),
+            to: to,
             value: 0,
             bounce: true,
             mode: SendRemainingValue,
-            body: TokenBurn{
-                queryId: self.queryId,
-                amount: amount,
-                owner: user,
-                response_destination: user // This field isn't used in TokenBurn
-            }.toCell()
+            body: tokenBurnMsg.toCell()
         });
     }
 
