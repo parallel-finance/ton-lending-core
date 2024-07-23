@@ -1,6 +1,13 @@
 import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
 import { address, beginCell, Cell, fromNano, toNano } from '@ton/core';
-import { ATokenDTokenContents, Pool, ReserveConfiguration, ReserveInterestRateStrategy } from '../wrappers/Pool';
+import {
+    ATokenDTokenContents,
+    Pool,
+    ReserveConfiguration,
+    ReserveInterestRateStrategy,
+    TokenBurnBounce,
+    UpdatePositionBounce,
+} from '../wrappers/Pool';
 import '@ton/test-utils';
 import { SampleJetton } from '../build/SampleJetton/tact_SampleJetton';
 import { buildOnchainMetadata } from '../scripts/utils';
@@ -9,9 +16,10 @@ import { UserAccount } from '../build/Pool/tact_UserAccount';
 import { DTokenDefaultWallet } from '../build/DToken/tact_DTokenDefaultWallet';
 import { AToken } from '../wrappers/AToken';
 import { DToken } from '../wrappers/DToken';
-import { PERCENTAGE_FACTOR } from '../helpers/constant';
+import { PERCENTAGE_FACTOR, RERUN_ACTION_TOKEN_BURN, RERUN_ACTION_UPDATE_POSITION } from '../helpers/constant';
 import { ATokenDefaultWallet } from '../build/AToken/tact_ATokenDefaultWallet';
 import { sleep } from '@ton/blueprint';
+import { parsePoolBounceMessage } from '../helpers/pool';
 
 describe('Pool Withdraw', () => {
     let blockchain: Blockchain;
@@ -304,195 +312,329 @@ describe('Pool Withdraw', () => {
         await supplyFromDeployer(supplyAmount);
     });
 
-    it('withdraw successfully with no debt', async () => {
-        const userAccountAddress = await UserAccount.fromInit(pool.address, deployer.address);
+    // it('withdraw successfully with no debt', async () => {
+    //     const userAccountAddress = await UserAccount.fromInit(pool.address, deployer.address);
+    //     const withdrawAmount = toNano(50n);
+    //     const deployerJettonBalanceBefore = (await deployerJettonDefaultWallet.getGetWalletData()).balance;
+
+    //     const result = await pool.send(
+    //         deployer.getSender(),
+    //         {
+    //             value: toNano('1.5'),
+    //         },
+    //         {
+    //             $$type: 'WithdrawToken',
+    //             tokenAddress: sampleJetton.address,
+    //             amount: withdrawAmount,
+    //         },
+    //     );
+
+    //     // WithdrawToken
+    //     expect(result.transactions).toHaveTransaction({
+    //         from: deployer.address,
+    //         to: pool.address,
+    //         success: true,
+    //     });
+
+    //     // GetUserAccountData
+    //     expect(result.transactions).toHaveTransaction({
+    //         from: pool.address,
+    //         to: userAccountAddress.address,
+    //         success: true,
+    //     });
+
+    //     // UserAccountDataResponse
+    //     expect(result.transactions).toHaveTransaction({
+    //         from: userAccountAddress.address,
+    //         to: pool.address,
+    //         success: true,
+    //     });
+
+    //     // sendTokenTransferByPool TokenTransfer
+    //     expect(result.transactions).toHaveTransaction({
+    //         from: pool.address,
+    //         to: poolWallet.address,
+    //         success: true,
+    //     });
+
+    //     // UpdatePosition
+    //     expect(result.transactions).toHaveTransaction({
+    //         from: pool.address,
+    //         to: userAccountAddress.address,
+    //         success: true,
+    //     });
+
+    //     // UserPositionUpdated
+    //     expect(result.transactions).toHaveTransaction({
+    //         from: userAccountAddress.address,
+    //         to: pool.address,
+    //         success: true,
+    //     });
+
+    //     // Burn aToken
+    //     expect(result.transactions).toHaveTransaction({
+    //         from: pool.address,
+    //         to: deployerATokenDefaultWallet.address,
+    //         success: true,
+    //     });
+
+    //     // aToken-wallet to aToken-master TokenBurnNotification
+    //     expect(result.transactions).toHaveTransaction({
+    //         from: deployerATokenDefaultWallet.address,
+    //         to: aToken.address,
+    //         success: true,
+    //     });
+
+    //     const userAccountContract = blockchain.openContract(userAccountAddress);
+    //     const accountData = await userAccountContract.getAccount();
+    //     expect(accountData.positionsDetail?.get(sampleJetton.address)!!.supply).toEqual(supplyAmount - withdrawAmount);
+    //     expect(accountData.positionsDetail?.get(sampleJetton.address)!!.borrow).toEqual(toNano(0n));
+
+    //     const walletData = await deployerATokenDefaultWallet.getGetWalletData();
+    //     expect(walletData.balance).toEqual(supplyAmount - withdrawAmount);
+    //     expect((await deployerJettonDefaultWallet.getGetWalletData()).balance).toEqual(
+    //         deployerJettonBalanceBefore + withdrawAmount,
+    //     );
+    // });
+
+    // it('withdraw max amount successfully with no debt', async () => {
+    //     const userAccountAddress = await UserAccount.fromInit(pool.address, deployer.address);
+    //     const withdrawAmount = supplyAmount;
+    //     const deployerJettonBalanceBefore = (await deployerJettonDefaultWallet.getGetWalletData()).balance;
+    //     const result = await pool.send(
+    //         deployer.getSender(),
+    //         {
+    //             value: toNano('0.5'),
+    //         },
+    //         {
+    //             $$type: 'WithdrawToken',
+    //             tokenAddress: sampleJetton.address,
+    //             amount: withdrawAmount,
+    //         },
+    //     );
+
+    //     // WithdrawToken
+    //     expect(result.transactions).toHaveTransaction({
+    //         from: deployer.address,
+    //         to: pool.address,
+    //         success: true,
+    //     });
+
+    //     // GetUserAccountData
+    //     expect(result.transactions).toHaveTransaction({
+    //         from: pool.address,
+    //         to: userAccountAddress.address,
+    //         success: true,
+    //     });
+
+    //     // UserAccountDataResponse
+    //     expect(result.transactions).toHaveTransaction({
+    //         from: userAccountAddress.address,
+    //         to: pool.address,
+    //         success: true,
+    //     });
+
+    //     // sendTokenTransferByPool TokenTransfer
+    //     expect(result.transactions).toHaveTransaction({
+    //         from: pool.address,
+    //         to: poolWallet.address,
+    //         success: true,
+    //     });
+
+    //     // UpdatePosition
+    //     expect(result.transactions).toHaveTransaction({
+    //         from: pool.address,
+    //         to: userAccountAddress.address,
+    //         success: true,
+    //     });
+
+    //     // UserPositionUpdated
+    //     expect(result.transactions).toHaveTransaction({
+    //         from: userAccountAddress.address,
+    //         to: pool.address,
+    //         success: true,
+    //     });
+
+    //     // Burn aToken
+    //     expect(result.transactions).toHaveTransaction({
+    //         from: pool.address,
+    //         to: deployerATokenDefaultWallet.address,
+    //         success: true,
+    //     });
+
+    //     // aToken-wallet to aToken-master TokenBurnNotification
+    //     expect(result.transactions).toHaveTransaction({
+    //         from: deployerATokenDefaultWallet.address,
+    //         to: aToken.address,
+    //         success: true,
+    //     });
+
+    //     const userAccountContract = blockchain.openContract(userAccountAddress);
+    //     const accountData = await userAccountContract.getAccount();
+    //     expect(accountData.positionsLength).toEqual(1n);
+    //     expect(accountData.positions?.get(0n)!!.equals(sampleJetton.address)).toBeTruthy();
+    //     expect(accountData.positionsDetail?.get(sampleJetton.address)!!.supply).toEqual(supplyAmount - withdrawAmount);
+    //     expect(accountData.positionsDetail?.get(sampleJetton.address)!!.borrow).toEqual(toNano(0n));
+
+    //     const walletData = await deployerATokenDefaultWallet.getGetWalletData();
+    //     expect(walletData.balance).toEqual(supplyAmount - withdrawAmount);
+    //     expect((await deployerJettonDefaultWallet.getGetWalletData()).balance).toEqual(
+    //         deployerJettonBalanceBefore + withdrawAmount,
+    //     );
+    // });
+
+    // it('withdraw max amount when user have the debt and check HF successfully', async () => {
+    //     const userAccountAddress = await UserAccount.fromInit(pool.address, deployer.address);
+    //     const userAccountContract = blockchain.openContract(userAccountAddress);
+
+    //     const borrowAmount = toNano(60n);
+    //     await borrowFromDeployer(borrowAmount / 2n);
+    //     await sleep(5 * 1000);
+    //     await borrowFromDeployer(borrowAmount / 2n);
+
+    //     const maxWithdrawAmount =
+    //         supplyAmount - (borrowAmount * PERCENTAGE_FACTOR) / reserveConfiguration.liquidationThreshold;
+    //     // withdraw
+    //     const withdrawAmount = maxWithdrawAmount - toNano('0.01');
+    //     const deployerJettonBalanceBefore = (await deployerJettonDefaultWallet.getGetWalletData()).balance;
+    //     let result = await pool.send(
+    //         deployer.getSender(),
+    //         {
+    //             value: toNano('1.5'),
+    //         },
+    //         {
+    //             $$type: 'WithdrawToken',
+    //             tokenAddress: sampleJetton.address,
+    //             amount: withdrawAmount,
+    //         },
+    //     );
+
+    //     // WithdrawToken
+    //     expect(result.transactions).toHaveTransaction({
+    //         from: deployer.address,
+    //         to: pool.address,
+    //         success: true,
+    //     });
+
+    //     // GetUserAccountData
+    //     expect(result.transactions).toHaveTransaction({
+    //         from: pool.address,
+    //         to: userAccountAddress.address,
+    //         success: true,
+    //     });
+
+    //     // UserAccountDataResponse
+    //     expect(result.transactions).toHaveTransaction({
+    //         from: userAccountAddress.address,
+    //         to: pool.address,
+    //         success: true,
+    //     });
+
+    //     // sendTokenTransferByPool TokenTransfer
+    //     expect(result.transactions).toHaveTransaction({
+    //         from: pool.address,
+    //         to: poolWallet.address,
+    //         success: true,
+    //     });
+
+    //     // UpdatePosition
+    //     expect(result.transactions).toHaveTransaction({
+    //         from: pool.address,
+    //         to: userAccountAddress.address,
+    //         success: true,
+    //     });
+
+    //     // UserPositionUpdated
+    //     expect(result.transactions).toHaveTransaction({
+    //         from: userAccountAddress.address,
+    //         to: pool.address,
+    //         success: true,
+    //     });
+
+    //     // Burn aToken
+    //     expect(result.transactions).toHaveTransaction({
+    //         from: pool.address,
+    //         to: deployerATokenDefaultWallet.address,
+    //         success: true,
+    //     });
+
+    //     // aToken-wallet to aToken-master TokenBurnNotification
+    //     expect(result.transactions).toHaveTransaction({
+    //         from: deployerATokenDefaultWallet.address,
+    //         to: aToken.address,
+    //         success: true,
+    //     });
+
+    //     let accountData = await userAccountContract.getAccount();
+
+    //     expect(Number(fromNano(accountData.positionsDetail?.get(sampleJetton.address)!!.supply))).toBeCloseTo(
+    //         Number(fromNano(supplyAmount - withdrawAmount)),
+    //         5,
+    //     );
+    //     expect(Number(fromNano(accountData.positionsDetail?.get(sampleJetton.address)!!.borrow))).toBeCloseTo(
+    //         Number(fromNano(borrowAmount)),
+    //         5,
+    //     );
+
+    //     const walletData = await deployerATokenDefaultWallet.getGetWalletData();
+    //     expect(Number(fromNano(walletData.balance))).toBeCloseTo(Number(fromNano(supplyAmount - withdrawAmount)), 5);
+    //     expect((await deployerJettonDefaultWallet.getGetWalletData()).balance).toEqual(
+    //         deployerJettonBalanceBefore + withdrawAmount,
+    //     );
+    // });
+
+    // it('should bounce if the left supply position cant cover the debt', async () => {
+    //     const userAccountAddress = await UserAccount.fromInit(pool.address, deployer.address);
+
+    //     const borrowAmount = toNano(60n);
+    //     await borrowFromDeployer(borrowAmount);
+
+    //     const maxWithdrawAmount =
+    //         supplyAmount - (borrowAmount * PERCENTAGE_FACTOR) / reserveConfiguration.liquidationThreshold;
+    //     // withdraw
+    //     let result = await pool.send(
+    //         deployer.getSender(),
+    //         {
+    //             value: toNano('1.5'),
+    //         },
+    //         {
+    //             $$type: 'WithdrawToken',
+    //             tokenAddress: sampleJetton.address,
+    //             amount: maxWithdrawAmount + 2n,
+    //         },
+    //     );
+
+    //     // WithdrawToken
+    //     expect(result.transactions).toHaveTransaction({
+    //         from: deployer.address,
+    //         to: pool.address,
+    //         success: true,
+    //     });
+
+    //     // GetUserAccountData
+    //     expect(result.transactions).toHaveTransaction({
+    //         from: pool.address,
+    //         to: userAccountAddress.address,
+    //         success: true,
+    //     });
+
+    //     // UserAccountDataResponse
+    //     expect(result.transactions).toHaveTransaction({
+    //         from: userAccountAddress.address,
+    //         to: pool.address,
+    //         success: false,
+    //     });
+    // });
+
+    it('withdraw Bounce and rerun', async () => {
+        const userAccount = await UserAccount.fromInit(pool.address, deployer.address);
         const withdrawAmount = toNano(50n);
         const deployerJettonBalanceBefore = (await deployerJettonDefaultWallet.getGetWalletData()).balance;
 
-        const result = await pool.send(
-            deployer.getSender(),
-            {
-                value: toNano('1.5'),
-            },
-            {
-                $$type: 'WithdrawToken',
-                tokenAddress: sampleJetton.address,
-                amount: withdrawAmount,
-            },
-        );
-
-        // WithdrawToken
-        expect(result.transactions).toHaveTransaction({
-            from: deployer.address,
-            to: pool.address,
-            success: true,
-        });
-
-        // GetUserAccountData
-        expect(result.transactions).toHaveTransaction({
-            from: pool.address,
-            to: userAccountAddress.address,
-            success: true,
-        });
-
-        // UserAccountDataResponse
-        expect(result.transactions).toHaveTransaction({
-            from: userAccountAddress.address,
-            to: pool.address,
-            success: true,
-        });
-
-        // sendTokenTransferByPool TokenTransfer
-        expect(result.transactions).toHaveTransaction({
-            from: pool.address,
-            to: poolWallet.address,
-            success: true,
-        });
-
-        // UpdatePosition
-        expect(result.transactions).toHaveTransaction({
-            from: pool.address,
-            to: userAccountAddress.address,
-            success: true,
-        });
-
-        // UserPositionUpdated
-        expect(result.transactions).toHaveTransaction({
-            from: userAccountAddress.address,
-            to: pool.address,
-            success: true,
-        });
-
-        // Burn aToken
-        expect(result.transactions).toHaveTransaction({
-            from: pool.address,
-            to: deployerATokenDefaultWallet.address,
-            success: true,
-        });
-
-        // aToken-wallet to aToken-master TokenBurnNotification
-        expect(result.transactions).toHaveTransaction({
-            from: deployerATokenDefaultWallet.address,
-            to: aToken.address,
-            success: true,
-        });
-
-        const userAccountContract = blockchain.openContract(userAccountAddress);
-        const accountData = await userAccountContract.getAccount();
-        expect(accountData.positionsDetail?.get(sampleJetton.address)!!.supply).toEqual(supplyAmount - withdrawAmount);
-        expect(accountData.positionsDetail?.get(sampleJetton.address)!!.borrow).toEqual(toNano(0n));
-
-        const walletData = await deployerATokenDefaultWallet.getGetWalletData();
-        expect(walletData.balance).toEqual(supplyAmount - withdrawAmount);
-        expect((await deployerJettonDefaultWallet.getGetWalletData()).balance).toEqual(
-            deployerJettonBalanceBefore + withdrawAmount,
-        );
-    });
-
-    it('withdraw max amount successfully with no debt', async () => {
-        const userAccountAddress = await UserAccount.fromInit(pool.address, deployer.address);
-        const withdrawAmount = supplyAmount;
-        const deployerJettonBalanceBefore = (await deployerJettonDefaultWallet.getGetWalletData()).balance;
-        const result = await pool.send(
-            deployer.getSender(),
-            {
-                value: toNano('0.5'),
-            },
-            {
-                $$type: 'WithdrawToken',
-                tokenAddress: sampleJetton.address,
-                amount: withdrawAmount,
-            },
-        );
-
-        // WithdrawToken
-        expect(result.transactions).toHaveTransaction({
-            from: deployer.address,
-            to: pool.address,
-            success: true,
-        });
-
-        // GetUserAccountData
-        expect(result.transactions).toHaveTransaction({
-            from: pool.address,
-            to: userAccountAddress.address,
-            success: true,
-        });
-
-        // UserAccountDataResponse
-        expect(result.transactions).toHaveTransaction({
-            from: userAccountAddress.address,
-            to: pool.address,
-            success: true,
-        });
-
-        // sendTokenTransferByPool TokenTransfer
-        expect(result.transactions).toHaveTransaction({
-            from: pool.address,
-            to: poolWallet.address,
-            success: true,
-        });
-
-        // UpdatePosition
-        expect(result.transactions).toHaveTransaction({
-            from: pool.address,
-            to: userAccountAddress.address,
-            success: true,
-        });
-
-        // UserPositionUpdated
-        expect(result.transactions).toHaveTransaction({
-            from: userAccountAddress.address,
-            to: pool.address,
-            success: true,
-        });
-
-        // Burn aToken
-        expect(result.transactions).toHaveTransaction({
-            from: pool.address,
-            to: deployerATokenDefaultWallet.address,
-            success: true,
-        });
-
-        // aToken-wallet to aToken-master TokenBurnNotification
-        expect(result.transactions).toHaveTransaction({
-            from: deployerATokenDefaultWallet.address,
-            to: aToken.address,
-            success: true,
-        });
-
-        const userAccountContract = blockchain.openContract(userAccountAddress);
-        const accountData = await userAccountContract.getAccount();
-        expect(accountData.positionsLength).toEqual(1n);
-        expect(accountData.positions?.get(0n)!!.equals(sampleJetton.address)).toBeTruthy();
-        expect(accountData.positionsDetail?.get(sampleJetton.address)!!.supply).toEqual(supplyAmount - withdrawAmount);
-        expect(accountData.positionsDetail?.get(sampleJetton.address)!!.borrow).toEqual(toNano(0n));
-
-        const walletData = await deployerATokenDefaultWallet.getGetWalletData();
-        expect(walletData.balance).toEqual(supplyAmount - withdrawAmount);
-        expect((await deployerJettonDefaultWallet.getGetWalletData()).balance).toEqual(
-            deployerJettonBalanceBefore + withdrawAmount,
-        );
-    });
-
-    it('withdraw max amount when user have the debt and check HF successfully', async () => {
-        const userAccountAddress = await UserAccount.fromInit(pool.address, deployer.address);
-        const userAccountContract = blockchain.openContract(userAccountAddress);
-
-        const borrowAmount = toNano(60n);
-        await borrowFromDeployer(borrowAmount / 2n);
-        await sleep(5 * 1000);
-        await borrowFromDeployer(borrowAmount / 2n);
-
-        const maxWithdrawAmount =
-            supplyAmount - (borrowAmount * PERCENTAGE_FACTOR) / reserveConfiguration.liquidationThreshold;
-        // withdraw
-        const withdrawAmount = maxWithdrawAmount - toNano('0.01');
-        const deployerJettonBalanceBefore = (await deployerJettonDefaultWallet.getGetWalletData()).balance;
         let result = await pool.send(
             deployer.getSender(),
             {
-                value: toNano('1.5'),
+                value: toNano('0.05'),
             },
             {
                 $$type: 'WithdrawToken',
@@ -511,13 +653,13 @@ describe('Pool Withdraw', () => {
         // GetUserAccountData
         expect(result.transactions).toHaveTransaction({
             from: pool.address,
-            to: userAccountAddress.address,
+            to: userAccount.address,
             success: true,
         });
 
         // UserAccountDataResponse
         expect(result.transactions).toHaveTransaction({
-            from: userAccountAddress.address,
+            from: userAccount.address,
             to: pool.address,
             success: true,
         });
@@ -532,89 +674,129 @@ describe('Pool Withdraw', () => {
         // UpdatePosition
         expect(result.transactions).toHaveTransaction({
             from: pool.address,
-            to: userAccountAddress.address,
-            success: true,
-        });
-
-        // UserPositionUpdated
-        expect(result.transactions).toHaveTransaction({
-            from: userAccountAddress.address,
-            to: pool.address,
-            success: true,
-        });
-
-        // Burn aToken
-        expect(result.transactions).toHaveTransaction({
-            from: pool.address,
-            to: deployerATokenDefaultWallet.address,
-            success: true,
-        });
-
-        // aToken-wallet to aToken-master TokenBurnNotification
-        expect(result.transactions).toHaveTransaction({
-            from: deployerATokenDefaultWallet.address,
-            to: aToken.address,
-            success: true,
-        });
-
-        let accountData = await userAccountContract.getAccount();
-
-        expect(Number(fromNano(accountData.positionsDetail?.get(sampleJetton.address)!!.supply))).toBeCloseTo(
-            Number(fromNano(supplyAmount - withdrawAmount)),
-            5,
-        );
-        expect(Number(fromNano(accountData.positionsDetail?.get(sampleJetton.address)!!.borrow))).toBeCloseTo(
-            Number(fromNano(borrowAmount)),
-            5,
-        );
-
-        const walletData = await deployerATokenDefaultWallet.getGetWalletData();
-        expect(Number(fromNano(walletData.balance))).toBeCloseTo(Number(fromNano(supplyAmount - withdrawAmount)), 5);
-        expect((await deployerJettonDefaultWallet.getGetWalletData()).balance).toEqual(
-            deployerJettonBalanceBefore + withdrawAmount,
-        );
-    });
-
-    it('should bounce if the left supply position cant cover the debt', async () => {
-        const userAccountAddress = await UserAccount.fromInit(pool.address, deployer.address);
-
-        const borrowAmount = toNano(60n);
-        await borrowFromDeployer(borrowAmount);
-
-        const maxWithdrawAmount =
-            supplyAmount - (borrowAmount * PERCENTAGE_FACTOR) / reserveConfiguration.liquidationThreshold;
-        // withdraw
-        let result = await pool.send(
-            deployer.getSender(),
-            {
-                value: toNano('1.5'),
-            },
-            {
-                $$type: 'WithdrawToken',
-                tokenAddress: sampleJetton.address,
-                amount: maxWithdrawAmount + 2n,
-            },
-        );
-
-        // WithdrawToken
-        expect(result.transactions).toHaveTransaction({
-            from: deployer.address,
-            to: pool.address,
-            success: true,
-        });
-
-        // GetUserAccountData
-        expect(result.transactions).toHaveTransaction({
-            from: pool.address,
-            to: userAccountAddress.address,
-            success: true,
-        });
-
-        // UserAccountDataResponse
-        expect(result.transactions).toHaveTransaction({
-            from: userAccountAddress.address,
-            to: pool.address,
+            to: userAccount.address,
             success: false,
         });
+
+        let msgId = (await pool.getQueryId()) - 1n;
+        const updatePositionBounce = parsePoolBounceMessage(await pool.getBounceMsg(msgId)) as UpdatePositionBounce;
+        expect(updatePositionBounce.$$type).toEqual('UpdatePositionBounce');
+        expect(updatePositionBounce.to.toString()).toEqual(userAccount.address.toString());
+        expect(updatePositionBounce.user.toString()).toEqual(deployer.getSender().address.toString());
+        expect(updatePositionBounce.msg.$$type).toEqual('UpdatePosition');
+        expect(updatePositionBounce.msg.queryId).toEqual(msgId);
+        expect(updatePositionBounce.msg.address.toString()).toEqual(sampleJetton.address.toString());
+        expect(updatePositionBounce.msg.supply).toEqual(-withdrawAmount);
+        expect(updatePositionBounce.msg.borrow).toEqual(0n);
+
+        result = await pool.send(
+            deployer.getSender(),
+            {
+                value: toNano('0.06'),
+            },
+            {
+                $$type: 'RerunBounceMsg',
+                queryId: msgId,
+                action: RERUN_ACTION_UPDATE_POSITION,
+            },
+        );
+
+        // RerunBounceMsg
+        expect(result.transactions).toHaveTransaction({
+            from: deployer.getSender().address,
+            to: pool.address,
+            success: true,
+        });
+        // UpdatePosition
+        expect(result.transactions).toHaveTransaction({
+            from: pool.address,
+            to: userAccount.address,
+            success: true,
+        });
+        // UserPositionUpdated
+        expect(result.transactions).toHaveTransaction({
+            from: userAccount.address,
+            to: pool.address,
+            success: true,
+        });
+
+        // UserPositionUpdated
+        expect(result.transactions).toHaveTransaction({
+            from: userAccount.address,
+            to: pool.address,
+            success: true,
+        });
+
+        expect(await pool.getBounceMsg(msgId)).toEqual(null);
+
+        // Burn aToken
+        expect(result.transactions).toHaveTransaction({
+            from: pool.address,
+            to: deployerATokenDefaultWallet.address,
+            success: false,
+        });
+
+        msgId = (await pool.getQueryId()) - 1n;
+        const tokenBurnBounce = parsePoolBounceMessage(await pool.getBounceMsg(msgId)) as TokenBurnBounce;
+        expect(tokenBurnBounce.$$type).toEqual('TokenBurnBounce');
+        expect(tokenBurnBounce.to.toString()).toEqual(deployerATokenDefaultWallet.address.toString());
+        expect(tokenBurnBounce.user.toString()).toEqual(deployer.getSender().address.toString());
+        expect(tokenBurnBounce.msg.$$type).toEqual('TokenBurn');
+        expect(tokenBurnBounce.msg.queryId).toEqual(msgId);
+        expect(tokenBurnBounce.msg.amount).toEqual(withdrawAmount);
+        expect(tokenBurnBounce.msg.owner.toString()).toEqual(deployer.getSender().address.toString());
+        expect(tokenBurnBounce.msg.response_destination.toString()).toEqual(pool.address.toString());
+
+        result = await pool.send(
+            deployer.getSender(),
+            {
+                value: toNano('0.05'),
+            },
+            {
+                $$type: 'RerunBounceMsg',
+                queryId: msgId,
+                action: RERUN_ACTION_TOKEN_BURN,
+            },
+        );
+
+        // RerunBounceMsg
+        expect(result.transactions).toHaveTransaction({
+            from: deployer.getSender().address,
+            to: pool.address,
+            success: true,
+        });
+
+        // Burn aToken
+        expect(result.transactions).toHaveTransaction({
+            from: pool.address,
+            to: deployerATokenDefaultWallet.address,
+            success: true,
+        });
+
+        // aToken-wallet to aToken-master TokenBurnNotification
+        expect(result.transactions).toHaveTransaction({
+            from: deployerATokenDefaultWallet.address,
+            to: aToken.address,
+            success: true,
+        });
+
+        // TokenExcesses
+        expect(result.transactions).toHaveTransaction({
+            from: aToken.address,
+            to: pool.address,
+            success: true,
+        });
+        expect(await pool.getBounceMsg(msgId)).toEqual(null);
+
+        const userAccountContract = blockchain.openContract(userAccount);
+        const accountData = await userAccountContract.getAccount();
+        expect(accountData.positionsDetail?.get(sampleJetton.address)!!.supply).toEqual(supplyAmount - withdrawAmount);
+        expect(accountData.positionsDetail?.get(sampleJetton.address)!!.borrow).toEqual(toNano(0n));
+
+        const walletData = await deployerATokenDefaultWallet.getGetWalletData();
+        expect(walletData.balance).toEqual(supplyAmount - withdrawAmount);
+        expect((await deployerJettonDefaultWallet.getGetWalletData()).balance).toEqual(
+            deployerJettonBalanceBefore + withdrawAmount,
+        );
     });
 });

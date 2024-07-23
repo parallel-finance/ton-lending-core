@@ -29,6 +29,7 @@ trait PoolView with Ownable, Resumable {
     updatePositionMsg: map<Int, UpdatePositionBounce>;
     mintMsg: map<Int, MintBounce>;
     tokenTransferMsg: map<Int, TokenTransferBounce>;
+    tokenBurnMsg: map<Int, TokenBurnBounce>;
 
     // ===== Get functions =====
 
@@ -166,6 +167,14 @@ trait PoolView with Ownable, Resumable {
         let mintMsg: MintBounce? = self.mintMsg.get(queryId);
         if (mintMsg != null) {
             return mintMsg!!.toCell();
+        }
+        let tokenTransferMsg: TokenTransferBounce? = self.tokenTransferMsg.get(queryId);
+        if (tokenTransferMsg != null) {
+            return tokenTransferMsg!!.toCell();
+        }
+        let tokenBurnMsg: TokenBurnBounce? = self.tokenBurnMsg.get(queryId);
+        if (tokenBurnMsg != null) {
+            return tokenBurnMsg!!.toCell();
         }
         return null;
     }

@@ -77,3 +77,8 @@ message TokenTransferBounce {
     user: Address;
     msg: TokenTransfer;
 }
+message TokenBurnBounce {
+    to: Address;
+    user: Address;
+    msg: TokenBurn;
+}
