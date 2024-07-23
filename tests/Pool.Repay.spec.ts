@@ -218,6 +218,8 @@ describe('Pool', () => {
             },
             {
                 $$type: 'Mint',
+                queryId: 0n,
+                token: sampleJetton.address,
                 amount: toNano(100n),
                 receiver: deployer.address,
             },
@@ -316,7 +318,7 @@ describe('Pool', () => {
             });
 
             const walletDataAfter = await userDTokenDefaultWallet.getGetWalletData();
-            expect(Number(fromNano(walletDataAfter.balance))).toBeCloseTo(25, 5);
+            expect(Number(fromNano(walletDataAfter.balance))).toBeCloseTo(Number(fromNano(toNano(25n))), 5);
             expect(walletDataAfter.owner.toString()).toEqual(deployer.address.toString());
 
             const accountData = await userAccountContract.getAccount();

@@ -10,8 +10,9 @@ import "./types/struct";
 import "./types/message";
 import "./libraries/logic/reserve-logic";
 import "./constants";
+import "./pool-view";
 
-contract Pool with Deployable, Ownable, Resumable {
+contract Pool with Deployable, Ownable, Resumable, PoolView {
 
     owner: Address;
     stopped: Bool;
@@ -27,6 +28,10 @@ contract Pool with Deployable, Ownable, Resumable {
     // baseTokenAddress -> reserveConfiguration
     reservesConfiguration: map<Address, ReserveConfiguration>;
     reserveInterestRateStrategy: map<Address, ReserveInterestRateStrategy>;
+
+    // bounce messages
+    updatePositionMsg: map<Int, UpdatePosition>;
+    mintMsg: map<Int, Mint>;
 
     init() {
         self.owner = sender();
@@ -58,6 +63,12 @@ contract Pool with Deployable, Ownable, Resumable {
     }
 
     receive(msg: UserPositionUpdated) {
+        // TODO: check ctx sender is user's userAccount address
+        let userAccount: Address = self.userAccountAddress(msg.user);
+        require(userAccount == context().sender, "Not from the user account");
+        // delete stored updatePositionMsg
+        self.updatePositionMsg.del(msg.queryId);
+
         // for supply
         if (msg.supply > 0) {
             self.mintAToken(msg.asset, msg.user, msg.supply);
@@ -78,8 +89,7 @@ contract Pool with Deployable, Ownable, Resumable {
 
     receive(msg: BorrowToken) {
         // send message to get user account data
-        let userAccountInit: StateInit = initOf UserAccount(myAddress(), sender());
-        let userAccountAddress: Address = contractAddress(userAccountInit);
+        let userAccountAddress: Address = self.userAccountAddress(sender());
         let reserveAddress: Address = msg.tokenAddress;
         let reserveConfiguration: ReserveConfiguration? = self.reservesConfiguration.get(reserveAddress);
         require(reserveConfiguration != null, "Reserve not found");
@@ -102,8 +112,7 @@ contract Pool with Deployable, Ownable, Resumable {
 
     receive(msg: WithdrawToken) {
         // send message to get user account data
-        let userAccountInit: StateInit = initOf UserAccount(myAddress(), sender());
-        let userAccountAddress: Address = contractAddress(userAccountInit);
+        let userAccountAddress: Address = self.userAccountAddress(sender());
         let reserveAddress: Address = msg.tokenAddress;
         let reserveConfiguration: ReserveConfiguration? = self.reservesConfiguration.get(reserveAddress);
         require(reserveConfiguration != null, "Reserve not found");
@@ -182,8 +191,20 @@ contract Pool with Deployable, Ownable, Resumable {
     }
 
     receive(msg: TokenExcesses) {
-        // accept excesses and do nothing
         // TODO: consider store the token transfer data and transfer token here
+        // because `self.queryId` is globally increment, 
+        // we can delete the key of the queryId from `mintMsg` map and `tokenTransferMsg` map in the same time,
+        // And only one map will be updated.
+        self.mintMsg.del(msg.queryId);
+    }
+
+    receive(msg: RerunBounceMsg) {
+        if (msg.action == RERUN_ACTION_UPDATE_POSITION) {
+            self.rerunUpdatePositionMsg(msg.queryId);
+        }
+        if (msg.action == RERUN_ACTION_MINT) {
+            self.rerunMintMsg(msg.queryId);
+        }
     }
 
     fun sendTokenTransferByPool(queryId: Int, poolWalletAddress: Address, toAddress: Address, amount: Int) {
@@ -253,59 +274,26 @@ contract Pool with Deployable, Ownable, Resumable {
         return true;
     }
 
-    get fun userAccountHealthInfo(userAccountData: UserAccountData): UserAccountHealthInfo {
-        // sum(reserve supply amount * reserve price)
-        let totalSupply: Int = 0;
-        // sum(reserve Collateral amount * reserve price)
-        let totalCollateral: Int = 0;
-        // sum(reserve Collateral amount * reserve price * reserve ltv)
-        let totalCollateralMulLtv: Int = 0;
-        // sum(reserve Collateral amount * reserve price * reserve LiquidationThreshold)
-        let totalCollateralMulLT: Int = 0;
-        // sum(reserve borrow amount * reserve price)
-        let totalDebt: Int = 0;
-
-        foreach (reserve, tokenData in userAccountData.positionsDetail) {
-            let reserveData: ReserveData = self.reservesData.get(reserve)!!;
-            let reserveConfiguration: ReserveConfiguration = self.reservesConfiguration.get(reserve)!!;
-
-            if (tokenData.supply > 0) {
-                let normalizedIncome: Int = reserveData.getNormalizedIncome();
-                let supplyValue: Int = tokenData.supply.rayMul(normalizedIncome) * reserveData.price / JETTON_UNIT;
-                totalSupply += supplyValue;
-                if (tokenData.asCollateral) {
-                    totalCollateral += supplyValue;
-                    totalCollateralMulLtv += supplyValue * reserveConfiguration.ltv;
-                    totalCollateralMulLT += supplyValue  * reserveConfiguration.liquidationThreshold;
-                }
-            }
-            if (tokenData.borrow > 0) {
-                let normalizedDebt: Int = reserveData.getNormalizedDebt();
-                let borrowValue: Int = tokenData.borrow.rayMul(normalizedDebt) * reserveData.price / JETTON_UNIT;
-                totalDebt += borrowValue;
-            }
-        }
-        return UserAccountHealthInfo{
-            avgLtv: totalCollateralMulLtv / totalCollateral,
-            avgLiquidationThreshold: totalCollateralMulLT / totalCollateral,
-            totalSupplyInBaseCurrency: totalSupply,
-            totalCollateralInBaseCurrency: totalCollateral,
-            totalDebtInBaseCurrency: totalDebt,
-            healthFactorInRay: totalDebt != 0 ? (totalCollateralMulLT / PERCENTAGE_FACTOR).rayDiv(totalDebt) : UINT256_MAX // base in RAY
-        };
-    }
-
     fun mintAToken(asset: Address, user: Address, amount: Int) {
         let aTokenAddress: Address = self.reservesConfiguration.get(asset)!!.aTokenAddress;
+
+        // store mintMsg
+        let queryId: Int = self.queryId;
+        let mintMsg: Mint = Mint{
+            queryId: queryId,
+            token: aTokenAddress,
+            amount: amount,
+            receiver: user
+        };
+        self.mintMsg.set(queryId, mintMsg);
+        self.queryId += 1;
+
         send(SendParameters{
             to: aTokenAddress,
             value: 0,
             bounce: true,
             mode: SendRemainingValue,
-            body: Mint{
-                amount: amount,
-                receiver: user
-            }.toCell()
+            body: mintMsg.toCell()
         });
     }
 
@@ -348,9 +336,23 @@ contract Pool with Deployable, Ownable, Resumable {
             bounce: true,
             mode: SendRemainingValue,
             body: Mint{
+                queryId: self.queryId,
+                token: dTokenAddress,
                 amount: amount,
                 receiver: user
             }.toCell()
+        });
+        self.queryId += 1;
+    }
+
+    fun rerunMintMsg(queryId: Int) {
+        let msg: Mint = self.mintMsg.get(queryId)!!;
+        send(SendParameters{
+            to: msg.token,
+            value: 0,
+            bounce: true,
+            mode: SendRemainingValue,
+            body: msg.toCell()
         });
     }
 
@@ -430,21 +432,45 @@ contract Pool with Deployable, Ownable, Resumable {
     }
 
     fun updateUserAccountPosition(queryId: Int, ownerAddress: Address, reserveAddress: Address, supply: Int, borrow: Int) {
-        let userAccountInit: StateInit = initOf UserAccount(myAddress(), ownerAddress);
+        let userAccountInit: StateInit = self.getUserAccountInit(ownerAddress);
         let userAccountAddress: Address = contractAddress(userAccountInit);
-        send(SendParameters{
-        to: userAccountAddress,
-        value: 0,
-        bounce: true,
-        mode: SendRemainingValue,
-        body: UpdatePosition{
+        
+        let msg: UpdatePosition = UpdatePosition{
             queryId: queryId,
+            user: ownerAddress,
             address: reserveAddress,
             supply: supply,
             borrow: borrow
-        }.toCell(),
-        code: userAccountInit.code,
-        data: userAccountInit.data
+        };
+        self.updatePositionMsg.set(queryId, msg);
+        self.queryId += 1;
+        
+        send(SendParameters{
+            to: userAccountAddress,
+            value: 0,
+            bounce: true,
+            mode: SendRemainingValue,
+            body: msg.toCell(),
+            code: userAccountInit.code,
+            data: userAccountInit.data
+        });
+    }
+
+    // rerun the stored UpdatePositionMsg which isn't deleted in the UserPositionUpdated.
+    fun rerunUpdatePositionMsg(queryId: Int) {
+        let msg: UpdatePosition = self.updatePositionMsg.get(queryId)!!;
+
+        let userAccountInit: StateInit = self.getUserAccountInit(msg.user);
+        let userAccountAddress: Address = contractAddress(userAccountInit);
+
+        send(SendParameters{
+            to: userAccountAddress,
+            value: 0,
+            bounce: true,
+            mode: SendRemainingValue,
+            body: msg.toCell(),
+            code: userAccountInit.code,
+            data: userAccountInit.data
         });
     }
 
@@ -460,18 +486,6 @@ contract Pool with Deployable, Ownable, Resumable {
             i = i + 1;
         }
         return matchedReserve;
-    }
-
-    fun getUserAccountInit(userAddress: Address): StateInit {
-        return initOf UserAccount(myAddress(), userAddress);
-    }
-
-    fun getAssetATokenInit(content: Cell, asset: Address): StateInit {
-        return initOf AToken(myAddress(), content, asset);
-    }
-
-    fun getAssetDTokenInit(content: Cell, asset: Address): StateInit {
-        return initOf DToken(myAddress(), content, asset);
     }
 
     fun deployAToken(content: Cell, asset: Address): Address {
@@ -563,68 +577,5 @@ contract Pool with Deployable, Ownable, Resumable {
         require(reserveData.accruedToTreasury == 0, "Treasury share not zero");
         require(reserveData.totalSupply == 0, "Liability not zero");
         require(reserveData.totalBorrow == 0, "Debt not zero");
-    }
-
-    // ===== Get functions =====
-    get fun reservesLength(): Int {
-        return self.reservesLength;
-    }
-
-    get fun reserves(): map<Int, Address> {
-        return self.reserves;
-    }
-
-    get fun reserveAddress(reserveIndex: Int): Address {
-        return self.reserves.get(reserveIndex)!!;
-    }
-
-    get fun reserveData(reserveAddress: Address): ReserveData {
-        return self.reservesData.get(reserveAddress)!!;
-    }
-
-    get fun reserveDataForUI(reserveAddress: Address): ReserveDataForUI {
-        let reserveData: ReserveData = self.reservesData.get(reserveAddress)!!;
-        return ReserveDataForUI{
-            liquidityIndex: reserveData.liquidityIndex,
-            currentLiquidityRate: reserveData.currentLiquidityRate,
-            borrowIndex: reserveData.borrowIndex,
-            currentBorrowRate: reserveData.currentBorrowRate,
-            totalSupply: reserveData.totalSupply,
-            availableLiquidity: reserveData.availableLiquidity,
-            accruedToTreasury: reserveData.accruedToTreasury,
-            totalBorrow: reserveData.totalBorrow,
-            lastUpdateTimestamp: reserveData.lastUpdateTimestamp,
-            price: reserveData.price,
-            normalizedIncome: reserveData.getNormalizedIncome(),
-            normalizedDebt: reserveData.getNormalizedDebt(),
-        };
-    }
-
-    get fun reserveConfiguration(reserveAddress: Address): ReserveConfiguration {
-        return self.reservesConfiguration.get(reserveAddress)!!;
-    }
-
-    get fun calculateATokenAddress(content: Cell, reserveAddress: Address): Address {
-        let sinit: StateInit = self.getAssetATokenInit(content, reserveAddress);
-        let aTokenAddress: Address = contractAddress(sinit);
-        return aTokenAddress;
-    }
-
-    get fun calculateDTokenAddress(content: Cell, reserveAddress: Address): Address {
-        let sinit: StateInit = self.getAssetDTokenInit(content, reserveAddress);
-        let dTokenAddress: Address = contractAddress(sinit);
-        return dTokenAddress;
-    }
-
-    get fun userATokenWalletAddress(asset: Address, user: Address): Address {
-        let aToken: Address = self.reservesConfiguration.get(asset)!!.aTokenAddress;
-        let sinit: StateInit = initOf ATokenDefaultWallet(aToken, myAddress(), asset, user);
-        return contractAddress(sinit);
-    }
-
-    get fun userDTokenWalletAddress(asset: Address, user: Address): Address {
-        let dToken: Address = self.reservesConfiguration.get(asset)!!.dTokenAddress;
-        let sinit: StateInit = initOf DTokenDefaultWallet(dToken, myAddress(), asset, user);
-        return contractAddress(sinit);
     }
 }

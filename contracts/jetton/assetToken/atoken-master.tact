@@ -40,7 +40,7 @@ trait ATokenJettonTrait with Ownable, Deployable, Resumable {
     // @to The Address receive the Jetton token after minting
     // @amount The amount of Jetton token being minted
     // @response_destination The previous owner address
-    fun mint(to: Address, amount: Int, response_destination: Address) {
+    fun mint(queryId: Int, to: Address, amount: Int, response_destination: Address) {
         self.totalSupply = (self.totalSupply + amount); // Update total supply
 
         let winit: StateInit = self.getJettonWalletInit(to); // Create message
@@ -50,7 +50,7 @@ trait ATokenJettonTrait with Ownable, Deployable, Resumable {
                 bounce: false,
                 mode: SendRemainingValue,
                 body: TokenTransferInternal{
-                    queryId: 0,
+                    queryId: queryId,
                     amount: amount,
                     from: myAddress(),
                     response_destination: response_destination,

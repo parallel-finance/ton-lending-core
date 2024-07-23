@@ -1,6 +1,12 @@
 import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
 import { address, beginCell, Cell, toNano } from '@ton/core';
-import { ATokenDTokenContents, Pool, ReserveConfiguration, ReserveInterestRateStrategy } from '../wrappers/Pool';
+import {
+    ATokenDTokenContents,
+    Pool,
+    ReserveConfiguration,
+    ReserveInterestRateStrategy,
+    UpdatePosition,
+} from '../wrappers/Pool';
 import '@ton/test-utils';
 import { SampleJetton } from '../build/SampleJetton/tact_SampleJetton';
 import { buildOnchainMetadata } from '../scripts/utils';
@@ -8,8 +14,10 @@ import { JettonDefaultWallet } from '../build/SampleJetton/tact_JettonDefaultWal
 import { UserAccount } from '../build/Pool/tact_UserAccount';
 import { ATokenDefaultWallet } from '../build/AToken/tact_ATokenDefaultWallet';
 import { AToken } from '../wrappers/AToken';
+import { RERUN_ACTION_MINT, RERUN_ACTION_UPDATE_POSITION } from '../helpers/constant';
+import { parsePoolBounceMessage } from '../helpers/pool';
 
-describe('Pool', () => {
+describe('Pool Supply', () => {
     let blockchain: Blockchain;
     let deployer: SandboxContract<TreasuryContract>;
     let secondUser: SandboxContract<TreasuryContract>;
@@ -147,6 +155,8 @@ describe('Pool', () => {
             },
             {
                 $$type: 'Mint',
+                queryId: 0n,
+                token: sampleJetton.address,
                 amount: 100000000000n,
                 receiver: deployer.address,
             },
@@ -331,6 +341,154 @@ describe('Pool', () => {
                 to: pool.address,
                 success: false,
             });
+        });
+
+        it('UpdatePosition and MintAToken Bounce and rerun', async () => {
+            // transfer jetton to pool
+            const deployerWalletAddress = await sampleJetton.getGetWalletAddress(deployer.address);
+            const poolWalletAddress = await sampleJetton.getGetWalletAddress(pool.address);
+            const deployerJettonDefaultWallet = blockchain.openContract(
+                JettonDefaultWallet.fromAddress(deployerWalletAddress),
+            );
+            const forward_payload: Cell = beginCell().storeUint(0x55b591ba, 32).endCell();
+
+            const userAccountContract = blockchain.openContract(
+                await UserAccount.fromInit(pool.address, deployer.address),
+            );
+            const userAccountAddress = userAccountContract.address;
+            const amount = toNano(100n);
+
+            let result = await deployerJettonDefaultWallet.send(
+                deployer.getSender(),
+                {
+                    value: toNano('0.5'),
+                },
+                {
+                    $$type: 'TokenTransfer',
+                    queryId: 0n,
+                    amount: amount,
+                    destination: pool.address,
+                    response_destination: deployerWalletAddress,
+                    custom_payload: null,
+                    forward_ton_amount: toNano('0.025'),
+                    forward_payload: forward_payload,
+                },
+            );
+
+            // TokenTransferInternal
+            expect(result.transactions).toHaveTransaction({
+                from: deployerWalletAddress,
+                to: poolWalletAddress,
+                success: true,
+            });
+
+            // TransferNotification
+            expect(result.transactions).toHaveTransaction({
+                from: poolWalletAddress,
+                to: pool.address,
+                success: true,
+            });
+
+            // UpdatePosition should be failed
+            expect(result.transactions).toHaveTransaction({
+                from: pool.address,
+                to: userAccountAddress,
+                success: false,
+            });
+            // check user account
+            let accountData = await userAccountContract.getAccount();
+            expect(accountData.positionsLength).toEqual(0n);
+
+            let msgId = (await pool.getQueryId()) - 1n;
+            const updatePositionMsg = parsePoolBounceMessage(await pool.getBounceMsg(msgId)) as UpdatePosition;
+            expect(updatePositionMsg?.$$type).toEqual('UpdatePosition');
+            expect(updatePositionMsg?.queryId).toEqual(msgId);
+            expect(updatePositionMsg?.user.toString()).toEqual(deployer.getSender().address.toString());
+            expect(updatePositionMsg?.address.toString()).toEqual(sampleJetton.address.toString());
+            expect(updatePositionMsg?.supply).toEqual(100000000000n);
+            expect(updatePositionMsg?.borrow).toEqual(0n);
+
+            result = await pool.send(
+                deployer.getSender(),
+                {
+                    value: toNano('0.05'),
+                },
+                {
+                    $$type: 'RerunBounceMsg',
+                    queryId: msgId,
+                    action: RERUN_ACTION_UPDATE_POSITION,
+                },
+            );
+
+            // RerunBounceMsg
+            expect(result.transactions).toHaveTransaction({
+                from: deployer.getSender().address,
+                to: pool.address,
+                success: true,
+            });
+            // UpdatePosition
+            expect(result.transactions).toHaveTransaction({
+                from: pool.address,
+                to: userAccountAddress,
+                success: true,
+            });
+            // UserPositionUpdated
+            expect(result.transactions).toHaveTransaction({
+                from: userAccountAddress,
+                to: pool.address,
+                success: true,
+            });
+            // mintAToken bounce because of the gas
+            expect(result.transactions).toHaveTransaction({
+                from: pool.address,
+                to: aToken.address,
+                success: false,
+            });
+            expect(await pool.getBounceMsg(msgId)).toEqual(null);
+            // rerun mint msg
+            const aTokenWallet = blockchain.openContract(
+                ATokenDefaultWallet.fromAddress(
+                    await pool.getUserATokenWalletAddress(sampleJetton.address, deployer.getSender().address),
+                ),
+            );
+            msgId = (await pool.getQueryId()) - 1n;
+            result = await pool.send(
+                deployer.getSender(),
+                {
+                    value: toNano('0.08'),
+                },
+                {
+                    $$type: 'RerunBounceMsg',
+                    queryId: msgId,
+                    action: RERUN_ACTION_MINT,
+                },
+            );
+            // mintAToken
+            expect(result.transactions).toHaveTransaction({
+                from: pool.address,
+                to: aToken.address,
+                success: true,
+            });
+            // aToken TokenTransferInternal
+            expect(result.transactions).toHaveTransaction({
+                from: aToken.address,
+                to: aTokenWallet.address,
+                success: true,
+            });
+            // aToken TokenExcesses
+            expect(result.transactions).toHaveTransaction({
+                from: aTokenWallet.address,
+                to: pool.address,
+                success: true,
+            });
+            expect(await pool.getBounceMsg(msgId)).toEqual(null);
+
+            accountData = await userAccountContract.getAccount();
+            // check user account
+            expect(accountData.positionsLength).toEqual(1n);
+            expect(accountData.positions?.get(0n)!!.equals(sampleJetton.address)).toBeTruthy();
+            expect(accountData.positionsDetail?.get(sampleJetton.address)!!.supply).toEqual(amount);
+            expect(accountData.positionsDetail?.get(sampleJetton.address)!!.asCollateral).toBeTruthy();
         });
     });
 });

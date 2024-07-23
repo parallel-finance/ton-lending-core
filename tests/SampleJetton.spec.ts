@@ -18,7 +18,7 @@ describe('SampleJetton', () => {
             description: 'Sample Jetton for testing purposes',
             decimals: '9',
             image: 'https://ipfs.io/ipfs/bafybeicn7i3soqdgr7dwnrwytgq4zxy7a5jpkizrvhm5mv6bgjd32wm3q4/welcome-to-IPFS.jpg',
-            symbol: 'SAM'
+            symbol: 'SAM',
         };
 
         // It's the largest value I can use for max_supply in the tests
@@ -31,19 +31,19 @@ describe('SampleJetton', () => {
         const deployResult = await sampleJetton.send(
             deployer.getSender(),
             {
-                value: toNano('0.05')
+                value: toNano('0.05'),
             },
             {
                 $$type: 'Deploy',
-                queryId: 0n
-            }
+                queryId: 0n,
+            },
         );
 
         expect(deployResult.transactions).toHaveTransaction({
             from: deployer.address,
             to: sampleJetton.address,
             deploy: true,
-            success: true
+            success: true,
         });
     });
 
@@ -53,20 +53,22 @@ describe('SampleJetton', () => {
             const result = await sampleJetton.send(
                 deployer.getSender(),
                 {
-                    value: toNano('0.05')
+                    value: toNano('0.05'),
                 },
                 {
                     $$type: 'Mint',
+                    queryId: 0n,
+                    token: sampleJetton.address,
                     amount: 1000000000n,
-                    receiver: receiverAddress
-                }
+                    receiver: receiverAddress,
+                },
             );
 
             // Mint message
             expect(result.transactions).toHaveTransaction({
                 from: deployer.address,
                 to: sampleJetton.address,
-                success: true
+                success: true,
             });
             const receiverSampleJettonWalletAddress = await sampleJetton.getGetWalletAddress(receiverAddress);
 
@@ -74,17 +76,19 @@ describe('SampleJetton', () => {
             expect(result.transactions).toHaveTransaction({
                 from: sampleJetton.address,
                 to: receiverSampleJettonWalletAddress,
-                success: true
+                success: true,
             });
 
             // Excess message
             expect(result.transactions).toHaveTransaction({
                 from: receiverSampleJettonWalletAddress,
                 to: deployer.address,
-                success: true
+                success: true,
             });
 
-            const receiverSampleJettonWallet = blockchain.openContract(await JettonDefaultWallet.fromAddress(receiverSampleJettonWalletAddress));
+            const receiverSampleJettonWallet = blockchain.openContract(
+                await JettonDefaultWallet.fromAddress(receiverSampleJettonWalletAddress),
+            );
             const walletData = await receiverSampleJettonWallet.getGetWalletData();
             expect(walletData.balance).toEqual(1000000000n);
         });

@@ -28,7 +28,7 @@ contract AToken with ATokenJettonTrait {
         self.requireOwner();
         self.requireNotStopped();
         require(self.mintable, "Can't Mint Anymore");
-        self.mint(msg.receiver, msg.amount, self.owner); // (to, amount, response_destination)
+        self.mint(msg.queryId, msg.receiver, msg.amount, self.owner); // (to, amount, response_destination)
     }
 
     // ====== Get Methods ====== //

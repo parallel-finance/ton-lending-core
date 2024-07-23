@@ -59,7 +59,11 @@ message CheckAndTransferAToken {
     forward_ton_amount: Int as coins;
     forward_payload: Slice as remaining;
 }
+
+// custom Mint message
 message Mint {
+    queryId: Int as uint64;
+    token: Address;
     amount: Int;
     receiver: Address;
 }
