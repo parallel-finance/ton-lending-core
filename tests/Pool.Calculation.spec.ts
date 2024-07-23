@@ -351,7 +351,7 @@ describe('Pool indexes calculation', () => {
         const supplyAmount = toNano(100n);
 
         await supply(deployer.getSender(), supplyAmount);
-        let reserveData = await pool.getReserveDataForUi(sampleJetton.address);
+        let reserveData = (await pool.getReserveDataAndConfiguration(sampleJetton.address)).reserveData;
         // no debts, no rates
         expect(reserveData.liquidityIndex).toEqual(RAY);
         expect(reserveData.borrowIndex).toEqual(RAY);
@@ -360,7 +360,7 @@ describe('Pool indexes calculation', () => {
 
         await sleep(5 * 1000);
 
-        reserveData = await pool.getReserveDataForUi(sampleJetton.address);
+        reserveData = (await pool.getReserveDataAndConfiguration(sampleJetton.address)).reserveData;
         // no debts, no rates
         expect(reserveData.liquidityIndex).toEqual(RAY);
         expect(reserveData.borrowIndex).toEqual(RAY);
@@ -368,7 +368,7 @@ describe('Pool indexes calculation', () => {
         expect(reserveData.currentBorrowRate).toEqual(0n);
 
         await supply(secondUser.getSender(), supplyAmount);
-        reserveData = await pool.getReserveDataForUi(sampleJetton.address);
+        reserveData = (await pool.getReserveDataAndConfiguration(sampleJetton.address)).reserveData;
         // no debts, no rates
         expect(reserveData.liquidityIndex).toEqual(RAY);
         expect(reserveData.borrowIndex).toEqual(RAY);
@@ -376,11 +376,12 @@ describe('Pool indexes calculation', () => {
         expect(reserveData.currentBorrowRate).toEqual(0n);
         await sleep(5 * 1000);
 
-        let reserveDataBefore = await pool.getReserveDataForUi(sampleJetton.address);
+        let reserveDataBefore = (await pool.getReserveDataAndConfiguration(sampleJetton.address)).reserveData;
         const borrowAmount = toNano(50n);
         await borrow(secondUser.getSender(), borrowAmount);
         await sleep(5 * 1000);
-        reserveData = await pool.getReserveDataForUi(sampleJetton.address);
+        const reserveDataAndConfiguration = await pool.getReserveDataAndConfiguration(sampleJetton.address);
+        reserveData = reserveDataAndConfiguration.reserveData
         // first borrow, the index still should be RAY, the rates should not be zero
         expect(reserveData.liquidityIndex).toEqual(RAY);
         expect(reserveData.borrowIndex).toEqual(RAY);
@@ -405,24 +406,24 @@ describe('Pool indexes calculation', () => {
         // non-zero debts, non-zero rates
         // normalizedIncome is the real-time liquidityIndex
         // normalizedDebt is the real-time borrowIndex
-        expect(reserveData.normalizedIncome).toEqual(
+        expect(reserveDataAndConfiguration.normalizedIncome).toEqual(
             await mathUtils.getCalculateLinearInterest(
                 reserveData.currentLiquidityRate,
                 reserveData.lastUpdateTimestamp,
             ),
         );
-        expect(reserveData.normalizedDebt).toEqual(
+        expect(reserveDataAndConfiguration.normalizedDebt).toEqual(
             await mathUtils.getCalculateCompoundedInterest(
                 reserveData.currentBorrowRate,
                 reserveData.lastUpdateTimestamp,
             ),
         );
-        const normalizedIncomeBefore = reserveData.normalizedIncome;
-        const normalizedDebtBefore = reserveData.normalizedDebt;
+        const normalizedIncomeBefore = reserveDataAndConfiguration.normalizedIncome;
+        const normalizedDebtBefore = reserveDataAndConfiguration.normalizedDebt;
         reserveDataBefore = reserveData;
         await supply(deployer.getSender(), supplyAmount);
         await sleep(5 * 1000);
-        reserveData = await pool.getReserveDataForUi(sampleJetton.address);
+        reserveData = (await pool.getReserveDataAndConfiguration(sampleJetton.address)).reserveData;
         // after the first borrow, the other action will update the indexes.
         expect(reserveData.liquidityIndex).toEqual(normalizedIncomeBefore);
         expect(reserveData.borrowIndex).toEqual(normalizedDebtBefore);

@@ -103,20 +103,13 @@ trait PoolView with Ownable, Resumable {
         return self.reservesData.get(reserveAddress)!!;
     }
 
-    get fun reserveDataForUI(reserveAddress: Address): ReserveDataForUI {
+    get fun reserveDataAndConfiguration(reserveAddress: Address): ReserveDataAndConfiguration {
         let reserveData: ReserveData = self.reservesData.get(reserveAddress)!!;
+        let reserveConfiguration: ReserveConfiguration = self.reservesConfiguration.get(reserveAddress)!!;
         return
-            ReserveDataForUI{
-                liquidityIndex: reserveData.liquidityIndex,
-                currentLiquidityRate: reserveData.currentLiquidityRate,
-                borrowIndex: reserveData.borrowIndex,
-                currentBorrowRate: reserveData.currentBorrowRate,
-                totalSupply: reserveData.totalSupply,
-                availableLiquidity: reserveData.availableLiquidity,
-                accruedToTreasury: reserveData.accruedToTreasury,
-                totalBorrow: reserveData.totalBorrow,
-                lastUpdateTimestamp: reserveData.lastUpdateTimestamp,
-                price: reserveData.price,
+            ReserveDataAndConfiguration{
+                reserveData: reserveData,
+                reserveConfiguration: reserveConfiguration,
                 normalizedIncome: reserveData.getNormalizedIncome(),
                 normalizedDebt: reserveData.getNormalizedDebt()
             };
