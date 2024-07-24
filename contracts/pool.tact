@@ -575,19 +575,6 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
                 }.toCell()
             });
             self.queryId += 1;
-
-            // // TODO: validate Liquidate
-
-            // // updateInterestRates
-            // let rateStrategy: ReserveInterestRateStrategy = self.reserveInterestRateStrategy.get(matchedReserve!!)!!;
-            // reserveData.updateInterestRates(reserveCache, rateStrategy, repayAmount, 0);
-            // // update liquidity and set reserveData to storage back;
-            // let scaledBorrowAmount: Int = repayAmount.rayDiv(reserveCache.nextBorrowIndex);
-            // reserveData.availableLiquidity += repayAmount;
-            // reserveData.totalBorrow -= scaledBorrowAmount;
-            // self.reservesData.set(matchedReserve!!, reserveData);
-
-            // self.updateUserAccountPosition(msg.from, matchedReserve!!, 0, -scaledBorrowAmount);
         }
     }
 
@@ -690,16 +677,16 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
         self.validateAddReserve(reserveAddress, reserveConfiguration);
         let now: Int = now();
         let newReserveData: ReserveData = ReserveData{
-        liquidityIndex: RAY,
-        currentLiquidityRate: 0,
-        borrowIndex: RAY,
-        currentBorrowRate: 0,
-        totalSupply: 0,
-        availableLiquidity: 0,
-        accruedToTreasury: 0,
-        totalBorrow: 0,
-        lastUpdateTimestamp: now,
-        price: 0
+            liquidityIndex: RAY,
+            currentLiquidityRate: 0,
+            borrowIndex: RAY,
+            currentBorrowRate: 0,
+            totalSupply: 0,
+            availableLiquidity: 0,
+            accruedToTreasury: 0,
+            totalBorrow: 0,
+            lastUpdateTimestamp: now,
+            price: 0
         };
         self.reserveInterestRateStrategy.set(reserveAddress, interestRateStrategy);
         self.reserves.set(self.reservesLength, reserveAddress);

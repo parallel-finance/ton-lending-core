@@ -37,6 +37,7 @@ describe('Pool', () => {
         borrowingEnabled: true,
         supplyCap: 1000000n,
         borrowCap: 1000000n,
+        treasury: reserveAddress
     };
     const RAY = 10n ** 27n;
 
