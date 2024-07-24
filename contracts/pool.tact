@@ -610,7 +610,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
         // TODO: more gas check
         send(SendParameters{
             to: userAccountAddress,
-            value: ton("0.05"),
+            value: ton("0.07"),
             bounce: true,
             mode: SendPayGasSeparately,
             body: msg.toCell(),

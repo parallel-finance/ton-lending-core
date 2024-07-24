@@ -608,10 +608,22 @@ describe('Pool indexes calculation', () => {
             to: borrowerAccount.address,
             success: true,
         });
+        // burn dToken
+        expect(result.transactions).toHaveTransaction({
+            from: pool.address,
+            to: await dToken2.getGetWalletAddress(borrower.address),
+            success: true,
+        });
         // UpdatePosition collateral token
         expect(result.transactions).toHaveTransaction({
             from: pool.address,
             to: borrowerAccount.address,
+            success: true,
+        });
+        // burn aToken
+        expect(result.transactions).toHaveTransaction({
+            from: pool.address,
+            to: await aToken1.getGetWalletAddress(borrower.address),
             success: true,
         });
         // tokenTransfer
