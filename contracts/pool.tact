@@ -120,7 +120,8 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
                 user: context().sender,
                 action: ACTION_BORROW,
                 tokenAddress: msg.tokenAddress,
-                amount: msg.amount
+                amount: msg.amount,
+                forward_payload: emptySlice()
             }.toCell()
         });
         self.queryId += 1;
@@ -150,7 +151,8 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
                 user: context().sender,
                 action: ACTION_WITHDRAW,
                 tokenAddress: msg.tokenAddress,
-                amount: msg.amount
+                amount: msg.amount,
+                forward_payload: emptySlice()
             }.toCell()
         });
         self.queryId += 1;
@@ -158,9 +160,8 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
 
     receive(msg: UserAccountDataResponse) {
         let reserveAddress: Address = msg.tokenAddress;
-        let userAccountData: UserAccountData = msg.accountData;
 
-        self.validateForAction(msg.action, msg.tokenAddress, msg.amount, userAccountData);
+        let healthInfo: UserAccountHealthInfo = self.validateForAction(msg);
 
         let reserveData: ReserveData = self.reservesData.get(reserveAddress)!!;
         let reserveConfigration: ReserveConfiguration = self.reservesConfiguration.get(reserveAddress)!!;
@@ -205,6 +206,91 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
             // TODO: calculate fees and Ton to send
             self.updateUserAccountPosition(msg.user, msg.tokenAddress, -scaledWithdrawAmount, 0);
         }
+
+        if (msg.action == ACTION_LIQUIDATION) {
+            let liquidationAmount: Int = msg.amount;
+            let collateralReserve: Address = msg.forward_payload.loadAddress();
+            let liquidator: Address = msg.forward_payload.loadAddress();
+
+            // check borrower debt and collateral are not zero
+            let userLiquidationPosition: TokenData? = msg.accountData.positionsDetail.get(reserveAddress);
+            let userCollateralPosition: TokenData? = msg.accountData.positionsDetail.get(collateralReserve);
+            require(userLiquidationPosition != null && userLiquidationPosition!!.borrow != 0, "user didn't borrow this debt");
+            require(userCollateralPosition != null && userCollateralPosition!!.supply != 0, "user didn't supply this collateral");
+
+            // fetch collateral ReserveData and ReserveConfiguration 
+            let collateralReserveData: ReserveData = self.reservesData.get(collateralReserve)!!;
+            let collateralReserveConfigration: ReserveConfiguration = self.reservesConfiguration.get(collateralReserve)!!;
+            // calculate collateral nextLiquidityIndex
+            let collateralNextLiquidityIndex: Int = collateralReserveData.getNormalizedIncome();
+
+            // calculte liquidation closeFactor
+            let closeFactor: Int = healthInfo.healthFactorInRay > CLOSE_FACTOR_HF_THRESHOLD ? 
+                DEFAULT_LIQUIDATION_CLOSE_FACTOR : 
+                MAX_LIQUIDATION_CLOSE_FACTOR;
+            // calculate actual liquidationAmount = min(userDebt, the debt token amount that liquidator transferred)
+            let userDebt: Int = userLiquidationPosition!!.borrow.rayMul(reserveCache.nextBorrowIndex).percentMul(closeFactor);
+            let actualLiquidationAmount: Int = min(liquidationAmount, userDebt);
+            // calculate user collateral amount
+            let userCollateral: Int = userCollateralPosition!!.supply.rayMul(collateralNextLiquidityIndex);
+            
+            // calculate the max collateral amount based on the actualLiquidationAmount
+            let maxCollateralToLiquidate: Int = (
+                reserveData.price * actualLiquidationAmount / collateralReserveData.price
+            ).percentMul(collateralReserveConfigration.liquidationBonus);
+
+            // if user collateral amount can't cover `maxCollateralToLiquidate`, calculate the actualLiquidationAmount based on the user collateral
+            let actualCollateralToLiquidate: Int = 0;
+            if (maxCollateralToLiquidate > userCollateral) {
+                actualCollateralToLiquidate = userCollateral;
+                actualLiquidationAmount = (
+                    collateralReserveData.price * actualCollateralToLiquidate / reserveData.price
+                ).percentDiv(collateralReserveConfigration.liquidationBonus);
+            } else {
+                actualCollateralToLiquidate = maxCollateralToLiquidate;
+            }
+
+            // calculate the liquidation protocol fee = liquidation Bouns * configration.liquidationProtocolFee
+            let liquidationFee: Int = 0;
+            if (collateralReserveConfigration.liquidationProtocolFee != 0) {
+                let bonusCollateral: Int = actualCollateralToLiquidate - 
+                    actualCollateralToLiquidate.percentDiv(collateralReserveConfigration.liquidationBonus);
+                liquidationFee = bonusCollateral.percentMul(collateralReserveConfigration.liquidationProtocolFee);
+                // actualCollateralToLiquidate = actualCollateralToLiquidate - liquidationFee;
+            }
+            
+            // update user debt token position and burn dToken
+            let scaledLiquidationAmount: Int = actualLiquidationAmount.rayDiv(reserveCache.nextBorrowIndex);
+            reserveData.totalBorrow -= scaledLiquidationAmount;
+            reserveCache.nextScaledDebt = reserveData.totalBorrow;
+
+            reserveData.updateInterestRates(reserveCache, rateStrategy, 0, -actualLiquidationAmount);
+            
+            reserveData.availableLiquidity += actualLiquidationAmount;
+            self.reservesData.set(reserveAddress, reserveData);
+
+            self.updateUserAccountPosition(msg.user, reserveAddress, 0, -scaledLiquidationAmount);
+
+            // update user collateral token position and burn aToken
+            collateralReserveData = self.reservesData.get(collateralReserve)!!;
+            let collateralReserveCache: ReserveCache = collateralReserveData.cache(collateralReserveConfigration);
+
+            collateralReserveCache = collateralReserveData.updateState(collateralReserveCache);
+            collateralReserveData.updateInterestRates(collateralReserveCache, rateStrategy, -actualCollateralToLiquidate, 0);
+
+            let scaledCollateralAmount: Int = actualCollateralToLiquidate.rayDiv(collateralReserveCache.nextLiquidityIndex);
+            collateralReserveData.availableLiquidity -= actualCollateralToLiquidate;
+            collateralReserveData.totalSupply -= scaledCollateralAmount;
+            self.reservesData.set(collateralReserve, collateralReserveData);
+
+            self.updateUserAccountPosition(msg.user, collateralReserve, -scaledCollateralAmount, 0);
+            
+            // Transfer collateral Token to the liquidator.
+            let poolWalletAddress: Address = collateralReserveConfigration.poolWalletAddress;
+            self.sendTokenTransferByPool(poolWalletAddress, liquidator, actualCollateralToLiquidate - liquidationFee);
+            // Transfer collateral Token to the reserve treasury.
+            self.sendTokenTransferByPool(poolWalletAddress, collateralReserveConfigration.treasury, liquidationFee);
+        }
     }
 
     // Notice: Only for Test
@@ -245,16 +331,15 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
         });
     }
 
-    fun validateForAction(
-        action: Int,
-        reserve: Address,
-        amount: Int,
-        userAccountData: UserAccountData
-    ): Bool {
+    fun validateForAction(msg: UserAccountDataResponse): UserAccountHealthInfo {
+        let userAccountData: UserAccountData = msg.accountData;
+        let reserve: Address = msg.tokenAddress;
+        let amount: Int = msg.amount;
+
         let healthInfo: UserAccountHealthInfo = self.userAccountHealthInfo(userAccountData);
         let reserveData: ReserveData = self.reservesData.get(reserve)!!;
         let reserveConfigration: ReserveConfiguration = self.reservesConfiguration.get(reserve)!!;
-        if (action == ACTION_BORROW) {
+        if (msg.action == ACTION_BORROW) {
             // 1. check borrowingEnabled
             // 2. check reserve isActive / isFrozen
             // 3. check reserve availableLiquidity
@@ -269,7 +354,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
             let collateralNeeded: Int = borrowAmountValue.percentDiv(healthInfo.avgLtv);
             require(healthInfo.totalDebtInBaseCurrency + collateralNeeded <= healthInfo.totalCollateralInBaseCurrency, "collateral can't cover new borrow");
         }
-        if (action == ACTION_WITHDRAW) {
+        if (msg.action == ACTION_WITHDRAW) {
             // 1. check reserve isActive
             // 2. check reserve availableLiquidity
             // 3. check withdraw amount <= supply position
@@ -287,11 +372,20 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
             let totalCollateralMulLT: Int = healthInfo.totalCollateralInBaseCurrency.percentMul(healthInfo.avgLiquidationThreshold);
             require(totalCollateralMulLT - withdrawValueMulLT >= healthInfo.totalDebtInBaseCurrency, "the left collateral can't cover debt");
         }
-        if (action == ACTION_LIQUIDATION) {
+        if (msg.action == ACTION_LIQUIDATION) {
             require(healthInfo.healthFactorInRay < RAY, "HF >= 1");
+            let collateralReserve: Address = msg.forward_payload.loadAddress();
+            let collateralReserveConfigration: ReserveConfiguration = self.reservesConfiguration.get(collateralReserve)!!;
+            let userCollateralPosition: TokenData = userAccountData.positionsDetail.get(collateralReserve)!!;
+            require(
+                userCollateralPosition.asCollateral && 
+                collateralReserveConfigration.liquidationThreshold != 0, 
+                "collateral can't be liquidated"
+            );
+            require(collateralReserveConfigration.isActive && reserveConfigration.isActive, "reserve isn not active");
         }
 
-        return true;
+        return healthInfo;
     }
 
     fun mintAToken(asset: Address, user: Address, amount: Int) {
@@ -447,6 +541,53 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
             self.reservesData.set(matchedReserve!!, reserveData);
 
             self.updateUserAccountPosition(msg.from, matchedReserve!!, 0, -scaledBorrowAmount);
+        }
+
+        // use crc32 code of 'Liquidate': utils.calculateRequestOpcode_1('Liquidate')
+        if (opCode == 0x1f03e59a) {
+            // send message to get user account data
+            // liquidation reserve
+            let liquidationReserve: Address? = self.findReserveByPoolWalletAddress(context().sender);
+            require(liquidationReserve != null, "Liquidation reserve not found");
+            
+            let borrower: Address = forwardPayload.loadAddress();
+            let collateralIndex: Int = forwardPayload.loadUint(8);
+            let collateralReserve: Address? = self.reserves.get(collateralIndex);
+            require(collateralReserve != null, "Collateral reserve not found");
+            
+            let liquidationAmount: Int = msg.amount;
+            let userAccountAddress: Address = self.userAccountAddress(borrower);
+            // store collateralReserve
+            let forward_payload: Slice = beginCell().storeAddress(collateralReserve!!).storeAddress(msg.from).endCell().asSlice();
+            // TODO: This GetUserAccountData need to do bounce
+            send(SendParameters{
+                to: userAccountAddress,
+                value: 0,
+                bounce: true,
+                mode: SendRemainingValue,
+                body: GetUserAccountData{
+                    queryId: self.queryId,
+                    user: borrower,
+                    action: ACTION_LIQUIDATION,
+                    tokenAddress: liquidationReserve!!,
+                    amount: liquidationAmount,
+                    forward_payload: emptySlice()
+                }.toCell()
+            });
+            self.queryId += 1;
+
+            // // TODO: validate Liquidate
+
+            // // updateInterestRates
+            // let rateStrategy: ReserveInterestRateStrategy = self.reserveInterestRateStrategy.get(matchedReserve!!)!!;
+            // reserveData.updateInterestRates(reserveCache, rateStrategy, repayAmount, 0);
+            // // update liquidity and set reserveData to storage back;
+            // let scaledBorrowAmount: Int = repayAmount.rayDiv(reserveCache.nextBorrowIndex);
+            // reserveData.availableLiquidity += repayAmount;
+            // reserveData.totalBorrow -= scaledBorrowAmount;
+            // self.reservesData.set(matchedReserve!!, reserveData);
+
+            // self.updateUserAccountPosition(msg.from, matchedReserve!!, 0, -scaledBorrowAmount);
         }
     }
 

@@ -15,6 +15,8 @@ struct ReserveConfiguration {
     borrowingEnabled: Bool;
     supplyCap: Int as coins;
     borrowCap: Int as coins;
+    // reserve treasury address
+    treasury: Address;
 }
 struct ReserveInterestRateStrategy {
     optimalUsageRatio: Int as uint128;
