@@ -179,7 +179,7 @@ describe('Pool Supply', () => {
         const result = await deployerJettonDefaultWallet.send(
             deployer.getSender(),
             {
-                value: toNano('0.3'),
+                value: toNano('0.24'),
             },
             {
                 $$type: 'TokenTransfer',
@@ -188,7 +188,7 @@ describe('Pool Supply', () => {
                 destination: pool.address,
                 response_destination: deployerWalletAddress,
                 custom_payload: null,
-                forward_ton_amount: toNano('0.25'),
+                forward_ton_amount: toNano('0.19'),
                 forward_payload: forward_payload,
             },
         );
