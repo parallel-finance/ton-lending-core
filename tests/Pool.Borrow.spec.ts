@@ -10,6 +10,7 @@ import { DTokenDefaultWallet } from '../build/DToken/tact_DTokenDefaultWallet';
 import { AToken } from '../wrappers/AToken';
 import { DToken } from '../wrappers/DToken';
 import { PERCENTAGE_FACTOR, RAY } from '../helpers/constant';
+import { sumTransactionsFee } from '../jest.setup';
 
 describe('Pool', () => {
     let blockchain: Blockchain;
@@ -311,6 +312,9 @@ describe('Pool', () => {
                 to: deployerJettonDefaultWallet.address,
                 success: true,
             });
+
+            const totalTransactionFee = sumTransactionsFee(result.transactions);
+            expect(totalTransactionFee).toBeLessThanOrEqual(0.1);
 
             const userAccountContract = blockchain.openContract(userAccountAddress);
             const accountData = await userAccountContract.getAccount();
