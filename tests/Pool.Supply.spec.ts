@@ -1,4 +1,4 @@
-import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
+import { Blockchain, printTransactionFees, SandboxContract, TreasuryContract } from '@ton/sandbox';
 import { address, beginCell, Cell, toNano } from '@ton/core';
 import {
     ATokenDTokenContents,
@@ -14,6 +14,7 @@ import { JettonDefaultWallet } from '../build/SampleJetton/tact_JettonDefaultWal
 import { UserAccount } from '../build/Pool/tact_UserAccount';
 import { ATokenDefaultWallet } from '../build/AToken/tact_ATokenDefaultWallet';
 import { AToken } from '../wrappers/AToken';
+import { sumTransactionsFee } from '../jest.setup';
 import { RERUN_ACTION_MINT, RERUN_ACTION_UPDATE_POSITION } from '../helpers/constant';
 import { parsePoolBounceMessage } from '../helpers/pool';
 
@@ -163,7 +164,7 @@ describe('Pool Supply', () => {
         );
     });
 
-    const deployerSupply = async (amount: bigint) => {
+    const supplyJetton = async (amount: bigint) => {
         // transfer jetton to pool
         const deployerWalletAddress = await sampleJetton.getGetWalletAddress(deployer.address);
         const poolWalletAddress = await sampleJetton.getGetWalletAddress(pool.address);
@@ -213,6 +214,11 @@ describe('Pool Supply', () => {
             success: true,
         });
 
+        // open this line to see the details
+        // printTransactionFees(result.transactions);
+        const totalTransactionFee = sumTransactionsFee(result.transactions);
+        expect(totalTransactionFee).toBeLessThanOrEqual(0.1);
+
         // check user account
         const accountData = await userAccountContract.getAccount();
         expect(accountData.positionsLength).toEqual(1n);
@@ -224,12 +230,12 @@ describe('Pool Supply', () => {
     describe('handle supply', () => {
         it('should handle supply successfully', async () => {
             const amount = toNano(100n);
-            await deployerSupply(amount);
+            await supplyJetton(amount);
         });
 
         it('transfer AToken', async () => {
             const amount = toNano(100n);
-            await deployerSupply(amount);
+            await supplyJetton(amount);
             const aTokenWallet = blockchain.openContract(
                 ATokenDefaultWallet.fromAddress(
                     await pool.getUserATokenWalletAddress(sampleJetton.address, deployer.getSender().address),
@@ -243,7 +249,7 @@ describe('Pool Supply', () => {
                 ATokenDefaultWallet.fromAddress(await aToken.getGetWalletAddress(secondUser.address)),
             );
 
-            let rst = await aTokenWallet.send(
+            const result = await aTokenWallet.send(
                 deployer.getSender(),
                 {
                     value: toNano('1.5'),
@@ -259,22 +265,22 @@ describe('Pool Supply', () => {
                     forward_payload: Cell.EMPTY,
                 },
             );
-            expect(rst.transactions).toHaveTransaction({
+            expect(result.transactions).toHaveTransaction({
                 from: deployer.address,
                 to: aTokenWallet.address,
                 success: true,
             });
-            expect(rst.transactions).toHaveTransaction({
+            expect(result.transactions).toHaveTransaction({
                 from: aTokenWallet.address,
                 to: pool.address,
                 success: true,
             });
-            expect(rst.transactions).toHaveTransaction({
+            expect(result.transactions).toHaveTransaction({
                 from: pool.address,
                 to: aTokenWallet.address,
                 success: true,
             });
-            expect(rst.transactions).toHaveTransaction({
+            expect(result.transactions).toHaveTransaction({
                 from: aTokenWallet.address,
                 to: secondUserWallet.address,
                 success: true,
@@ -286,7 +292,7 @@ describe('Pool Supply', () => {
 
         it('check reservesData after supply', async () => {
             const amount = toNano(100n);
-            await deployerSupply(amount);
+            await supplyJetton(amount);
             const reserveData = await pool.getReserveData(sampleJetton.address);
             expect(reserveData.availableLiquidity).toEqual(amount);
             expect(reserveData.totalSupply).toEqual(amount);

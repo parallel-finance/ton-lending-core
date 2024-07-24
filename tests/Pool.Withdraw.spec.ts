@@ -12,6 +12,7 @@ import { DToken } from '../wrappers/DToken';
 import { PERCENTAGE_FACTOR } from '../helpers/constant';
 import { ATokenDefaultWallet } from '../build/AToken/tact_ATokenDefaultWallet';
 import { sleep } from '@ton/blueprint';
+import { sumTransactionsFee } from '../jest.setup';
 
 describe('Pool Withdraw', () => {
     let blockchain: Blockchain;
@@ -474,6 +475,9 @@ describe('Pool Withdraw', () => {
         expect((await deployerJettonDefaultWallet.getGetWalletData()).balance).toEqual(
             deployerJettonBalanceBefore + withdrawAmount,
         );
+
+        const totalTransactionFee = sumTransactionsFee(result.transactions);
+        expect(totalTransactionFee).toBeLessThanOrEqual(0.1);
     });
 
     it('withdraw max amount when user have the debt and check HF successfully', async () => {
@@ -574,6 +578,9 @@ describe('Pool Withdraw', () => {
         expect((await deployerJettonDefaultWallet.getGetWalletData()).balance).toEqual(
             deployerJettonBalanceBefore + withdrawAmount,
         );
+
+        const totalTransactionFee = sumTransactionsFee(result.transactions);
+        expect(totalTransactionFee).toBeLessThanOrEqual(0.1);
     });
 
     it('should bounce if the left supply position cant cover the debt', async () => {

@@ -9,6 +9,7 @@ import { UserAccount } from '../build/Pool/tact_UserAccount';
 import { DTokenDefaultWallet } from '../build/DToken/tact_DTokenDefaultWallet';
 import { AToken } from '../wrappers/AToken';
 import { DToken } from '../wrappers/DToken';
+import { sumTransactionsFee } from '../jest.setup';
 
 describe('Pool', () => {
     let blockchain: Blockchain;
@@ -326,6 +327,9 @@ describe('Pool', () => {
             expect(accountData.positions?.get(0n)!!.equals(sampleJetton.address)).toBeTruthy();
             expect(Number(fromNano(accountData.positionsDetail?.get(sampleJetton.address)!!.supply))).toBeCloseTo(100, 5);
             expect(Number(fromNano(accountData.positionsDetail?.get(sampleJetton.address)!!.borrow))).toBeCloseTo(25, 5);
+
+            const totalTransactionFee = sumTransactionsFee(result.transactions);
+            expect(totalTransactionFee).toBeLessThanOrEqual(0.1);
         });
     });
 });
