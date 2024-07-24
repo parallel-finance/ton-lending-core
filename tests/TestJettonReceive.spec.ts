@@ -54,7 +54,6 @@ describe('TestJettonReceive', () => {
             {
                 $$type: 'Mint',
                 queryId: 0n,
-                token: sampleJetton.address,
                 receiver: deployer.getSender().address,
                 amount: toNano(100000),
             },

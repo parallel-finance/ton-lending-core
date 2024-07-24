@@ -26,8 +26,7 @@ trait PoolView with Ownable, Resumable {
     reservesConfiguration: map<Address, ReserveConfiguration>;
     reserveInterestRateStrategy: map<Address, ReserveInterestRateStrategy>;
     // bounce messages
-    updatePositionMsg: map<Int, UpdatePosition>;
-    mintMsg: map<Int, Mint>;
+    updatePositionMsg: map<Int, UpdatePositionBounce>;
 
     // ===== Get functions =====
 
@@ -101,20 +100,13 @@ trait PoolView with Ownable, Resumable {
         return self.reservesData.get(reserveAddress)!!;
     }
 
-    get fun reserveDataForUI(reserveAddress: Address): ReserveDataForUI {
+    get fun reserveDataAndConfiguration(reserveAddress: Address): ReserveDataAndConfiguration {
         let reserveData: ReserveData = self.reservesData.get(reserveAddress)!!;
+        let reserveConfiguration: ReserveConfiguration = self.reservesConfiguration.get(reserveAddress)!!;
         return
-            ReserveDataForUI{
-                liquidityIndex: reserveData.liquidityIndex,
-                currentLiquidityRate: reserveData.currentLiquidityRate,
-                borrowIndex: reserveData.borrowIndex,
-                currentBorrowRate: reserveData.currentBorrowRate,
-                totalSupply: reserveData.totalSupply,
-                availableLiquidity: reserveData.availableLiquidity,
-                accruedToTreasury: reserveData.accruedToTreasury,
-                totalBorrow: reserveData.totalBorrow,
-                lastUpdateTimestamp: reserveData.lastUpdateTimestamp,
-                price: reserveData.price,
+            ReserveDataAndConfiguration{
+                reserveData: reserveData,
+                reserveConfiguration: reserveConfiguration,
                 normalizedIncome: reserveData.getNormalizedIncome(),
                 normalizedDebt: reserveData.getNormalizedDebt()
             };
@@ -158,13 +150,9 @@ trait PoolView with Ownable, Resumable {
     }
 
     get fun bounceMsg(queryId: Int): Cell? {
-        let updatePositionMsg: UpdatePosition? = self.updatePositionMsg.get(queryId);
+        let updatePositionMsg: UpdatePositionBounce? = self.updatePositionMsg.get(queryId);
         if (updatePositionMsg != null) {
             return updatePositionMsg!!.toCell();
-        }
-        let mintMsg: Mint? = self.mintMsg.get(queryId);
-        if (mintMsg != null) {
-            return mintMsg!!.toCell();
         }
         return null;
     }
