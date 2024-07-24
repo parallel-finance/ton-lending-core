@@ -9,7 +9,7 @@ import { UserAccount } from '../build/Pool/tact_UserAccount';
 import { DTokenDefaultWallet } from '../build/DToken/tact_DTokenDefaultWallet';
 import { AToken } from '../wrappers/AToken';
 import { DToken } from '../wrappers/DToken';
-import { PERCENTAGE_FACTOR } from '../helpers/constant';
+import { PERCENTAGE_FACTOR, RERUN_ACTION_TOKEN_BURN, RERUN_ACTION_UPDATE_POSITION } from '../helpers/constant';
 import { ATokenDefaultWallet } from '../build/AToken/tact_ATokenDefaultWallet';
 import { sleep } from '@ton/blueprint';
 import { sumTransactionsFee } from '../jest.setup';
@@ -296,7 +296,6 @@ describe('Pool Withdraw', () => {
             {
                 $$type: 'Mint',
                 queryId: 0n,
-                token: sampleJetton.address,
                 amount: 100000000000n,
                 receiver: deployer.address,
             },

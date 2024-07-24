@@ -58,7 +58,6 @@ describe('SampleJetton', () => {
                 {
                     $$type: 'Mint',
                     queryId: 0n,
-                    token: sampleJetton.address,
                     amount: 1000000000n,
                     receiver: receiverAddress,
                 },

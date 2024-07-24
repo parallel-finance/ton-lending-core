@@ -40,8 +40,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
     reserveInterestRateStrategy: map<Address, ReserveInterestRateStrategy>;
 
     // bounce messages
-    updatePositionMsg: map<Int, UpdatePosition>;
-    mintMsg: map<Int, Mint>;
+    updatePositionMsg: map<Int, UpdatePositionBounce>;
 
     init() {
         self.owner = sender();
@@ -103,7 +102,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
         let reserveAddress: Address = msg.tokenAddress;
         let reserveConfiguration: ReserveConfiguration? = self.reservesConfiguration.get(reserveAddress);
         require(reserveConfiguration != null, "Reserve not found");
-
+        // GetUserAccountData don't need to handle bounce
         send(SendParameters{
             to: userAccountAddress,
             value: 0,
@@ -126,6 +125,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
         let reserveAddress: Address = msg.tokenAddress;
         let reserveConfiguration: ReserveConfiguration? = self.reservesConfiguration.get(reserveAddress);
         require(reserveConfiguration != null, "Reserve not found");
+        // GetUserAccountData don't need handle bounce
         send(SendParameters{
             to: userAccountAddress,
             value: 0,
@@ -170,9 +170,9 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
             self.reservesData.set(reserveAddress, reserveData);
             // Transfer borrowAmount Token(tokenAddress) to the user.
             let poolWalletAddress: Address = reserveConfigration.poolWalletAddress;
-            self.sendTokenTransferByPool(msg.queryId, poolWalletAddress, msg.user, borrowAmount);
+            self.sendTokenTransferByPool(poolWalletAddress, msg.user, borrowAmount);
             // TODO: calculate fees and Ton to send
-            self.updateUserAccountPosition(msg.queryId, msg.user, msg.tokenAddress, 0, scaledBorrowAmount); 
+            self.updateUserAccountPosition(msg.user, msg.tokenAddress, 0, scaledBorrowAmount); 
         }
 
         if(msg.action == ACTION_WITHDRAW) {
@@ -187,9 +187,9 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
             self.reservesData.set(reserveAddress, reserveData);
             // Transfer withdrawAmount Token(tokenAddress) to the user.
             let poolWalletAddress: Address = reserveConfigration.poolWalletAddress;
-            self.sendTokenTransferByPool(msg.queryId, poolWalletAddress, msg.user, withdrawAmount);
+            self.sendTokenTransferByPool(poolWalletAddress, msg.user, withdrawAmount);
             // TODO: calculate fees and Ton to send
-            self.updateUserAccountPosition(msg.queryId, msg.user, msg.tokenAddress, -scaledWithdrawAmount, 0);
+            self.updateUserAccountPosition(msg.user, msg.tokenAddress, -scaledWithdrawAmount, 0);
         }
     }
 
@@ -202,36 +202,32 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
 
     receive(msg: TokenExcesses) {
         // TODO: consider store the token transfer data and transfer token here
-        // because `self.queryId` is globally increment, 
-        // we can delete the key of the queryId from `mintMsg` map and `tokenTransferMsg` map in the same time,
-        // And only one map will be updated.
-        self.mintMsg.del(msg.queryId);
     }
 
     receive(msg: RerunBounceMsg) {
         if (msg.action == RERUN_ACTION_UPDATE_POSITION) {
             self.rerunUpdatePositionMsg(msg.queryId);
         }
-        if (msg.action == RERUN_ACTION_MINT) {
-            self.rerunMintMsg(msg.queryId);
-        }
     }
 
-    fun sendTokenTransferByPool(queryId: Int, poolWalletAddress: Address, toAddress: Address, amount: Int) {
+    fun sendTokenTransferByPool(poolWalletAddress: Address, toAddress: Address, amount: Int) {
+        let tokenTransferMsg: TokenTransfer = TokenTransfer{
+            queryId: self.queryId,
+            amount: amount,
+            destination: toAddress,
+            response_destination: toAddress,
+            custom_payload: null,
+            forward_ton_amount: 0,
+            forward_payload: emptySlice()
+        };
+        self.queryId += 1;
+
         send(SendParameters{
             to: poolWalletAddress,
             value: ton("0.05"),
             bounce: true,
             mode: SendPayGasSeparately,
-            body: TokenTransfer{
-                queryId: queryId,
-                amount: amount,
-                destination: toAddress,
-                response_destination: toAddress,
-                custom_payload: null,
-                forward_ton_amount: 0,
-                forward_payload: emptySlice()
-            }.toCell()
+            body: tokenTransferMsg.toCell()
         });
     }
 
@@ -287,15 +283,11 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
     fun mintAToken(asset: Address, user: Address, amount: Int) {
         let aTokenAddress: Address = self.reservesConfiguration.get(asset)!!.aTokenAddress;
 
-        // store mintMsg
-        let queryId: Int = self.queryId;
         let mintMsg: Mint = Mint{
-            queryId: queryId,
-            token: aTokenAddress,
+            queryId: self.queryId,
             amount: amount,
             receiver: user
         };
-        self.mintMsg.set(queryId, mintMsg);
         self.queryId += 1;
 
         send(SendParameters{
@@ -308,61 +300,58 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
     }
 
     fun burnAToken(asset: Address, user: Address, amount: Int) {
+        let tokenBurnMsg: TokenBurn = TokenBurn{
+            queryId: self.queryId,
+            amount: amount,
+            owner: user,
+            response_destination: user
+        };
+        self.queryId += 1;
+        let to: Address = self.userATokenWalletAddress(asset, user);
+
         send(SendParameters{
-            to: self.userATokenWalletAddress(asset, user),
+            to: to,
             value: 0,
             bounce: true,
             mode: SendRemainingValue,
-            body: TokenBurn{
-                queryId: self.queryId,
-                amount: amount,
-                owner: user,
-                response_destination: user // This field isn't used in TokenBurn
-            }.toCell()
+            body: tokenBurnMsg.toCell()
         });
     }
 
     fun burnDToken(asset: Address, user: Address, amount: Int) {
+        let tokenBurnMsg: TokenBurn = TokenBurn{
+            queryId: self.queryId,
+            amount: amount,
+            owner: user,
+            response_destination: user
+        };
+        self.queryId += 1;
+        let to: Address = self.userDTokenWalletAddress(asset, user);
+
         send(SendParameters{
-            to: self.userDTokenWalletAddress(asset, user),
+            to: to,
             value: 0,
             bounce: true,
             mode: SendRemainingValue,
-            body: TokenBurn{
-                queryId: self.queryId,
-                amount: amount,
-                owner: user,
-                response_destination: user // This field isn't used in TokenBurn
-            }.toCell()
+            body: tokenBurnMsg.toCell()
         });
     }
 
-    // TODO: handle bounce message
     fun mintDToken(asset: Address, user: Address, amount: Int) {
         let dTokenAddress: Address = self.reservesConfiguration.get(asset)!!.dTokenAddress;
+        let mintMsg: Mint = Mint{
+            queryId: self.queryId,
+            amount: amount,
+            receiver: user
+        };
+        self.queryId += 1;
+
         send(SendParameters{
             to: dTokenAddress,
             value: 0,
             bounce: true,
             mode: SendRemainingValue,
-            body: Mint{
-                queryId: self.queryId,
-                token: dTokenAddress,
-                amount: amount,
-                receiver: user
-            }.toCell()
-        });
-        self.queryId += 1;
-    }
-
-    fun rerunMintMsg(queryId: Int) {
-        let msg: Mint = self.mintMsg.get(queryId)!!;
-        send(SendParameters{
-            to: msg.token,
-            value: 0,
-            bounce: true,
-            mode: SendRemainingValue,
-            body: msg.toCell()
+            body: mintMsg.toCell()
         });
     }
 
@@ -425,7 +414,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
             reserveData.totalSupply += scaledSupplyAmount;
             self.reservesData.set(matchedReserve!!, reserveData);
 
-            self.updateUserAccountPosition(msg.queryId, msg.from, matchedReserve!!, scaledSupplyAmount, 0);
+            self.updateUserAccountPosition(msg.from, matchedReserve!!, scaledSupplyAmount, 0);
         }
 
         // use crc32 code of 'Repay': utils.calculateRequestOpcode_1('Repay')
@@ -443,22 +432,27 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
             reserveData.totalBorrow -= scaledBorrowAmount;
             self.reservesData.set(matchedReserve!!, reserveData);
 
-            self.updateUserAccountPosition(msg.queryId, msg.from, matchedReserve!!, 0, -scaledBorrowAmount);
+            self.updateUserAccountPosition(msg.from, matchedReserve!!, 0, -scaledBorrowAmount);
         }
     }
 
-    fun updateUserAccountPosition(queryId: Int, ownerAddress: Address, reserveAddress: Address, supply: Int, borrow: Int) {
+    fun updateUserAccountPosition(ownerAddress: Address, reserveAddress: Address, supply: Int, borrow: Int) {
+        let queryId: Int = self.queryId;
         let userAccountInit: StateInit = self.getUserAccountInit(ownerAddress);
         let userAccountAddress: Address = contractAddress(userAccountInit);
-        
         let msg: UpdatePosition = UpdatePosition{
             queryId: queryId,
-            user: ownerAddress,
             address: reserveAddress,
             supply: supply,
             borrow: borrow
         };
-        self.updatePositionMsg.set(queryId, msg);
+        let updatePositionBounce: UpdatePositionBounce = UpdatePositionBounce{
+            to: userAccountAddress,
+            user: ownerAddress,
+            msg: msg
+        };
+        
+        self.updatePositionMsg.set(queryId, updatePositionBounce);
         self.queryId += 1;
         
         send(SendParameters{
@@ -474,17 +468,17 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
 
     // rerun the stored UpdatePositionMsg which isn't deleted in the UserPositionUpdated.
     fun rerunUpdatePositionMsg(queryId: Int) {
-        let msg: UpdatePosition = self.updatePositionMsg.get(queryId)!!;
+        let bounce: UpdatePositionBounce = self.updatePositionMsg.get(queryId)!!;
 
-        let userAccountInit: StateInit = self.getUserAccountInit(msg.user);
+        let userAccountInit: StateInit = self.getUserAccountInit(bounce.user);
         let userAccountAddress: Address = contractAddress(userAccountInit);
 
         send(SendParameters{
-            to: userAccountAddress,
+            to: bounce.to,
             value: 0,
             bounce: true,
             mode: SendRemainingValue,
-            body: msg.toCell(),
+            body: bounce.msg.toCell(),
             code: userAccountInit.code,
             data: userAccountInit.data
         });

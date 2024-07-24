@@ -6,6 +6,7 @@ import {
     ReserveConfiguration,
     ReserveInterestRateStrategy,
     UpdatePosition,
+    UpdatePositionBounce,
 } from '../wrappers/Pool';
 import '@ton/test-utils';
 import { SampleJetton } from '../build/SampleJetton/tact_SampleJetton';
@@ -157,7 +158,6 @@ describe('Pool Supply', () => {
             {
                 $$type: 'Mint',
                 queryId: 0n,
-                token: sampleJetton.address,
                 amount: 100000000000n,
                 receiver: deployer.address,
             },
@@ -407,18 +407,18 @@ describe('Pool Supply', () => {
             expect(accountData.positionsLength).toEqual(0n);
 
             let msgId = (await pool.getQueryId()) - 1n;
-            const updatePositionMsg = parsePoolBounceMessage(await pool.getBounceMsg(msgId)) as UpdatePosition;
-            expect(updatePositionMsg?.$$type).toEqual('UpdatePosition');
-            expect(updatePositionMsg?.queryId).toEqual(msgId);
+            const updatePositionMsg = parsePoolBounceMessage(await pool.getBounceMsg(msgId)) as UpdatePositionBounce;
+            expect(updatePositionMsg?.$$type).toEqual('UpdatePositionBounce');
+            expect(updatePositionMsg?.msg.queryId).toEqual(msgId);
             expect(updatePositionMsg?.user.toString()).toEqual(deployer.getSender().address.toString());
-            expect(updatePositionMsg?.address.toString()).toEqual(sampleJetton.address.toString());
-            expect(updatePositionMsg?.supply).toEqual(100000000000n);
-            expect(updatePositionMsg?.borrow).toEqual(0n);
+            expect(updatePositionMsg?.msg.address.toString()).toEqual(sampleJetton.address.toString());
+            expect(updatePositionMsg?.msg.supply).toEqual(100000000000n);
+            expect(updatePositionMsg?.msg.borrow).toEqual(0n);
 
             result = await pool.send(
                 deployer.getSender(),
                 {
-                    value: toNano('0.05'),
+                    value: toNano('0.15'),
                 },
                 {
                     $$type: 'RerunBounceMsg',
@@ -449,7 +449,7 @@ describe('Pool Supply', () => {
             expect(result.transactions).toHaveTransaction({
                 from: pool.address,
                 to: aToken.address,
-                success: false,
+                success: true,
             });
             expect(await pool.getBounceMsg(msgId)).toEqual(null);
             // rerun mint msg
@@ -458,24 +458,6 @@ describe('Pool Supply', () => {
                     await pool.getUserATokenWalletAddress(sampleJetton.address, deployer.getSender().address),
                 ),
             );
-            msgId = (await pool.getQueryId()) - 1n;
-            result = await pool.send(
-                deployer.getSender(),
-                {
-                    value: toNano('0.08'),
-                },
-                {
-                    $$type: 'RerunBounceMsg',
-                    queryId: msgId,
-                    action: RERUN_ACTION_MINT,
-                },
-            );
-            // mintAToken
-            expect(result.transactions).toHaveTransaction({
-                from: pool.address,
-                to: aToken.address,
-                success: true,
-            });
             // aToken TokenTransferInternal
             expect(result.transactions).toHaveTransaction({
                 from: aToken.address,
@@ -488,8 +470,6 @@ describe('Pool Supply', () => {
                 to: pool.address,
                 success: true,
             });
-            expect(await pool.getBounceMsg(msgId)).toEqual(null);
-
             accountData = await userAccountContract.getAccount();
             // check user account
             expect(accountData.positionsLength).toEqual(1n);
