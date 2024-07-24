@@ -23,7 +23,6 @@ message(0x66660004) GetUserAccountData {
     action: Int as uint8;
     tokenAddress: Address;
     amount: Int as coins;
-    forward_payload: Slice as remaining;
 }
 // gas cost:
 //      borrow: 0.027
@@ -34,7 +33,6 @@ message(0x66660005) UserAccountDataResponse {
     action: Int as uint8;
     tokenAddress: Address;
     amount: Int as coins;
-    forward_payload: Slice as remaining;
     accountData: UserAccountData;
 }
 //

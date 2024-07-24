@@ -1,67 +1,57 @@
-import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
-import { address, beginCell, Cell, toNano } from '@ton/core';
-import {
-    ATokenDTokenContents,
-    Pool,
-    ReserveConfiguration,
-    ReserveInterestRateStrategy,
-    UpdatePosition,
-    UpdatePositionBounce,
-} from '../wrappers/Pool';
+import { Blockchain, BlockchainSnapshot, SandboxContract, Treasury, TreasuryContract } from '@ton/sandbox';
+import { Address, beginCell, Cell, fromNano, Slice, toNano } from '@ton/core';
+import { ATokenDTokenContents, Pool, ReserveConfiguration, ReserveInterestRateStrategy } from '../wrappers/Pool';
 import '@ton/test-utils';
 import { SampleJetton } from '../build/SampleJetton/tact_SampleJetton';
 import { buildOnchainMetadata } from '../scripts/utils';
 import { JettonDefaultWallet } from '../build/SampleJetton/tact_JettonDefaultWallet';
 import { UserAccount } from '../build/Pool/tact_UserAccount';
-import { ATokenDefaultWallet } from '../build/AToken/tact_ATokenDefaultWallet';
 import { AToken } from '../wrappers/AToken';
-import { RERUN_ACTION_MINT, RERUN_ACTION_UPDATE_POSITION } from '../helpers/constant';
-import { parsePoolBounceMessage } from '../helpers/pool';
+import { DToken } from '../wrappers/DToken';
+import { sleep } from '@ton/blueprint';
+import { PERCENTAGE_FACTOR, RAY } from '../helpers/constant';
+import { TestMathUtils } from '../wrappers/TestMathUtils';
 
-describe('Pool Liquidate', () => {
+describe('Pool indexes calculation', () => {
     let blockchain: Blockchain;
+    let snapshot: BlockchainSnapshot;
     let deployer: SandboxContract<TreasuryContract>;
     let secondUser: SandboxContract<TreasuryContract>;
     let pool: SandboxContract<Pool>;
-    let sampleJetton: SandboxContract<SampleJetton>;
-    let aToken: SandboxContract<AToken>;
+    let sampleJetton1: SandboxContract<SampleJetton>;
+    let sampleJetton2: SandboxContract<SampleJetton>;
+    let aToken1: SandboxContract<AToken>;
+    let aToken2: SandboxContract<AToken>;
+    let dToken1: SandboxContract<DToken>;
+    let dToken2: SandboxContract<DToken>;
+    let mathUtils: SandboxContract<TestMathUtils>;
+    let addresses: any = {};
 
-    const reserveAddress = address('UQAEJ7U1iaC1TzcFel5lc2-JaEm8I0k5Krui3fzz3_GeANWV');
+    let reserveConfiguration1: ReserveConfiguration;
+    let reserveConfiguration2: ReserveConfiguration;
+    let reserveInterestRateStrategy: ReserveInterestRateStrategy;
+    let contents1: ATokenDTokenContents;
+    let contents2: ATokenDTokenContents;
 
-    const reserveConfiguration: ReserveConfiguration = {
-        $$type: 'ReserveConfiguration',
-        poolWalletAddress: reserveAddress,
-        aTokenAddress: reserveAddress,
-        dTokenAddress: reserveAddress,
-        ltv: 6000n,
-        liquidationThreshold: 7500n,
-        liquidationBonus: 10500n,
-        reserveFactor: 1000n,
-        liquidationProtocolFee: 500n,
-        isActive: true,
-        isFrozen: false,
-        borrowingEnabled: true,
-        supplyCap: 1000000n,
-        borrowCap: 1000000n,
-    };
+    jest.setTimeout(60 * 1000);
 
-    const reserveInterestRateStrategy: ReserveInterestRateStrategy = {
-        $$type: 'ReserveInterestRateStrategy',
-        optimalUsageRatio: BigInt(0.9 * 10 ** 27),
-        maxUsageRatio: BigInt(10 ** 27) - BigInt(0.9 * 10 ** 27),
-        baseBorrowRate: 0n,
-        slope1: BigInt(0.04 * 10 ** 27),
-        slope2: BigInt(0.6 * 10 ** 27),
-    };
+    beforeAll(async () => {
+        reserveInterestRateStrategy = {
+            $$type: 'ReserveInterestRateStrategy',
+            optimalUsageRatio: BigInt(0.9 * 10 ** 27),
+            maxUsageRatio: BigInt(10 ** 27) - BigInt(0.9 * 10 ** 27),
+            baseBorrowRate: 0n,
+            slope1: BigInt(0.04 * 10 ** 27),
+            slope2: BigInt(0.6 * 10 ** 27),
+        };
 
-    beforeEach(async () => {
         blockchain = await Blockchain.create();
+        deployer = await blockchain.treasury('deployer');
+        addresses.deployer = deployer.address;
+        secondUser = (await blockchain.createWallets(2))[1];
+        addresses.secondUser = secondUser.address;
 
         pool = blockchain.openContract(await Pool.fromInit());
-
-        deployer = await blockchain.treasury('deployer');
-        secondUser = (await blockchain.createWallets(2))[1];
-
         // deploy pool
         const deployResult = await pool.send(
             deployer.getSender(),
@@ -73,6 +63,7 @@ describe('Pool Liquidate', () => {
                 queryId: 0n,
             },
         );
+        addresses.pool = pool.address;
 
         expect(deployResult.transactions).toHaveTransaction({
             from: deployer.address,
@@ -81,34 +72,70 @@ describe('Pool Liquidate', () => {
             success: true,
         });
 
-        // deploy test jetton
-        const jettonParams = {
-            name: 'SampleJetton',
-            description: 'Sample Jetton for testing purposes',
-            decimals: '9',
-            image: 'https://ipfs.io/ipfs/bafybeicn7i3soqdgr7dwnrwytgq4zxy7a5jpkizrvhm5mv6bgjd32wm3q4/welcome-to-IPFS.jpg',
-            symbol: 'SAM',
-        };
         let max_supply = toNano(1000000n); // 🔴 Set the specific total supply in nano
-        let content = buildOnchainMetadata(jettonParams);
-
-        const aTokenJettonParams = {
-            name: 'SampleJetton AToken',
-            description: 'Sample Jetton aToken',
+        let content1 = buildOnchainMetadata({
+            name: 'SampleJetton 1',
+            description: 'Sample Jetton 1',
             decimals: '9',
-            image: 'https://ipfs.io/ipfs/bafybeicn7i3soqdgr7dwnrwytgq4zxy7a5jpkizrvhm5mv6bgjd32wm3q4/welcome-to-IPFS.jpg',
-            symbol: 'aSAM',
-        };
-        let aTokenContent = buildOnchainMetadata(aTokenJettonParams);
-        const contents: ATokenDTokenContents = {
+            image: '',
+            symbol: 'SAM1',
+        });
+        contents1 = {
             $$type: 'ATokenDTokenContents',
-            aTokenContent,
-            dTokenContent: Cell.EMPTY, // TODO
+            aTokenContent: buildOnchainMetadata({
+                name: 'SampleJetton 1 AToken',
+                description: 'Sample Jetton 1 aToken',
+                decimals: '9',
+                image: '',
+                symbol: 'aSAM1',
+            }),
+            dTokenContent: buildOnchainMetadata({
+                name: 'SampleJetton 1 DToken',
+                description: 'Sample Jetton 1 dToken',
+                decimals: '9',
+                image: '',
+                symbol: 'dSAM1',
+            }),
+        };
+        let content2 = buildOnchainMetadata({
+            name: 'SampleJetton 2',
+            description: 'Sample Jetton 2',
+            decimals: '9',
+            image: '',
+            symbol: 'SAM2',
+        });
+        contents2 = {
+            $$type: 'ATokenDTokenContents',
+            aTokenContent: buildOnchainMetadata({
+                name: 'SampleJetton 2 AToken',
+                description: 'Sample Jetton 2 aToken',
+                decimals: '9',
+                image: '',
+                symbol: 'aSAM2',
+            }),
+            dTokenContent: buildOnchainMetadata({
+                name: 'SampleJetton 2 DToken',
+                description: 'Sample Jetton 2 dToken',
+                decimals: '9',
+                image: '',
+                symbol: 'dSAM2',
+            }),
         };
 
-        sampleJetton = blockchain.openContract(await SampleJetton.fromInit(deployer.address, content, max_supply));
+        sampleJetton1 = blockchain.openContract(await SampleJetton.fromInit(deployer.address, content1, max_supply));
+        sampleJetton2 = blockchain.openContract(await SampleJetton.fromInit(deployer.address, content2, max_supply));
 
-        await sampleJetton.send(
+        await sampleJetton1.send(
+            deployer.getSender(),
+            {
+                value: toNano('0.05'),
+            },
+            {
+                $$type: 'Deploy',
+                queryId: 0n,
+            },
+        );
+        await sampleJetton2.send(
             deployer.getSender(),
             {
                 value: toNano('0.05'),
@@ -119,8 +146,71 @@ describe('Pool Liquidate', () => {
             },
         );
 
-        // add reserve
-        const poolWalletAddress = await sampleJetton.getGetWalletAddress(pool.address);
+        const getPoolWalletAndATokenAndDToken = async (
+            jetton: SandboxContract<SampleJetton>,
+            contents: ATokenDTokenContents,
+        ): Promise<{
+            poolWalletAddress: Address;
+            aTokenAddress: Address;
+            dTokenAddress: Address;
+        }> => {
+            return {
+                poolWalletAddress: await jetton.getGetWalletAddress(pool.address),
+                aTokenAddress: await pool.getCalculateATokenAddress(contents.aTokenContent, jetton.address),
+                dTokenAddress: await pool.getCalculateDTokenAddress(contents.dTokenContent, jetton.address),
+            };
+        };
+
+        addresses.sampleJetton1 = sampleJetton1.address;
+        addresses.sampleJetton2 = sampleJetton2.address;
+
+        const {
+            poolWalletAddress: poolWalletAddress1,
+            aTokenAddress: aTokenAddress1,
+            dTokenAddress: dTokenAddress1,
+        } = await getPoolWalletAndATokenAndDToken(sampleJetton1, contents1);
+        const {
+            poolWalletAddress: poolWalletAddress2,
+            aTokenAddress: aTokenAddress2,
+            dTokenAddress: dTokenAddress2,
+        } = await getPoolWalletAndATokenAndDToken(sampleJetton2, contents2);
+
+        addresses.poolWalletAddress1 = poolWalletAddress1;
+        addresses.poolWalletAddress2 = poolWalletAddress2;
+        addresses.aTokenAddress1 = aTokenAddress1;
+        addresses.aTokenAddress2 = aTokenAddress2;
+        addresses.dTokenAddress1 = dTokenAddress1;
+        addresses.dTokenAddress2 = dTokenAddress2;
+        const commonReserveConfiguration = {
+            ltv: 6000n,
+            liquidationThreshold: 7500n,
+            liquidationBonus: 10500n,
+            reserveFactor: 1000n,
+            liquidationProtocolFee: 500n,
+            isActive: true,
+            isFrozen: false,
+            borrowingEnabled: true,
+            supplyCap: 1000000n,
+            borrowCap: 1000000n,
+        };
+        reserveConfiguration1 = {
+            $$type: 'ReserveConfiguration',
+            ...commonReserveConfiguration,
+            poolWalletAddress: poolWalletAddress1,
+            aTokenAddress: aTokenAddress1,
+            dTokenAddress: dTokenAddress1,
+            treasury: sampleJetton1.address,
+        };
+        reserveConfiguration2 = {
+            $$type: 'ReserveConfiguration',
+            ...commonReserveConfiguration,
+            poolWalletAddress: poolWalletAddress2,
+            aTokenAddress: aTokenAddress2,
+            dTokenAddress: dTokenAddress2,
+            treasury: sampleJetton2.address,
+        };
+
+        // add reserve sample Jetton 1
         await pool.send(
             deployer.getSender(),
             {
@@ -128,59 +218,129 @@ describe('Pool Liquidate', () => {
             },
             {
                 $$type: 'AddReserve',
-                reserveAddress: sampleJetton.address,
-                reserveConfiguration: {
-                    ...reserveConfiguration,
-                    poolWalletAddress,
-                },
-                contents,
+                reserveAddress: sampleJetton1.address,
+                reserveConfiguration: reserveConfiguration1,
+                contents: contents1,
                 reserveInterestRateStrategy,
             },
         );
 
-        const calculateATokenAddress = await pool.getCalculateATokenAddress(
-            contents.aTokenContent,
-            sampleJetton.address,
-        );
+        aToken1 = blockchain.openContract(AToken.fromAddress(addresses.aTokenAddress1));
+        dToken1 = blockchain.openContract(DToken.fromAddress(addresses.dTokenAddress1));
+        expect((await aToken1.getOwner()).toString()).toEqual(pool.address.toString());
+        expect((await aToken1.getGetPoolData()).pool.toString()).toEqual(pool.address.toString());
+        expect((await aToken1.getGetPoolData()).asset.toString()).toEqual(sampleJetton1.address.toString());
 
-        aToken = blockchain.openContract(AToken.fromAddress(calculateATokenAddress));
-        expect((await aToken.getOwner()).toString()).toEqual(pool.address.toString());
-        expect((await aToken.getGetPoolData()).pool.toString()).toEqual(pool.address.toString());
-        expect((await aToken.getGetPoolData()).asset.toString()).toEqual(sampleJetton.address.toString());
-
-        // mint test jetton to deployer
-        await sampleJetton.send(
+        // add reserve sample Jetton 2
+        await pool.send(
             deployer.getSender(),
             {
-                value: toNano('0.05'),
+                value: toNano('0.2'),
             },
             {
-                $$type: 'Mint',
+                $$type: 'AddReserve',
+                reserveAddress: sampleJetton2.address,
+                reserveConfiguration: reserveConfiguration2,
+                contents: contents2,
+                reserveInterestRateStrategy,
+            },
+        );
+
+        aToken2 = blockchain.openContract(AToken.fromAddress(addresses.aTokenAddress2));
+        dToken2 = blockchain.openContract(DToken.fromAddress(addresses.dTokenAddress2));
+        expect((await aToken2.getOwner()).toString()).toEqual(pool.address.toString());
+        expect((await aToken2.getGetPoolData()).pool.toString()).toEqual(pool.address.toString());
+        expect((await aToken2.getGetPoolData()).asset.toString()).toEqual(sampleJetton2.address.toString());
+
+        const mintTestJetton = async (jetton: SandboxContract<SampleJetton>, receiver: Address, amount: bigint) => {
+            await jetton.send(
+                deployer.getSender(),
+                {
+                    value: toNano('0.05'),
+                },
+                {
+                    $$type: 'Mint',
+                    queryId: 0n,
+                    amount,
+                    receiver,
+                },
+            );
+        };
+
+        await mintTestJetton(sampleJetton1, deployer.getSender().address, toNano(100000n));
+        await mintTestJetton(sampleJetton2, deployer.getSender().address, toNano(10000n));
+        await mintTestJetton(sampleJetton1, secondUser.address, toNano(100000n));
+        await mintTestJetton(sampleJetton2, secondUser.address, toNano(100000n));
+
+        await setMockOraclePrice(sampleJetton1.address, toNano('1'));
+        await setMockOraclePrice(sampleJetton2.address, toNano('1'));
+
+        mathUtils = blockchain.openContract(await TestMathUtils.fromInit());
+
+        await mathUtils.send(
+            deployer.getSender(),
+            {
+                value: toNano('0.02'),
+            },
+            {
+                $$type: 'Deploy',
                 queryId: 0n,
-                amount: 100000000000n,
-                receiver: deployer.address,
             },
         );
     });
 
-    const deployerSupply = async (amount: bigint) => {
-        // transfer jetton to pool
-        const deployerWalletAddress = await sampleJetton.getGetWalletAddress(deployer.address);
-        const poolWalletAddress = await sampleJetton.getGetWalletAddress(pool.address);
-        const deployerJettonDefaultWallet = blockchain.openContract(
-            JettonDefaultWallet.fromAddress(deployerWalletAddress),
-        );
-        // Liquidate opcode: 0x1f03e59a
-        // const forward_payload: Cell = beginCell().storeUint(0x1f03e59a, 32).storeAddress(deployer.getSender().address).storeUint(1, 8).endCell();
-        const forward_payload: Cell = beginCell().storeUint(0x1f03e59a, 32).storeAddress(deployer.getSender().address).storeUint(1, 8).endCell();
-        console.log(`user: ${deployer.getSender().address.toString()}`)
-        console.log(`user: ${sampleJetton.address.toString()}`)
+    beforeEach(async () => {
+        snapshot = blockchain.snapshot();
+    });
+    afterEach(async () => {
+        await blockchain.loadFrom(snapshot);
+        priceAddresses();
+    });
 
-        const userAccountContract = blockchain.openContract(await UserAccount.fromInit(pool.address, deployer.address));
+    const priceAddresses = () => {
+        const printAddress: any = {};
+        Object.entries(addresses).forEach(([key, value]) => {
+            printAddress[key] = (value as Address).toString();
+        });
+        console.table(printAddress);
+    };
+
+    const setMockOraclePrice = async (jetton: Address, price: bigint) => {
+        const rst = await pool.send(
+            deployer.getSender(),
+            {
+                value: toNano('0.2'),
+            },
+            {
+                $$type: 'SetMockOraclePrice',
+                asset: jetton,
+                price: price,
+            },
+        );
+        expect(rst.transactions).toHaveTransaction({
+            from: deployer.address,
+            to: pool.address,
+            success: true,
+        });
+        const reserveData = await pool.getReserveData(jetton);
+        expect(reserveData.price).toEqual(price);
+    };
+
+    const supply = async (user: Treasury, jetton: SandboxContract<SampleJetton>, amount: bigint) => {
+        // transfer jetton to pool
+        const userWalletAddress = await jetton.getGetWalletAddress(user.address);
+        const [poolWalletAddress, aTokenAddress] =
+            jetton.address.toString() === sampleJetton1.address.toString()
+                ? [addresses.poolWalletAddress1, addresses.aTokenAddress1]
+                : [addresses.poolWalletAddress2, addresses.aTokenAddress2];
+        const userJettonDefaultWallet = blockchain.openContract(JettonDefaultWallet.fromAddress(userWalletAddress));
+        const forward_payload: Cell = beginCell().storeUint(0x55b591ba, 32).endCell();
+
+        const userAccountContract = blockchain.openContract(await UserAccount.fromInit(pool.address, user.address));
         const userAccountAddress = userAccountContract.address;
 
-        const result = await deployerJettonDefaultWallet.send(
-            deployer.getSender(),
+        const result = await userJettonDefaultWallet.send(
+            user,
             {
                 value: toNano('3'),
             },
@@ -189,7 +349,7 @@ describe('Pool Liquidate', () => {
                 queryId: 0n,
                 amount: amount,
                 destination: pool.address,
-                response_destination: deployerWalletAddress,
+                response_destination: userWalletAddress,
                 custom_payload: null,
                 forward_ton_amount: toNano('2'),
                 forward_payload: forward_payload,
@@ -198,7 +358,7 @@ describe('Pool Liquidate', () => {
 
         // TokenTransferInternal
         expect(result.transactions).toHaveTransaction({
-            from: deployerWalletAddress,
+            from: userWalletAddress,
             to: poolWalletAddress,
             success: true,
         });
@@ -217,18 +377,259 @@ describe('Pool Liquidate', () => {
             success: true,
         });
 
-        // check user account
-        const accountData = await userAccountContract.getAccount();
-        expect(accountData.positionsLength).toEqual(1n);
-        expect(accountData.positions?.get(0n)!!.equals(sampleJetton.address)).toBeTruthy();
-        expect(accountData.positionsDetail?.get(sampleJetton.address)!!.supply).toEqual(amount);
-        expect(accountData.positionsDetail?.get(sampleJetton.address)!!.asCollateral).toBeTruthy();
+        // userPositionUpdated
+        expect(result.transactions).toHaveTransaction({
+            from: userAccountAddress,
+            to: pool.address,
+            success: true,
+        });
+
+        // Mint aToken
+        expect(result.transactions).toHaveTransaction({
+            from: pool.address,
+            to: aTokenAddress,
+            success: true,
+        });
     };
 
-    describe('handle supply', () => {
-        it('should handle supply successfully', async () => {
-            const amount = toNano(100n);
-            await deployerSupply(amount);
+    const borrow = async (user: Treasury, jetton: SandboxContract<SampleJetton>, amount: bigint) => {
+        const userWalletAddress = await jetton.getGetWalletAddress(user.address);
+        const [poolWalletAddress, dTokenAddress] =
+            jetton.address.toString() === sampleJetton1.address.toString()
+                ? [addresses.poolWalletAddress1, addresses.dTokenAddress1]
+                : [addresses.poolWalletAddress2, addresses.dTokenAddress2];
+
+        const userAccountAddress = await UserAccount.fromInit(pool.address, user.address);
+        const result = await pool.send(
+            user,
+            {
+                value: toNano('0.2'),
+            },
+            {
+                $$type: 'BorrowToken',
+                tokenAddress: jetton.address,
+                amount,
+            },
+        );
+
+        // BorrowToken
+        expect(result.transactions).toHaveTransaction({
+            from: user.address,
+            to: pool.address,
+            success: true,
         });
+
+        // GetUserAccountData
+        expect(result.transactions).toHaveTransaction({
+            from: pool.address,
+            to: userAccountAddress.address,
+            success: true,
+        });
+
+        // UserAccountDataResponse
+        expect(result.transactions).toHaveTransaction({
+            from: userAccountAddress.address,
+            to: pool.address,
+            success: true,
+        });
+
+        // UpdateUserAccountData
+        expect(result.transactions).toHaveTransaction({
+            from: pool.address,
+            to: userAccountAddress.address,
+            success: true,
+        });
+
+        // Mint dToken
+        expect(result.transactions).toHaveTransaction({
+            from: pool.address,
+            to: dTokenAddress,
+            success: true,
+        });
+
+        // Pool send the TransferToken message to the jetton contract
+        expect(result.transactions).toHaveTransaction({
+            from: pool.address,
+            to: poolWalletAddress,
+            success: true,
+        });
+
+        // Pool wallet transfer borrowed jetton to user
+        expect(result.transactions).toHaveTransaction({
+            from: poolWalletAddress,
+            to: userWalletAddress,
+            success: true,
+        });
+    };
+
+    it('check LiquidityIndex and BorrowIndex', async () => {
+        // provide liquidity
+        await supply(secondUser.getSender(), sampleJetton1, toNano('10000'));
+        await supply(secondUser.getSender(), sampleJetton2, toNano('10000'));
+
+        // borrower supply jetton1 and borrow jetton2
+        const borrower = deployer;
+        const supplyAmount = toNano('10000');
+        const borrowAmount = toNano('5000');
+        const collateralReserve = sampleJetton1;
+        const debtReserve = sampleJetton2;
+        await supply(deployer.getSender(), collateralReserve, supplyAmount);
+        await borrow(deployer.getSender(), debtReserve, borrowAmount);
+        const borrowerAccount = blockchain.openContract(await UserAccount.fromInit(pool.address, borrower.address));
+        console.log('borrowerAccount', borrowerAccount.address.toString());
+
+        let accountData = await borrowerAccount.getAccount();
+        let borrowerHealthInfo = await pool.getUserAccountHealthInfo(accountData);
+        let collateralReserveData = await pool.getReserveDataAndConfiguration(collateralReserve.address);
+        let debtReserveData = await pool.getReserveDataAndConfiguration(debtReserve.address);
+        expect(accountData.positionsLength).toEqual(2n);
+        expect(accountData.positionsDetail.get(collateralReserve.address)?.asCollateral).toEqual(true);
+        expect(accountData.positionsDetail.get(collateralReserve.address)?.supply).toEqual(supplyAmount);
+        expect(accountData.positionsDetail.get(collateralReserve.address)?.borrow).toEqual(0n);
+        expect(accountData.positionsDetail.get(debtReserve.address)?.asCollateral).toEqual(true);
+        expect(accountData.positionsDetail.get(debtReserve.address)?.supply).toEqual(0n);
+        expect(accountData.positionsDetail.get(debtReserve.address)?.borrow).toEqual(borrowAmount);
+        expect(Number(fromNano(borrowerHealthInfo.totalCollateralInBaseCurrency))).toBeCloseTo(
+            Number(fromNano((supplyAmount * collateralReserveData.reserveData.price) / toNano(1))),
+            5,
+        );
+        expect(Number(fromNano(borrowerHealthInfo.totalDebtInBaseCurrency))).toBeCloseTo(
+            Number(fromNano((borrowAmount * debtReserveData.reserveData.price) / toNano(1))),
+            5,
+        );
+        expect(borrowerHealthInfo.healthFactorInRay).toEqual(
+            (supplyAmount *
+                collateralReserveData.reserveData.price *
+                RAY *
+                collateralReserveData.reserveConfiguration.liquidationThreshold) /
+                (borrowAmount * debtReserveData.reserveData.price * PERCENTAGE_FACTOR),
+        );
+
+        // change debt asset price to shortfall borrower
+        await setMockOraclePrice(debtReserve.address, toNano('2'));
+
+        accountData = await borrowerAccount.getAccount();
+        borrowerHealthInfo = await pool.getUserAccountHealthInfo(accountData);
+        collateralReserveData = await pool.getReserveDataAndConfiguration(collateralReserve.address);
+        debtReserveData = await pool.getReserveDataAndConfiguration(debtReserve.address);
+        expect(accountData.positionsLength).toEqual(2n);
+        expect(accountData.positionsDetail.get(collateralReserve.address)?.asCollateral).toEqual(true);
+        expect(accountData.positionsDetail.get(collateralReserve.address)?.supply).toEqual(supplyAmount);
+        expect(accountData.positionsDetail.get(collateralReserve.address)?.borrow).toEqual(0n);
+        expect(accountData.positionsDetail.get(debtReserve.address)?.asCollateral).toEqual(true);
+        expect(accountData.positionsDetail.get(debtReserve.address)?.supply).toEqual(0n);
+        expect(accountData.positionsDetail.get(debtReserve.address)?.borrow).toEqual(borrowAmount);
+        expect(Number(fromNano(borrowerHealthInfo.totalCollateralInBaseCurrency))).toBeCloseTo(
+            Number(fromNano((supplyAmount * collateralReserveData.reserveData.price) / toNano(1))),
+            2,
+        );
+        expect(Number(fromNano(borrowerHealthInfo.totalDebtInBaseCurrency))).toBeCloseTo(
+            Number(fromNano((borrowAmount * debtReserveData.reserveData.price) / toNano(1))),
+            2,
+        );
+        expect(borrowerHealthInfo.healthFactorInRay).toEqual(
+            (supplyAmount *
+                collateralReserveData.reserveData.price *
+                RAY *
+                collateralReserveData.reserveConfiguration.liquidationThreshold) /
+                (borrowAmount * debtReserveData.reserveData.price * PERCENTAGE_FACTOR),
+        );
+        console.dir(borrowerHealthInfo, { depth: null });
+
+        // send liquidation message
+        const liquidator = secondUser;
+        const liquidatorDebtReserveWallet = blockchain.openContract(
+            JettonDefaultWallet.fromAddress(await debtReserve.getGetWalletAddress(liquidator.address)),
+        );
+        const poolDebtReserveWallet = blockchain.openContract(
+            JettonDefaultWallet.fromAddress(await debtReserve.getGetWalletAddress(pool.address)),
+        );
+        const poolCollateralWallet = blockchain.openContract(
+            JettonDefaultWallet.fromAddress(await collateralReserve.getGetWalletAddress(pool.address)),
+        );
+        const liquidatorCollateralWallet = blockchain.openContract(
+            JettonDefaultWallet.fromAddress(await collateralReserve.getGetWalletAddress(liquidator.address)),
+        );
+        const treasuryCollateralWallet = blockchain.openContract(
+            JettonDefaultWallet.fromAddress(
+                await collateralReserve.getGetWalletAddress(collateralReserveData.reserveConfiguration.treasury),
+            ),
+        );
+
+        const forward_payload: Cell = beginCell()
+            .storeUint(0x1f03e59a, 32) // Liquidate opcode: 0x1f03e59a
+            .storeAddress(borrower.address) // borrower
+            .storeUint(0, 4) // collateral reserve Index
+            .endCell();
+
+        const liquidationAmount = borrowAmount;
+        let result = await liquidatorDebtReserveWallet.send(
+            liquidator.getSender(),
+            {
+                value: toNano('10'),
+            },
+            {
+                $$type: 'TokenTransfer',
+                queryId: 0n,
+                amount: liquidationAmount,
+                destination: pool.address,
+                response_destination: liquidatorDebtReserveWallet.address,
+                custom_payload: null,
+                forward_ton_amount: toNano('4.1'),
+                forward_payload: forward_payload,
+            },
+        );
+        expect(result.transactions).toHaveTransaction({
+            from: liquidatorDebtReserveWallet.address,
+            to: poolDebtReserveWallet.address,
+            success: true,
+        });
+        // TokenNotification
+        expect(result.transactions).toHaveTransaction({
+            from: poolDebtReserveWallet.address,
+            to: pool.address,
+            success: true,
+        });
+        // GetUserAccountData
+        expect(result.transactions).toHaveTransaction({
+            from: pool.address,
+            to: borrowerAccount.address,
+            success: true,
+        });
+        // UserAccountDataResponse
+        expect(result.transactions).toHaveTransaction({
+            from: borrowerAccount.address,
+            to: pool.address,
+            success: true,
+        });
+        // UpdatePosition debt token
+        expect(result.transactions).toHaveTransaction({
+            from: pool.address,
+            to: borrowerAccount.address,
+            success: true,
+        });
+        // UpdatePosition collateral token
+        expect(result.transactions).toHaveTransaction({
+            from: pool.address,
+            to: borrowerAccount.address,
+            success: true,
+        });
+        // tokenTransfer
+        expect(result.transactions).toHaveTransaction({
+            from: poolCollateralWallet.address,
+            to: liquidatorCollateralWallet.address,
+            success: true,
+        });
+        // tokenTransfer
+        expect(result.transactions).toHaveTransaction({
+            from: poolCollateralWallet.address,
+            to: treasuryCollateralWallet.address,
+            success: true,
+        });
+
+        accountData = await borrowerAccount.getAccount();
+        console.log(accountData)
+        borrowerHealthInfo = await pool.getUserAccountHealthInfo(accountData);
+        console.dir(borrowerHealthInfo, { depth: null });
     });
 });

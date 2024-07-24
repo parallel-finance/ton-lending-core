@@ -92,3 +92,10 @@ struct UserAccountHealthInfo {
     // base in RAY
     healthFactorInRay: Int as uint256;
 }
+struct Liquidation {
+    liquidator: Address;
+    borrower: Address;
+    liquidationReserve: Address;
+    collateralReserve: Address;
+    liquidationAmount: Int;
+}
