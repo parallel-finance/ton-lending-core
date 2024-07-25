@@ -6,10 +6,10 @@ export async function run(provider: NetworkProvider, args: string[]) {
     const userAddress = Address.parse(provider.sender().address?.toString() || '');
     const ui= provider.ui();
 
-    // MAS: EQCP_v_hh0uTHIG_j6jpynQhazw3m1ZyEPR_aQMQTAsHMPxA
-    // NOT: EQBqFJkn_DoBFcNPQ0ble53CD92X_XsDgPr1_WAajYceJMHi
-    // PTon: EQBdMo5ZwwVWhBMMSNbU9oNe3L5B8GBhl14OD8aR9am2lv2-
-    // USDT: EQAXwaSn8OPKA08QgSBPVGvP5n_stP9PhuRvynayN-pnjKXb
+    // MAS: EQBe9prUeNqHJHRw4YWDZhXI91kiGaGTTHuCWIaY975Uw2AU
+    // USDT: EQColXOG7C2X8x0ZFT-3Ot5sYknz-JbLnJzI1eVNldQlX2Bu
+    // NOT: EQD8-IT-fOEuBqY5bG_NY3lcZTKnnKv-7_UuILidV2eCa4W-
+    // pTON: EQBvOgGXLdZOysRTnw2UDc_KRwcD5HLVH139DZ3AnK04LcxH
     const address = Address.parse(args.length > 0 ? args[0] : await ui.input('SampleJetton address'));
 
     if (!(await provider.isContractDeployed(address))) {
@@ -28,8 +28,8 @@ export async function run(provider: NetworkProvider, args: string[]) {
             $$type: 'Mint',
             queryId: 0n,
             receiver: userAddress,
-            amount: 1000000000000n,
+            amount: toNano("10000"),
         }
     );
-    console.log(`Minted 1000000000000n token to ${userAddress.toString()}`);
+    console.log(`Minted 10000 token to ${userAddress.toString()}`);
 }

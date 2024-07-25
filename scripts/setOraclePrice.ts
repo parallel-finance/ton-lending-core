@@ -27,8 +27,8 @@ export async function run(provider: NetworkProvider) {
     console.log('Set oracle price...')
     const pool = provider.open(await Pool.fromInit());
 
-    await setMockPrice(provider, pool, 'EQCP_v_hh0uTHIG_j6jpynQhazw3m1ZyEPR_aQMQTAsHMPxA', toNano('2'));
-    await setMockPrice(provider, pool, 'EQBqFJkn_DoBFcNPQ0ble53CD92X_XsDgPr1_WAajYceJMHi', toNano('0.016'));
-    await setMockPrice(provider, pool, 'EQBdMo5ZwwVWhBMMSNbU9oNe3L5B8GBhl14OD8aR9am2lv2-', toNano('7.16'));
-    await setMockPrice(provider, pool, 'EQAXwaSn8OPKA08QgSBPVGvP5n_stP9PhuRvynayN-pnjKXb', toNano('1'));
+    await setMockPrice(provider, pool, 'EQBe9prUeNqHJHRw4YWDZhXI91kiGaGTTHuCWIaY975Uw2AU', toNano('2'));
+    await setMockPrice(provider, pool, 'EQBvOgGXLdZOysRTnw2UDc_KRwcD5HLVH139DZ3AnK04LcxH', toNano('0.016'));
+    await setMockPrice(provider, pool, 'EQD8-IT-fOEuBqY5bG_NY3lcZTKnnKv-7_UuILidV2eCa4W-', toNano('7.16'));
+    await setMockPrice(provider, pool, 'EQColXOG7C2X8x0ZFT-3Ot5sYknz-JbLnJzI1eVNldQlX2Bu', toNano('1'));
 }

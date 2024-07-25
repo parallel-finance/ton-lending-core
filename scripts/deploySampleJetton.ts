@@ -9,7 +9,7 @@ export async function run(provider: NetworkProvider) {
         name: 'SampleJetton',
         description: 'Sample Jetton for testing purposes',
         image: 'https://ipfs.io/ipfs/bafybeicn7i3soqdgr7dwnrwytgq4zxy7a5jpkizrvhm5mv6bgjd32wm3q4/welcome-to-IPFS.jpg',
-        symbol: 'SAM',
+        symbol: 'MAS',
         decimals: '9',
     };
     let max_supply = (1n << 120n) - 1n;
@@ -28,7 +28,11 @@ export async function run(provider: NetworkProvider) {
         }
     );
 
-    // EQCP_v_hh0uTHIG_j6jpynQhazw3m1ZyEPR_aQMQTAsHMPxA MAS no max_supply
+    // SAM: EQDXzHrAAvH0oBVW3LEZd8dF6uGipG16r3GasIx0gKAAU_Qo
+    // MAS: EQBe9prUeNqHJHRw4YWDZhXI91kiGaGTTHuCWIaY975Uw2AU
+    // USDT: EQColXOG7C2X8x0ZFT-3Ot5sYknz-JbLnJzI1eVNldQlX2Bu
+    // NOT: EQD8-IT-fOEuBqY5bG_NY3lcZTKnnKv-7_UuILidV2eCa4W-
+    // pTON: EQBvOgGXLdZOysRTnw2UDc_KRwcD5HLVH139DZ3AnK04LcxH
     await provider.waitForDeploy(sampleJetton.address);
     console.log(`Deployed at ${sampleJetton.address.toString()}`);
 }
