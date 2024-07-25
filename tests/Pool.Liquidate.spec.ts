@@ -559,7 +559,7 @@ describe('Pool indexes calculation', () => {
         const forward_payload: Cell = beginCell()
             .storeUint(0x1f03e59a, 32) // Liquidate opcode: 0x1f03e59a
             .storeAddress(borrower.address) // borrower
-            .storeUint(0, 4) // collateral reserve Index
+            .storeUint(0, 5) // collateral reserve Index
             .endCell();
 
         const liquidationAmount = borrowAmount;

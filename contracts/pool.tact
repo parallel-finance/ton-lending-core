@@ -555,8 +555,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
             require(liquidationReserve != null, "Liquidation reserve not found");
             
             let borrower: Address = forwardPayload.loadAddress();
-            // TODO: risk
-            let collateralIndex: Int = forwardPayload.loadUint(4); 
+            let collateralIndex: Int = forwardPayload.loadUint(5); 
             let collateralReserve: Address? = self.reserves.get(collateralIndex);
             require(collateralReserve != null, "Collateral reserve not found");
             
