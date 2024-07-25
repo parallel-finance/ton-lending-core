@@ -35,6 +35,7 @@ export const reserveConfiguration: ReserveConfiguration = {
     supplyCap: 1000000n,
     borrowCap: 1000000n,
     treasury: reserveAddress,
+    decimals: 9n
 };
 
 export const reserveInterestRateStrategy: ReserveInterestRateStrategy = {

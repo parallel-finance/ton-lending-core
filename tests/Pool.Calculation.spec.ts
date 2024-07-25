@@ -132,7 +132,8 @@ describe('Pool indexes calculation', () => {
             borrowingEnabled: true,
             supplyCap: 1000000n,
             borrowCap: 1000000n,
-            treasury: sampleJetton.address
+            treasury: sampleJetton.address,
+            decimals: 9n
         };
 
         // add reserve

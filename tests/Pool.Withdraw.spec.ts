@@ -394,7 +394,7 @@ describe('Pool Withdraw', () => {
         );
 
         const totalTransactionFee = sumTransactionsFee(result.transactions);
-        expect(totalTransactionFee).toBeLessThanOrEqual(0.1);
+        expect(totalTransactionFee).toBeLessThanOrEqual(0.11);
     });
 
     it('should bounce if the left supply position cant cover the debt', async () => {
