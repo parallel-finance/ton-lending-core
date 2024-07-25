@@ -47,6 +47,7 @@ describe('Pool Withdraw', () => {
         borrowingEnabled: true,
         supplyCap: 1000000n,
         borrowCap: 1000000n,
+        treasury: reserveAddress
     };
 
     const reserveInterestRateStrategy: ReserveInterestRateStrategy = {
