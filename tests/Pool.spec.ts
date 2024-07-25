@@ -51,6 +51,7 @@ describe('Pool', () => {
         borrowingEnabled: true,
         supplyCap: 1000000n,
         borrowCap: 1000000n,
+        treasury: reserveAddress,
     };
 
     const reserveInterestRateStrategy: ReserveInterestRateStrategy = {
@@ -150,12 +151,13 @@ describe('Pool', () => {
 
             const reserveConfigurationResult = await pool.getReserveConfiguration(reserveAddress);
             expect(reserveConfiguration.aTokenAddress.toString()).toEqual(aToken.address.toString());
-            const { poolWalletAddress, aTokenAddress, dTokenAddress, ...otherReserveConfiguration } =
+            const { poolWalletAddress, aTokenAddress, dTokenAddress, treasury, ...otherReserveConfiguration } =
                 reserveConfigurationResult;
             expect(reserveConfiguration).toMatchObject(otherReserveConfiguration);
             expect(aTokenAddress.toString()).toEqual(reserveConfiguration.aTokenAddress.toString());
             expect(dTokenAddress.toString()).toEqual(reserveConfiguration.dTokenAddress.toString());
             expect(poolWalletAddress.toString()).toEqual(reserveConfiguration.poolWalletAddress.toString());
+            expect(treasury.toString()).toEqual(reserveConfiguration.treasury.toString());
         });
 
         it('should fail if reserve already exists', async () => {
@@ -306,11 +308,12 @@ describe('Pool', () => {
 
         it('should getReserveConfiguration', async () => {
             const result = await pool.getReserveConfiguration(reserveAddress);
-            const { poolWalletAddress, aTokenAddress, dTokenAddress, ...otherReserveConfiguration } = result;
+            const { poolWalletAddress, aTokenAddress, dTokenAddress, treasury, ...otherReserveConfiguration } = result;
             expect(reserveConfiguration).toMatchObject(otherReserveConfiguration);
             expect(aTokenAddress.toString()).toEqual(reserveConfiguration.aTokenAddress.toString());
             expect(dTokenAddress.toString()).toEqual(reserveConfiguration.dTokenAddress.toString());
             expect(poolWalletAddress.toString()).toEqual(reserveConfiguration.poolWalletAddress.toString());
+            expect(treasury.toString()).toEqual(reserveConfiguration.treasury.toString());
         });
 
         it('should getReservesLength', async () => {

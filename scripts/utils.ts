@@ -60,7 +60,7 @@ export function buildOnchainMetadata(data: JettonMetaData): Cell {
     return beginCell().storeInt(ONCHAIN_CONTENT_PREFIX, 8).storeDict(dict).endCell();
 }
 
-function calculateRequestOpcode_1(str: string): string {
+export function calculateRequestOpcode_1(str: string): string {
     return (BigInt(crc32.str(str)) & BigInt(0x7fffffff)).toString(16);
 }
 

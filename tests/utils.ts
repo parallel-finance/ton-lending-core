@@ -34,6 +34,7 @@ export const reserveConfiguration: ReserveConfiguration = {
     borrowingEnabled: true,
     supplyCap: 1000000n,
     borrowCap: 1000000n,
+    treasury: reserveAddress,
 };
 
 export const reserveInterestRateStrategy: ReserveInterestRateStrategy = {
@@ -63,14 +64,17 @@ export const deployPool = async (pool: SandboxContract<Pool>, deployer: SandboxC
         deploy: true,
         success: true,
     });
-}
+};
 
 // able to deploy several different jettons
-export const deployJetton = async (blockchain: Blockchain, deployer: SandboxContract<TreasuryContract>, jettonParams: JettonParams): Promise<SandboxContract<SampleJetton>> => {
+export const deployJetton = async (
+    blockchain: Blockchain,
+    deployer: SandboxContract<TreasuryContract>,
+    jettonParams: JettonParams,
+): Promise<SandboxContract<SampleJetton>> => {
     let max_supply = toNano(1000000n);
     let content = buildOnchainMetadata(jettonParams);
     const jetton = blockchain.openContract(await SampleJetton.fromInit(deployer.address, content, max_supply));
-
 
     await jetton.send(
         deployer.getSender(),
@@ -86,7 +90,12 @@ export const deployJetton = async (blockchain: Blockchain, deployer: SandboxCont
 };
 
 // able to add jetton and ton reserves
-export const addReserve = async (pool: SandboxContract<Pool>, deployer: SandboxContract<TreasuryContract>, reserveAddress: Address, poolWalletAddress: Address) => {
+export const addReserve = async (
+    pool: SandboxContract<Pool>,
+    deployer: SandboxContract<TreasuryContract>,
+    reserveAddress: Address,
+    poolWalletAddress: Address,
+) => {
     const aTokenJettonParams = {
         name: 'AToken',
         description: 'Jetton aToken',
@@ -110,15 +119,9 @@ export const addReserve = async (pool: SandboxContract<Pool>, deployer: SandboxC
         dTokenContent,
     };
 
-    const calculateATokenAddress = await pool.getCalculateATokenAddress(
-        contents.aTokenContent,
-        reserveAddress,
-    );
+    const calculateATokenAddress = await pool.getCalculateATokenAddress(contents.aTokenContent, reserveAddress);
 
-    const calculateDTokenAddress = await pool.getCalculateDTokenAddress(
-        contents.dTokenContent,
-        reserveAddress,
-    );
+    const calculateDTokenAddress = await pool.getCalculateDTokenAddress(contents.dTokenContent, reserveAddress);
 
     await pool.send(
         deployer.getSender(),
@@ -154,10 +157,15 @@ export const addReserve = async (pool: SandboxContract<Pool>, deployer: SandboxC
     return {
         aTokenAddress: calculateATokenAddress,
         dTokenAddress: calculateDTokenAddress,
-    }
-}
+    };
+};
 
-export const mintJetton = async (jetton: SandboxContract<SampleJetton>, via: Sender, receiver: Address, amount: bigint) => {
+export const mintJetton = async (
+    jetton: SandboxContract<SampleJetton>,
+    via: Sender,
+    receiver: Address,
+    amount: bigint,
+) => {
     await jetton.send(
         via,
         {
@@ -170,9 +178,14 @@ export const mintJetton = async (jetton: SandboxContract<SampleJetton>, via: Sen
             amount,
         },
     );
-}
+};
 
-export const supplyJetton = async (fromJettonWallet: SandboxContract<JettonDefaultWallet>, deployer: SandboxContract<TreasuryContract>, poolAddress: Address, amount:bigint) => {
+export const supplyJetton = async (
+    fromJettonWallet: SandboxContract<JettonDefaultWallet>,
+    deployer: SandboxContract<TreasuryContract>,
+    poolAddress: Address,
+    amount: bigint,
+) => {
     const forward_payload: Cell = beginCell().storeUint(0x55b591ba, 32).endCell();
     await fromJettonWallet.send(
         deployer.getSender(),
@@ -190,4 +203,4 @@ export const supplyJetton = async (fromJettonWallet: SandboxContract<JettonDefau
             forward_payload: forward_payload,
         },
     );
-}
+};

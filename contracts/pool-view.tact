@@ -63,8 +63,8 @@ trait PoolView with Ownable, Resumable {
             }
         }
         return UserAccountHealthInfo{
-            avgLtv: totalCollateralMulLtv / totalCollateral,
-            avgLiquidationThreshold: totalCollateralMulLT / totalCollateral,
+            avgLtv: totalCollateral != 0 ? totalCollateralMulLtv / totalCollateral : 0,
+            avgLiquidationThreshold: totalCollateral != 0 ? totalCollateralMulLT / totalCollateral : 0,
             totalSupplyInBaseCurrency: totalSupply,
             totalCollateralInBaseCurrency: totalCollateral,
             totalDebtInBaseCurrency: totalDebt,

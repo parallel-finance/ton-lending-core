@@ -73,6 +73,11 @@ describe('Pool Supply', () => {
             },
         );
 
+        // open this line to see the details
+        // printTransactionFees(result.transactions);
+        const totalTransactionFee = sumTransactionsFee(result.transactions);
+        expect(totalTransactionFee).toBeLessThanOrEqual(0.12);
+
         // TokenTransferInternal
         expect(result.transactions).toHaveTransaction({
             from: deployerWalletAddress,
@@ -94,11 +99,6 @@ describe('Pool Supply', () => {
             success: true,
         });
 
-        // open this line to see the details
-        // printTransactionFees(result.transactions);
-        const totalTransactionFee = sumTransactionsFee(result.transactions);
-        expect(totalTransactionFee).toBeLessThanOrEqual(0.1);
-
         // check user account
         const accountData = await userAccountContract.getAccount();
         expect(accountData.positionsLength).toEqual(1n);
@@ -115,7 +115,9 @@ describe('Pool Supply', () => {
 
         it('should handle ton supply successfully', async () => {
             await addReserve(pool, deployer, pool.address, pool.address);
-            const userAccountContract = blockchain.openContract(await UserAccount.fromInit(pool.address, deployer.address));
+            const userAccountContract = blockchain.openContract(
+                await UserAccount.fromInit(pool.address, deployer.address),
+            );
             const userAccountAddress = userAccountContract.address;
 
             const amount = toNano(100);

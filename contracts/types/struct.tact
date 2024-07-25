@@ -15,6 +15,8 @@ struct ReserveConfiguration {
     borrowingEnabled: Bool;
     supplyCap: Int as coins;
     borrowCap: Int as coins;
+    // reserve treasury address
+    treasury: Address;
 }
 struct ReserveInterestRateStrategy {
     optimalUsageRatio: Int as uint128;
@@ -89,4 +91,11 @@ struct UserAccountHealthInfo {
     totalDebtInBaseCurrency: Int as uint128;
     // base in RAY
     healthFactorInRay: Int as uint256;
+}
+struct Liquidation {
+    liquidator: Address;
+    borrower: Address;
+    liquidationReserve: Address;
+    collateralReserve: Address;
+    liquidationAmount: Int;
 }
