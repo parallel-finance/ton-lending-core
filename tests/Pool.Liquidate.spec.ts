@@ -403,7 +403,7 @@ describe('Pool indexes calculation', () => {
         const result = await pool.send(
             user,
             {
-                value: toNano('0.2'),
+                value: toNano('0.25'),
             },
             {
                 $$type: 'BorrowToken',

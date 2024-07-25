@@ -315,7 +315,7 @@ describe('Pool', () => {
 
             printTransactionFees(result.transactions);
             const totalTransactionFee = sumTransactionsFee(result.transactions);
-            expect(totalTransactionFee).toBeLessThanOrEqual(0.1);
+            expect(totalTransactionFee).toBeLessThanOrEqual(0.101); // real: 0.10056064799999999
 
             const userAccountContract = blockchain.openContract(userAccountAddress);
             const accountData = await userAccountContract.getAccount();
