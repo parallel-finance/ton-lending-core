@@ -45,11 +45,11 @@ trait PoolView with Ownable, Resumable {
         foreach (reserve, tokenData in userAccountData.positionsDetail) {
             let reserveData: ReserveData = self.reservesData.get(reserve)!!;
             let reserveConfiguration: ReserveConfiguration = self.reservesConfiguration.get(reserve)!!;
+            let reserveUint: Int = pow(10, reserveConfiguration.decimals);
 
             if (tokenData.supply > 0) {
                 let normalizedIncome: Int = reserveData.getNormalizedIncome();
-                let reserveUint: Int = pow(10, reserveConfiguration.decimals);
-                let supplyValue: Int = tokenData.supply.rayMul(normalizedIncome) * reserveData.price / JETTON_UNIT;
+                let supplyValue: Int = tokenData.supply.rayMul(normalizedIncome) * reserveData.price / reserveUint;
                 totalSupply += supplyValue;
                 if (tokenData.asCollateral) {
                     totalCollateral += supplyValue;
@@ -59,7 +59,7 @@ trait PoolView with Ownable, Resumable {
             }
             if (tokenData.borrow > 0) {
                 let normalizedDebt: Int = reserveData.getNormalizedDebt();
-                let borrowValue: Int = tokenData.borrow.rayMul(normalizedDebt) * reserveData.price / JETTON_UNIT;
+                let borrowValue: Int = tokenData.borrow.rayMul(normalizedDebt) * reserveData.price / reserveUint;
                 totalDebt += borrowValue;
             }
         }

@@ -12,7 +12,7 @@ import { sleep } from '@ton/blueprint';
 import { PERCENTAGE_FACTOR, RAY } from '../helpers/constant';
 import { TestMathUtils } from '../wrappers/TestMathUtils';
 
-describe('Pool indexes calculation', () => {
+describe('Pool liquidation test', () => {
     let blockchain: Blockchain;
     let snapshot: BlockchainSnapshot;
     let deployer: SandboxContract<TreasuryContract>;
@@ -100,7 +100,7 @@ describe('Pool indexes calculation', () => {
         let content2 = buildOnchainMetadata({
             name: 'SampleJetton 2',
             description: 'Sample Jetton 2',
-            decimals: '9',
+            decimals: '6',
             image: '',
             symbol: 'SAM2',
         });
@@ -109,14 +109,14 @@ describe('Pool indexes calculation', () => {
             aTokenContent: buildOnchainMetadata({
                 name: 'SampleJetton 2 AToken',
                 description: 'Sample Jetton 2 aToken',
-                decimals: '9',
+                decimals: '6',
                 image: '',
                 symbol: 'aSAM2',
             }),
             dTokenContent: buildOnchainMetadata({
                 name: 'SampleJetton 2 DToken',
                 description: 'Sample Jetton 2 dToken',
-                decimals: '9',
+                decimals: '6',
                 image: '',
                 symbol: 'dSAM2',
             }),
@@ -192,7 +192,6 @@ describe('Pool indexes calculation', () => {
             borrowingEnabled: true,
             supplyCap: 1000000n,
             borrowCap: 1000000n,
-            decimals: 9n
         };
         reserveConfiguration1 = {
             $$type: 'ReserveConfiguration',
@@ -201,6 +200,7 @@ describe('Pool indexes calculation', () => {
             aTokenAddress: aTokenAddress1,
             dTokenAddress: dTokenAddress1,
             treasury: sampleJetton1.address,
+            decimals: 9n,
         };
         reserveConfiguration2 = {
             $$type: 'ReserveConfiguration',
@@ -209,6 +209,7 @@ describe('Pool indexes calculation', () => {
             aTokenAddress: aTokenAddress2,
             dTokenAddress: dTokenAddress2,
             treasury: sampleJetton2.address,
+            decimals: 6n,
         };
 
         // add reserve sample Jetton 1
@@ -463,17 +464,19 @@ describe('Pool indexes calculation', () => {
         });
     };
 
-    xit('check LiquidityIndex and BorrowIndex', async () => {
+    it('Liquidation test', async () => {
         // provide liquidity
         await supply(secondUser.getSender(), sampleJetton1, toNano('10000'));
         await supply(secondUser.getSender(), sampleJetton2, toNano('10000'));
 
         // borrower supply jetton1 and borrow jetton2
         const borrower = deployer;
-        const supplyAmount = toNano('10000');
-        const borrowAmount = toNano('5000');
         const collateralReserve = sampleJetton1;
         const debtReserve = sampleJetton2;
+        const collateralUint = 10n ** reserveConfiguration1.decimals;
+        const debtUint = 10n ** reserveConfiguration2.decimals;
+        const supplyAmount = 10000n * collateralUint;
+        const borrowAmount = 5000n * debtUint;
         await supply(deployer.getSender(), collateralReserve, supplyAmount);
         await borrow(deployer.getSender(), debtReserve, borrowAmount);
         const borrowerAccount = blockchain.openContract(await UserAccount.fromInit(pool.address, borrower.address));
@@ -481,6 +484,8 @@ describe('Pool indexes calculation', () => {
 
         let accountData = await borrowerAccount.getAccount();
         let borrowerHealthInfo = await pool.getUserAccountHealthInfo(accountData);
+        console.dir(borrowerHealthInfo, { depth: null });
+
         let collateralReserveData = await pool.getReserveDataAndConfiguration(collateralReserve.address);
         let debtReserveData = await pool.getReserveDataAndConfiguration(debtReserve.address);
         expect(accountData.positionsLength).toEqual(2n);
@@ -491,19 +496,20 @@ describe('Pool indexes calculation', () => {
         expect(accountData.positionsDetail.get(debtReserve.address)?.supply).toEqual(0n);
         expect(accountData.positionsDetail.get(debtReserve.address)?.borrow).toEqual(borrowAmount);
         expect(Number(fromNano(borrowerHealthInfo.totalCollateralInBaseCurrency))).toBeCloseTo(
-            Number(fromNano((supplyAmount * collateralReserveData.reserveData.price) / toNano(1))),
+            Number(fromNano((supplyAmount * collateralReserveData.reserveData.price) / collateralUint)),
             5,
         );
         expect(Number(fromNano(borrowerHealthInfo.totalDebtInBaseCurrency))).toBeCloseTo(
-            Number(fromNano((borrowAmount * debtReserveData.reserveData.price) / toNano(1))),
+            Number(fromNano((borrowAmount * debtReserveData.reserveData.price) / debtUint)),
             5,
         );
         expect(borrowerHealthInfo.healthFactorInRay).toEqual(
             (supplyAmount *
                 collateralReserveData.reserveData.price *
                 RAY *
+                debtUint *
                 collateralReserveData.reserveConfiguration.liquidationThreshold) /
-                (borrowAmount * debtReserveData.reserveData.price * PERCENTAGE_FACTOR),
+                (borrowAmount * debtReserveData.reserveData.price * PERCENTAGE_FACTOR * collateralUint),
         );
 
         // change debt asset price to shortfall borrower
@@ -521,19 +527,20 @@ describe('Pool indexes calculation', () => {
         expect(accountData.positionsDetail.get(debtReserve.address)?.supply).toEqual(0n);
         expect(accountData.positionsDetail.get(debtReserve.address)?.borrow).toEqual(borrowAmount);
         expect(Number(fromNano(borrowerHealthInfo.totalCollateralInBaseCurrency))).toBeCloseTo(
-            Number(fromNano((supplyAmount * collateralReserveData.reserveData.price) / toNano(1))),
+            Number(fromNano((supplyAmount * collateralReserveData.reserveData.price) / collateralUint)),
             2,
         );
         expect(Number(fromNano(borrowerHealthInfo.totalDebtInBaseCurrency))).toBeCloseTo(
-            Number(fromNano((borrowAmount * debtReserveData.reserveData.price) / toNano(1))),
+            Number(fromNano((borrowAmount * debtReserveData.reserveData.price) / debtUint)),
             2,
         );
         expect(borrowerHealthInfo.healthFactorInRay).toEqual(
             (supplyAmount *
                 collateralReserveData.reserveData.price *
                 RAY *
+                debtUint *
                 collateralReserveData.reserveConfiguration.liquidationThreshold) /
-                (borrowAmount * debtReserveData.reserveData.price * PERCENTAGE_FACTOR),
+                (borrowAmount * debtReserveData.reserveData.price * PERCENTAGE_FACTOR * collateralUint),
         );
         console.dir(borrowerHealthInfo, { depth: null });
 
@@ -641,7 +648,7 @@ describe('Pool indexes calculation', () => {
         });
 
         accountData = await borrowerAccount.getAccount();
-        console.log(accountData)
+        console.log(accountData);
         borrowerHealthInfo = await pool.getUserAccountHealthInfo(accountData);
         console.dir(borrowerHealthInfo, { depth: null });
     });

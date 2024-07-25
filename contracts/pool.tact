@@ -245,9 +245,12 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
             // calculate user collateral amount
             let userCollateral: Int = userCollateralPosition!!.supply.rayMul(collateralNextLiquidityIndex);
 
+            let collateralUint: Int = pow(10, collateralReserveConfiguration.decimals);
+            let debtUint: Int = pow(10, reserveConfiguration.decimals);
+            
             // calculate the max collateral amount based on the actualLiquidationAmount
             let maxCollateralToLiquidate: Int = (
-                reserveData.price * actualLiquidationAmount / collateralReserveData.price
+                (reserveData.price * actualLiquidationAmount * collateralUint) / (collateralReserveData.price * debtUint)
             ).percentMul(collateralReserveConfiguration.liquidationBonus);
 
             // if user collateral amount can't cover `maxCollateralToLiquidate`, calculate the actualLiquidationAmount based on the user collateral
@@ -255,7 +258,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
             if (maxCollateralToLiquidate > userCollateral) {
                 actualCollateralToLiquidate = userCollateral;
                 actualLiquidationAmount = (
-                    collateralReserveData.price * actualCollateralToLiquidate / reserveData.price
+                    (collateralReserveData.price * actualCollateralToLiquidate * debtUint) / (reserveData.price * collateralUint)
                 ).percentDiv(collateralReserveConfiguration.liquidationBonus);
             } else {
                 actualCollateralToLiquidate = maxCollateralToLiquidate;
