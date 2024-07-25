@@ -555,6 +555,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
             require(liquidationReserve != null, "Liquidation reserve not found");
             
             let borrower: Address = forwardPayload.loadAddress();
+            // TODO risk: max supported token: 32
             let collateralIndex: Int = forwardPayload.loadUint(5); 
             let collateralReserve: Address? = self.reserves.get(collateralIndex);
             require(collateralReserve != null, "Collateral reserve not found");
