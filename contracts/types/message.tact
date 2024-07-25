@@ -1,22 +1,21 @@
 import "./struct";
 import "../jetton/messages";
-
-// TODO: update the message id
+// TODO: update the all of the message ids
 message(0x66660001) AddReserve {
     reserveAddress: Address;
     reserveConfiguration: ReserveConfiguration;
     contents: ATokenDTokenContents;
     reserveInterestRateStrategy: ReserveInterestRateStrategy;
 }
-// TODO: update the message id
 message(0x66660002) DropReserve {
     reserveIndex: Int as uint16;
 }
-// TODO: update the message id
+// gas cost: 0.01
 message(0x66660003) BorrowToken {
     tokenAddress: Address;
     amount: Int as coins;
 }
+// gas cost: 0.006
 message(0x66660004) GetUserAccountData {
     queryId: Int as uint64;
     user: Address;
@@ -25,7 +24,8 @@ message(0x66660004) GetUserAccountData {
     tokenAddress: Address;
     amount: Int as coins;
 }
-// TODO: update the message id
+// gas cost:
+//      borrow: 0.027
 message(0x66660005) UserAccountDataResponse {
     queryId: Int as uint64;
     user: Address;
@@ -35,18 +35,22 @@ message(0x66660005) UserAccountDataResponse {
     amount: Int as coins;
     accountData: UserAccountData;
 }
-// TODO: update the message id
+//
 message(0x66660006) WithdrawToken {
     tokenAddress: Address;
     amount: Int as coins;
 }
-message UpdatePosition {
+// gas cost: 0.006
+message(0x66660007) UpdatePosition {
     queryId: Int as uint64;
     address: Address;
     supply: Int as int128;
     borrow: Int as int128;
 }
-message UserPositionUpdated {
+// gas cost:
+//      supply: 0.011
+// .    borrow: 0.009
+message(0x66660008) UserPositionUpdated {
     queryId: Int as uint64;
     user: Address;
     asset: Address;

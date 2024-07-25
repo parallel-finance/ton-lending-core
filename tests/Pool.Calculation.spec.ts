@@ -12,6 +12,16 @@ import { sleep } from '@ton/blueprint';
 import { PERCENTAGE_FACTOR, RAY } from '../helpers/constant';
 import { TestMathUtils } from '../wrappers/TestMathUtils';
 
+declare global {
+    interface BigInt {
+        toJSON(): string;
+    }
+}
+
+BigInt.prototype.toJSON = function () {
+    return this.toString();
+};
+
 describe('Pool indexes calculation', () => {
     let blockchain: Blockchain;
     let snapshot: BlockchainSnapshot;
@@ -288,7 +298,7 @@ describe('Pool indexes calculation', () => {
         const result = await pool.send(
             user,
             {
-                value: toNano('0.2'),
+                value: toNano('0.3'),
             },
             {
                 $$type: 'BorrowToken',
@@ -381,7 +391,7 @@ describe('Pool indexes calculation', () => {
         await borrow(secondUser.getSender(), borrowAmount);
         await sleep(5 * 1000);
         const reserveDataAndConfiguration = await pool.getReserveDataAndConfiguration(sampleJetton.address);
-        reserveData = reserveDataAndConfiguration.reserveData
+        reserveData = reserveDataAndConfiguration.reserveData;
         // first borrow, the index still should be RAY, the rates should not be zero
         expect(reserveData.liquidityIndex).toEqual(RAY);
         expect(reserveData.borrowIndex).toEqual(RAY);
