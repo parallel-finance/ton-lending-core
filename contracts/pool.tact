@@ -16,7 +16,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
     const MIN_TONS_FOR_STORAGE: Int = ton("0.03");
     const TOKEN_TRANSFER_GAS_CONSUMPTION: Int = ton("0.05");
     const TOKEN_MINT_GAS_CONSUMPTION: Int = ton("0.05");
-
+    const TOKEN_BURN_GAS_CONSUMPTION: Int = ton("0.05");
     // update user account, process the response
     const SUPPLY_REPAY_GAS_CONSUMPTION: Int = ton("0.05");
     // check health factor, update user account, process the response
@@ -97,6 +97,13 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
     }
 
     receive(msg: BorrowToken) {
+        let ctx: Context = context();
+        let fwdFee: Int = ctx.readForwardFee() * 9;
+        let storageFee: Int = self.MIN_TONS_FOR_STORAGE;
+        let computationAndActionFee: Int = self.TOKEN_TRANSFER_GAS_CONSUMPTION + self.TOKEN_MINT_GAS_CONSUMPTION + self.BORROW_GAS_CONSUMPTION;
+        let totalFee: Int = fwdFee + storageFee + computationAndActionFee;
+        require(ctx.value > totalFee, "Insufficient fee");
+
         // send message to get user account data
         let userAccountAddress: Address = self.userAccountAddress(sender());
         let reserveAddress: Address = msg.tokenAddress;
@@ -120,6 +127,13 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
     }
 
     receive(msg: WithdrawToken) {
+        let ctx: Context = context();
+        let fwdFee: Int = ctx.readForwardFee() * 9;
+        let storageFee: Int = self.MIN_TONS_FOR_STORAGE;
+        let computationAndActionFee: Int = self.TOKEN_TRANSFER_GAS_CONSUMPTION + self.TOKEN_MINT_GAS_CONSUMPTION + self.WITHDRAW_GAS_CONSUMPTION;
+        let totalFee: Int = fwdFee + storageFee + computationAndActionFee;
+        require(ctx.value > totalFee, "Insufficient fee");
+
         // send message to get user account data
         let userAccountAddress: Address = self.userAccountAddress(sender());
         let reserveAddress: Address = msg.tokenAddress;
@@ -385,7 +399,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
         let matchedReserve: Address? = self.findReserveByPoolWalletAddress(context().sender);
         require(matchedReserve != null, "Reserve not found");
 
-        let ctx: Context = context(); // Check sender
+        let ctx: Context = context();
         let fwdFee: Int = ctx.readForwardFee() * 5;
         let storageFee: Int = self.MIN_TONS_FOR_STORAGE;
         let computationAndActionFee: Int = self.TOKEN_TRANSFER_GAS_CONSUMPTION + self.TOKEN_MINT_GAS_CONSUMPTION + self.SUPPLY_REPAY_GAS_CONSUMPTION;

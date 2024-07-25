@@ -242,7 +242,7 @@ describe('Pool', () => {
             await pool.send(
                 deployer.getSender(),
                 {
-                    value: toNano('0.2'),
+                    value: toNano('0.3'),
                 },
                 {
                     $$type: 'BorrowToken',

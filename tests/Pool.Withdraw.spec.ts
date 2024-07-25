@@ -99,7 +99,7 @@ describe('Pool Withdraw', () => {
         let result = await pool.send(
             deployer.getSender(),
             {
-                value: toNano('0.2'),
+                value: toNano('0.3'),
             },
             {
                 $$type: 'BorrowToken',
@@ -313,7 +313,7 @@ describe('Pool Withdraw', () => {
         const result = await pool.send(
             deployer.getSender(),
             {
-                value: toNano('1.5'),
+                value: toNano('0.25'),
             },
             {
                 $$type: 'WithdrawToken',
@@ -496,7 +496,7 @@ describe('Pool Withdraw', () => {
         let result = await pool.send(
             deployer.getSender(),
             {
-                value: toNano('1.5'),
+                value: toNano('0.25'),
             },
             {
                 $$type: 'WithdrawToken',
@@ -594,7 +594,7 @@ describe('Pool Withdraw', () => {
         let result = await pool.send(
             deployer.getSender(),
             {
-                value: toNano('1.5'),
+                value: toNano('0.25'),
             },
             {
                 $$type: 'WithdrawToken',

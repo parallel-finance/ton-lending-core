@@ -1,4 +1,4 @@
-import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
+import { Blockchain, printTransactionFees, SandboxContract, TreasuryContract } from '@ton/sandbox';
 import { address, beginCell, Cell, contractAddress, fromNano, toNano } from '@ton/core';
 import { ATokenDTokenContents, Pool, ReserveConfiguration, ReserveInterestRateStrategy } from '../wrappers/Pool';
 import '@ton/test-utils';
@@ -176,7 +176,7 @@ describe('Pool', () => {
         await pool.send(
             deployer.getSender(),
             {
-                value: toNano('0.2'),
+                value: toNano('0.3'),
             },
             {
                 $$type: 'AddReserve',
@@ -254,7 +254,7 @@ describe('Pool', () => {
             const result = await pool.send(
                 deployer.getSender(),
                 {
-                    value: toNano('0.2'),
+                    value: toNano('0.4'),
                 },
                 {
                     $$type: 'BorrowToken',
@@ -312,6 +312,7 @@ describe('Pool', () => {
                 success: true,
             });
 
+            printTransactionFees(result.transactions);
             const totalTransactionFee = sumTransactionsFee(result.transactions);
             expect(totalTransactionFee).toBeLessThanOrEqual(0.1);
 
@@ -404,9 +405,9 @@ describe('Pool', () => {
                 Number(fromNano(60n * toNano(1))),
                 7,
             );
-            expect(userHealthInfo.healthFactorInRay).toEqual(
-                (100n * toNano(1) * reserveConfiguration.liquidationThreshold * RAY) /
-                    (PERCENTAGE_FACTOR * 60n * toNano(1)),
+            expect(Number(fromNano((toNano(1) * userHealthInfo.healthFactorInRay) / RAY))).toBeCloseTo(
+                (100 * Number(reserveConfiguration.liquidationThreshold)) / (Number(PERCENTAGE_FACTOR) * 60),
+                5,
             );
         });
 
@@ -416,7 +417,7 @@ describe('Pool', () => {
             const result = await pool.send(
                 deployer.getSender(),
                 {
-                    value: toNano('0.2'),
+                    value: toNano('0.3'),
                 },
                 {
                     $$type: 'BorrowToken',

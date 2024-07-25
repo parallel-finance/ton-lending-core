@@ -1,7 +1,12 @@
 import { fromNano, Transaction } from '@ton/core';
 
-// @ts-ignore
-BigInt.prototype["toJSON"] = function () {
+declare global {
+    interface BigInt {
+        toJSON(): string;
+    }
+}
+
+BigInt.prototype.toJSON = function () {
     return this.toString();
 };
 
