@@ -3,7 +3,7 @@ import "../math/math-utils";
 import "../math/percentage-math";
 import "./interest-rate-strategy";
 
-extends fun cache(self: ReserveData, reserveConfigration: ReserveConfiguration): ReserveCache {
+extends fun cache(self: ReserveData, reserveConfiguration: ReserveConfiguration): ReserveCache {
     return
         ReserveCache{
             currentScaledDebt: self.totalBorrow,
@@ -14,7 +14,7 @@ extends fun cache(self: ReserveData, reserveConfigration: ReserveConfiguration):
             nextBorrowIndex: 0,
             currentLiquidityRate: self.currentLiquidityRate,
             currentBorrowRate: self.currentBorrowRate,
-            reserveFactor: reserveConfigration.reserveFactor,
+            reserveFactor: reserveConfiguration.reserveFactor,
             lastUpdateTimestamp: self.lastUpdateTimestamp
         };
 }

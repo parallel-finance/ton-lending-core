@@ -52,6 +52,7 @@ describe('Pool', () => {
         supplyCap: 1000000n,
         borrowCap: 1000000n,
         treasury: reserveAddress,
+        decimals: 9n
     };
 
     const reserveInterestRateStrategy: ReserveInterestRateStrategy = {

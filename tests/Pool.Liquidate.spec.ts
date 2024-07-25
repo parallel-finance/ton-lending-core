@@ -192,6 +192,7 @@ describe('Pool indexes calculation', () => {
             borrowingEnabled: true,
             supplyCap: 1000000n,
             borrowCap: 1000000n,
+            decimals: 9n
         };
         reserveConfiguration1 = {
             $$type: 'ReserveConfiguration',

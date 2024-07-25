@@ -48,6 +48,7 @@ trait PoolView with Ownable, Resumable {
 
             if (tokenData.supply > 0) {
                 let normalizedIncome: Int = reserveData.getNormalizedIncome();
+                let reserveUint: Int = pow(10, reserveConfiguration.decimals);
                 let supplyValue: Int = tokenData.supply.rayMul(normalizedIncome) * reserveData.price / JETTON_UNIT;
                 totalSupply += supplyValue;
                 if (tokenData.asCollateral) {
