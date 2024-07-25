@@ -14,6 +14,9 @@ struct UserAccountData {
 }
 
 contract UserAccount with Deployable {
+    const MIN_TONS_FOR_STORAGE: Int = ton("0.01");
+    const GAS_CONSUMPTION: Int = ton("0.01");
+
     owner: Address;
     master: Address;
 
@@ -55,10 +58,12 @@ contract UserAccount with Deployable {
     receive(msg: UpdatePosition) {
         self.requireMaster();
         self.processUpdatePosition(msg);
+        let ctx: Context = context();
+        let msgValue: Int = self.msgValue(ctx.value) - ctx.readForwardFee();
         send(SendParameters{
             to: self.master,
-            value: 0,
-            mode: SendRemainingValue,
+            value: msgValue,
+            mode: SendPayGasSeparately,
             bounce: true,
             body: UserPositionUpdated{
                 queryId: msg.queryId,
@@ -72,24 +77,34 @@ contract UserAccount with Deployable {
 
     receive(msg: GetUserAccountData) {
         self.requireMaster();
+        let ctx: Context = context();
+        let msgValue: Int = self.msgValue(ctx.value) - ctx.readForwardFee();
         send(SendParameters{
-                to: context().sender,
-                value: 0,
-                mode: SendRemainingValue,
-                bounce: false,
-                body: UserAccountDataResponse{
-                    queryId: msg.queryId,
-                    user: msg.user,
-                    tokenAddress: msg.tokenAddress,
-                    action: msg.action,
-                    amount: msg.amount,
-                    accountData: UserAccountData{
+            to: context().sender,
+            value: msgValue,
+            mode: SendPayGasSeparately,
+            bounce: false,
+            body: UserAccountDataResponse{
+                queryId: msg.queryId,
+                user: msg.user,
+                tokenAddress: msg.tokenAddress,
+                action: msg.action,
+                amount: msg.amount,
+                accountData: UserAccountData{
                     positions: self.positions,
                     positionsLength: self.positionsLength,
                     positionsDetail: self.positionsDetail
                 }
             }.toCell()
         });
+    }
+
+    fun msgValue(value: Int): Int {
+        let msgValue: Int = value;
+        let tonBalanceBeforeMsg: Int = myBalance() - msgValue;
+        let storageFee: Int = self.MIN_TONS_FOR_STORAGE - min(tonBalanceBeforeMsg, self.MIN_TONS_FOR_STORAGE);
+        msgValue = msgValue - (storageFee + self.GAS_CONSUMPTION);
+        return msgValue;
     }
 
     get fun account(): UserAccountData {
