@@ -12,16 +12,6 @@ import { sleep } from '@ton/blueprint';
 import { PERCENTAGE_FACTOR, RAY } from '../helpers/constant';
 import { TestMathUtils } from '../wrappers/TestMathUtils';
 
-declare global {
-    interface BigInt {
-        toJSON(): string;
-    }
-}
-
-BigInt.prototype.toJSON = function () {
-    return this.toString();
-};
-
 describe('Pool indexes calculation', () => {
     let blockchain: Blockchain;
     let snapshot: BlockchainSnapshot;
