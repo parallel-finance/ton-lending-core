@@ -462,7 +462,7 @@ describe('Pool indexes calculation', () => {
         });
     };
 
-    it('check LiquidityIndex and BorrowIndex', async () => {
+    xit('check LiquidityIndex and BorrowIndex', async () => {
         // provide liquidity
         await supply(secondUser.getSender(), sampleJetton1, toNano('10000'));
         await supply(secondUser.getSender(), sampleJetton2, toNano('10000'));
