@@ -6,7 +6,8 @@ import { JettonDefaultWallet } from '../build/SampleJetton/tact_JettonDefaultWal
 
 export async function run(provider: NetworkProvider) {
     const pool = provider.open(await Pool.fromInit());
-    const tokenAddress = address('EQBdMo5ZwwVWhBMMSNbU9oNe3L5B8GBhl14OD8aR9am2lv2-');
+    // USDT
+    const tokenAddress = address('EQColXOG7C2X8x0ZFT-3Ot5sYknz-JbLnJzI1eVNldQlX2Bu');
     const sampleJetton = provider.open(SampleJetton.fromAddress(tokenAddress));
     const providerJettonWalletAddress = await sampleJetton.getGetWalletAddress(provider.sender().address!!);
     const providerJettonWallet = provider.open(JettonDefaultWallet.fromAddress(providerJettonWalletAddress));

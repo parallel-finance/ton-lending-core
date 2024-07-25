@@ -106,7 +106,7 @@ const addMasReserve = async (provider: NetworkProvider, pool: OpenedContract<Poo
     await addReserve(
         provider,
         pool,
-        address('EQCP_v_hh0uTHIG_j6jpynQhazw3m1ZyEPR_aQMQTAsHMPxA'),
+        address('EQBe9prUeNqHJHRw4YWDZhXI91kiGaGTTHuCWIaY975Uw2AU'),
         aTokenJettonParams,
         dTokenJettonParams,
         1n,
@@ -133,7 +133,7 @@ const addNotCoinReserve = async (provider: NetworkProvider, pool: OpenedContract
     await addReserve(
         provider,
         pool,
-        address('EQBqFJkn_DoBFcNPQ0ble53CD92X_XsDgPr1_WAajYceJMHi'),
+        address('EQD8-IT-fOEuBqY5bG_NY3lcZTKnnKv-7_UuILidV2eCa4W-'),
         aTokenJettonParams,
         dTokenJettonParams,
         2n,
@@ -160,7 +160,7 @@ const addProxyTonReserve = async (provider: NetworkProvider, pool: OpenedContrac
     await addReserve(
         provider,
         pool,
-        address('EQBdMo5ZwwVWhBMMSNbU9oNe3L5B8GBhl14OD8aR9am2lv2-'),
+        address('EQBvOgGXLdZOysRTnw2UDc_KRwcD5HLVH139DZ3AnK04LcxH'),
         aTokenJettonParams,
         dTokenJettonParams,
         3n,
@@ -187,7 +187,7 @@ const addUSDTReserve = async (provider: NetworkProvider, pool: OpenedContract<Po
     await addReserve(
         provider,
         pool,
-        address('EQAXwaSn8OPKA08QgSBPVGvP5n_stP9PhuRvynayN-pnjKXb'),
+        address('EQColXOG7C2X8x0ZFT-3Ot5sYknz-JbLnJzI1eVNldQlX2Bu'),
         aTokenJettonParams,
         dTokenJettonParams,
         4n,
