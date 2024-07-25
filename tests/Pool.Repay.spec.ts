@@ -265,7 +265,7 @@ describe('Pool', () => {
             const result = await userJettonDefaultWallet.send(
                 deployer.getSender(),
                 {
-                    value: toNano('0.25'),
+                    value: toNano('0.3'),
                 },
                 {
                     $$type: 'TokenTransfer',
@@ -274,7 +274,7 @@ describe('Pool', () => {
                     destination: pool.address,
                     response_destination: deployer.getSender().address!!,
                     custom_payload: null,
-                    forward_ton_amount: toNano('0.15'),
+                    forward_ton_amount: toNano('0.25'),
                     forward_payload: forward_payload,
                 },
             );
@@ -324,8 +324,14 @@ describe('Pool', () => {
             const accountData = await userAccountContract.getAccount();
             expect(accountData.positionsLength).toEqual(1n);
             expect(accountData.positions?.get(0n)!!.equals(sampleJetton.address)).toBeTruthy();
-            expect(Number(fromNano(accountData.positionsDetail?.get(sampleJetton.address)!!.supply))).toBeCloseTo(100, 5);
-            expect(Number(fromNano(accountData.positionsDetail?.get(sampleJetton.address)!!.borrow))).toBeCloseTo(25, 5);
+            expect(Number(fromNano(accountData.positionsDetail?.get(sampleJetton.address)!!.supply))).toBeCloseTo(
+                100,
+                5,
+            );
+            expect(Number(fromNano(accountData.positionsDetail?.get(sampleJetton.address)!!.borrow))).toBeCloseTo(
+                25,
+                5,
+            );
 
             const totalTransactionFee = sumTransactionsFee(result.transactions);
             expect(totalTransactionFee).toBeLessThanOrEqual(0.1);

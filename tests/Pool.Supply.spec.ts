@@ -179,7 +179,7 @@ describe('Pool Supply', () => {
         const result = await deployerJettonDefaultWallet.send(
             deployer.getSender(),
             {
-                value: toNano('3'),
+                value: toNano('0.24'),
             },
             {
                 $$type: 'TokenTransfer',
@@ -188,7 +188,7 @@ describe('Pool Supply', () => {
                 destination: pool.address,
                 response_destination: deployerWalletAddress,
                 custom_payload: null,
-                forward_ton_amount: toNano('2'),
+                forward_ton_amount: toNano('0.19'),
                 forward_payload: forward_payload,
             },
         );
@@ -349,7 +349,8 @@ describe('Pool Supply', () => {
             });
         });
 
-        it('UpdatePosition Bounce and rerun', async () => {
+        // Won't be able to bounce due to the gas check
+        xit('UpdatePosition and MintAToken Bounce and rerun', async () => {
             // transfer jetton to pool
             const deployerWalletAddress = await sampleJetton.getGetWalletAddress(deployer.address);
             const poolWalletAddress = await sampleJetton.getGetWalletAddress(pool.address);
@@ -475,6 +476,56 @@ describe('Pool Supply', () => {
             expect(accountData.positions?.get(0n)!!.equals(sampleJetton.address)).toBeTruthy();
             expect(accountData.positionsDetail?.get(sampleJetton.address)!!.supply).toEqual(amount);
             expect(accountData.positionsDetail?.get(sampleJetton.address)!!.asCollateral).toBeTruthy();
+        });
+
+        it('Should fail if not enough gas', async () => {
+            const amount = toNano(100n);
+            // transfer jetton to pool
+            const deployerWalletAddress = await sampleJetton.getGetWalletAddress(deployer.address);
+            const poolWalletAddress = await sampleJetton.getGetWalletAddress(pool.address);
+            const deployerJettonDefaultWallet = blockchain.openContract(
+                JettonDefaultWallet.fromAddress(deployerWalletAddress),
+            );
+            const forward_payload: Cell = beginCell().storeUint(0x55b591ba, 32).endCell();
+
+            const userAccountContract = blockchain.openContract(
+                await UserAccount.fromInit(pool.address, deployer.address),
+            );
+            const userAccountAddress = userAccountContract.address;
+
+            const result = await deployerJettonDefaultWallet.send(
+                deployer.getSender(),
+                {
+                    value: toNano('0.25'),
+                },
+                {
+                    $$type: 'TokenTransfer',
+                    queryId: 0n,
+                    amount: amount,
+                    destination: pool.address,
+                    response_destination: deployerWalletAddress,
+                    custom_payload: null,
+                    forward_ton_amount: toNano('0.1'),
+                    forward_payload: forward_payload,
+                },
+            );
+            printTransactionFees(result.transactions);
+
+            // TokenTransferInternal
+            expect(result.transactions).toHaveTransaction({
+                from: deployerWalletAddress,
+                to: poolWalletAddress,
+                success: true,
+            });
+
+            // TransferNotification
+            expect(result.transactions).toHaveTransaction({
+                from: poolWalletAddress,
+                to: pool.address,
+                // 55259: Insufficient fee
+                exitCode: 55259,
+                success: false,
+            });
         });
     });
 });

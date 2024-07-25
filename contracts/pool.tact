@@ -13,6 +13,16 @@ import "./constants";
 import "./pool-view";
 
 contract Pool with Deployable, Ownable, Resumable, PoolView {
+    const MIN_TONS_FOR_STORAGE: Int = ton("0.03");
+    const TOKEN_TRANSFER_GAS_CONSUMPTION: Int = ton("0.05");
+    const TOKEN_MINT_GAS_CONSUMPTION: Int = ton("0.05");
+
+    // update user account, process the response
+    const SUPPLY_REPAY_GAS_CONSUMPTION: Int = ton("0.05");
+    // check health factor, update user account, process the response
+    const BORROW_GAS_CONSUMPTION: Int = ton("0.1");
+    // check health factor, update user account, process the response
+    const WITHDRAW_GAS_CONSUMPTION: Int = ton("0.1");
 
     owner: Address;
     stopped: Bool;
@@ -370,11 +380,17 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
         });
     }
 
-    // TODO: process user account position update message
 
     fun processTokenNotification(msg: TokenNotification) {
         let matchedReserve: Address? = self.findReserveByPoolWalletAddress(context().sender);
         require(matchedReserve != null, "Reserve not found");
+
+        let ctx: Context = context(); // Check sender
+        let fwdFee: Int = ctx.readForwardFee() * 5;
+        let storageFee: Int = self.MIN_TONS_FOR_STORAGE;
+        let computationAndActionFee: Int = self.TOKEN_TRANSFER_GAS_CONSUMPTION + self.TOKEN_MINT_GAS_CONSUMPTION + self.SUPPLY_REPAY_GAS_CONSUMPTION;
+        let totalFee: Int = fwdFee + storageFee + computationAndActionFee;
+        require(ctx.value > totalFee, "Insufficient fee");
 
         let forwardPayload: Slice = msg.forward_payload;
         let opCode: Int = forwardPayload.loadUint(32);
