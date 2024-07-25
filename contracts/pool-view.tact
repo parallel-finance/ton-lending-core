@@ -112,6 +112,26 @@ trait PoolView with Ownable, Resumable {
             };
     }
 
+    get fun allReserveDataAndConfiguration(): map<Address, ReserveDataAndConfiguration> {
+        let allDataAndConfigurations: map<Address, ReserveDataAndConfiguration> = emptyMap();
+
+        let i: Int = 0;
+        while (i < self.reservesLength) {
+            let reserveAddress: Address = self.reserves.get(i)!!;
+            let reserveData: ReserveData = self.reservesData.get(reserveAddress)!!;
+            let reserveConfiguration: ReserveConfiguration = self.reservesConfiguration.get(reserveAddress)!!;
+            
+            allDataAndConfigurations.set(reserveAddress, ReserveDataAndConfiguration{
+                reserveData: reserveData,
+                reserveConfiguration: reserveConfiguration,
+                normalizedIncome: reserveData.getNormalizedIncome(),
+                normalizedDebt: reserveData.getNormalizedDebt()
+            });
+            i = i + 1;
+        }
+        return allDataAndConfigurations;
+    }
+
     get fun reserveConfiguration(reserveAddress: Address): ReserveConfiguration {
         return self.reservesConfiguration.get(reserveAddress)!!;
     }
