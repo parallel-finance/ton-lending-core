@@ -50,7 +50,7 @@ describe('Pool', () => {
         await supplyJetton(deployerJettonDefaultWallet, deployer, pool.address, amount);
     });
 
-    describe('borrow', () => {
+    describe('borrow jetton', () => {
         it('should borrow successfully', async () => {
             const deployerWalletAddress = await sampleJetton.getGetWalletAddress(deployer.address);
             const deployerJettonDefaultWallet = blockchain.openContract(
@@ -259,6 +259,65 @@ describe('Pool', () => {
             });
         });
     });
+
+    describe('borrow ton', () => {
+        it('should handle ton borrow successfully', async () => {
+            // Add TON as reserve
+            await addReserve(pool, deployer, pool.address, pool.address);
+
+            const supplyAmount = toNano(100);
+            // Supply Ton first to add liquidity
+            await pool.send(
+                deployer.getSender(),
+                {
+                    value: toNano('100.25'),
+                },
+                {
+                    $$type: 'SupplyTon',
+                    amount: supplyAmount,
+                },
+            );
+            // Borrow Ton
+            const borrowAmount = toNano(50);
+            const result = await pool.send(
+                deployer.getSender(),
+                {
+                    value: toNano('100.25'),
+                },
+                {
+                    $$type: 'BorrowTon',
+                    amount: borrowAmount,
+                },
+            );
+            // Check user account data
+            const userAccountContract = blockchain.openContract(
+                await UserAccount.fromInit(pool.address, deployer.address),
+            );
+
+            const userAccountAddress = userAccountContract.address;
+            // UpdatePosition
+            expect(result.transactions).toHaveTransaction({
+                from: pool.address,
+                to: userAccountAddress,
+                success: true,
+            });
+
+            // UserPositionUpdated
+            expect(result.transactions).toHaveTransaction({
+                from: userAccountAddress,
+                to: pool.address,
+                success: true,
+            });
+
+            // check user account
+            const accountData = await userAccountContract.getAccount();
+            expect(accountData.positionsLength).toEqual(2n);
+            expect(accountData.positions?.get(1n)!!.equals(pool.address)).toBeTruthy();
+            expect(Number(fromNano(accountData.positionsDetail?.get(pool.address)!!.supply))).toBeCloseTo(100, 3);
+            expect(Number(fromNano(accountData.positionsDetail?.get(pool.address)!!.borrow))).toBeCloseTo(50, 3);
+            expect(accountData.positionsDetail?.get(pool.address)!!.asCollateral).toBeTruthy();
+        });
+    })
 
     it('should bounce if the borrowed asset is not configured for borrowing', async () => {
         const result = await pool.send(

@@ -101,6 +101,10 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
     }
 
     receive(msg: BorrowToken) {
+        let reserveAddress: Address = msg.tokenAddress;
+        let optionalReserveConfiguration: ReserveConfiguration? = self.reservesConfiguration.get(reserveAddress);
+        require(optionalReserveConfiguration != null, "Reserve not supported");
+
         let ctx: Context = context();
         let fwdFee: Int = ctx.readForwardFee() * 5;
         let storageFee: Int = self.MIN_TONS_FOR_STORAGE;
@@ -110,9 +114,6 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
 
         // send message to get user account data
         let userAccountAddress: Address = self.userAccountAddress(sender());
-        let reserveAddress: Address = msg.tokenAddress;
-        let reserveConfiguration: ReserveConfiguration? = self.reservesConfiguration.get(reserveAddress);
-        require(reserveConfiguration != null, "Reserve not found");
         // GetUserAccountData don't need to handle bounce
         send(SendParameters{
             to: userAccountAddress,
@@ -123,7 +124,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
                 queryId: self.queryId,
                 user: context().sender,
                 action: ACTION_BORROW,
-                tokenAddress: msg.tokenAddress,
+                tokenAddress: reserveAddress,
                 amount: msg.amount
             }.toCell()
         });
@@ -131,6 +132,10 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
     }
 
     receive(msg: WithdrawToken) {
+        let reserveAddress: Address = msg.tokenAddress;
+        let optionalReserveConfiguration: ReserveConfiguration? = self.reservesConfiguration.get(reserveAddress);
+        require(optionalReserveConfiguration != null, "Reserve not supported");
+
         let ctx: Context = context();
         let fwdFee: Int = ctx.readForwardFee() * 5;
         let storageFee: Int = self.MIN_TONS_FOR_STORAGE;
@@ -140,9 +145,6 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
 
         // send message to get user account data
         let userAccountAddress: Address = self.userAccountAddress(sender());
-        let reserveAddress: Address = msg.tokenAddress;
-        let reserveConfiguration: ReserveConfiguration? = self.reservesConfiguration.get(reserveAddress);
-        require(reserveConfiguration != null, "Reserve not found");
         // GetUserAccountData don't need handle bounce
         send(SendParameters{
             to: userAccountAddress,
@@ -151,7 +153,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
             mode: SendRemainingValue,
             body: GetUserAccountData{
                 queryId: self.queryId,
-                user: context().sender,
+                user: sender(),
                 action: ACTION_WITHDRAW,
                 tokenAddress: msg.tokenAddress,
                 amount: msg.amount
@@ -355,6 +357,37 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
 
         let remainingValue: Int = self.remainingValue(ctx.value, self.SUPPLY_REPAY_GAS_CONSUMPTION + ctx.readForwardFee());
         self.updateUserAccountPosition(ctx.sender, reserveAddress, scaledSupplyAmount, 0, remainingValue);
+    }
+
+    receive(msg: BorrowTon) {
+        let reserveAddress: Address = myAddress();
+        let optionalReserveData: ReserveData? = self.reserveData(reserveAddress);
+        require(optionalReserveData != null, "Reserve not supported");
+
+        let ctx: Context = context();
+        let fwdFee: Int = ctx.readForwardFee() * 5;
+        let storageFee: Int = self.MIN_TONS_FOR_STORAGE;
+        let computationAndActionFee: Int = self.TOKEN_TRANSFER_GAS_CONSUMPTION + self.TOKEN_MINT_GAS_CONSUMPTION + self.BORROW_GAS_CONSUMPTION;
+        let totalFee: Int = fwdFee + storageFee + computationAndActionFee;
+        require(ctx.value > totalFee, "Insufficient fee");
+
+        // send message to get user account data
+        let userAccountAddress: Address = self.userAccountAddress(sender());
+        // GetUserAccountData don't need to handle bounce
+        send(SendParameters{
+            to: userAccountAddress,
+            value: 0,
+            bounce: false,
+            mode: SendRemainingValue,
+            body: GetUserAccountData{
+                queryId: self.queryId,
+                user: sender(),
+                action: ACTION_BORROW,
+                tokenAddress: reserveAddress,
+                amount: msg.amount
+            }.toCell()
+        });
+        self.queryId += 1;
     }
 
     fun remainingValue(value: Int, selfConsumption: Int): Int {
