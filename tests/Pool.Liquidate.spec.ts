@@ -11,6 +11,8 @@ import { DToken } from '../wrappers/DToken';
 import { sleep } from '@ton/blueprint';
 import { PERCENTAGE_FACTOR, RAY } from '../helpers/constant';
 import { TestMathUtils } from '../wrappers/TestMathUtils';
+import { DTokenDefaultWallet } from '../build/DToken/tact_DTokenDefaultWallet';
+import { ATokenDefaultWallet } from '../build/Pool/tact_ATokenDefaultWallet';
 
 describe('Pool liquidation test', () => {
     let blockchain: Blockchain;
@@ -328,6 +330,29 @@ describe('Pool liquidation test', () => {
         expect(reserveData.price).toEqual(price);
     };
 
+    const updateReserveConfiguration = async (jetton: Address, config: ReserveConfiguration) => {
+        const rst = await pool.send(
+            deployer.getSender(),
+            {
+                value: toNano('0.2'),
+            },
+            {
+                $$type: 'UpdateReserveConfiguration',
+                reserve: jetton,
+                reserveConfiguration: config,
+            },
+        );
+        expect(rst.transactions).toHaveTransaction({
+            from: deployer.address,
+            to: pool.address,
+            success: true,
+        });
+        const configuration = await pool.getReserveConfiguration(jetton);
+        const { poolWalletAddress, aTokenAddress, dTokenAddress, treasury, ...otherReserveConfiguration } =
+            configuration;
+        expect(config).toMatchObject(otherReserveConfiguration);
+    };
+
     const supply = async (user: Treasury, jetton: SandboxContract<SampleJetton>, amount: bigint) => {
         // transfer jetton to pool
         const userWalletAddress = await jetton.getGetWalletAddress(user.address);
@@ -464,7 +489,7 @@ describe('Pool liquidation test', () => {
         });
     };
 
-    it('Liquidation test', async () => {
+    it('supply jetton1, borrow jetton2, closeFactor: 100%', async () => {
         // provide liquidity
         await supply(secondUser.getSender(), sampleJetton1, toNano('10000'));
         await supply(secondUser.getSender(), sampleJetton2, toNano('10000'));
@@ -558,10 +583,17 @@ describe('Pool liquidation test', () => {
         const liquidatorCollateralWallet = blockchain.openContract(
             JettonDefaultWallet.fromAddress(await collateralReserve.getGetWalletAddress(liquidator.address)),
         );
+        const liquidatorCollateralWalletBalanceBefore = (await liquidatorCollateralWallet.getGetWalletData()).balance;
         const treasuryCollateralWallet = blockchain.openContract(
             JettonDefaultWallet.fromAddress(
                 await collateralReserve.getGetWalletAddress(collateralReserveData.reserveConfiguration.treasury),
             ),
+        );
+        const borrowerDTokenWallet = blockchain.openContract(
+            DTokenDefaultWallet.fromAddress(await dToken2.getGetWalletAddress(borrower.address)),
+        );
+        const borrowerATokenWallet = blockchain.openContract(
+            ATokenDefaultWallet.fromAddress(await aToken1.getGetWalletAddress(borrower.address)),
         );
 
         const forward_payload: Cell = beginCell()
@@ -570,7 +602,52 @@ describe('Pool liquidation test', () => {
             .storeUint(0, 5) // collateral reserve Index
             .endCell();
 
-        const liquidationAmount = borrowAmount;
+        const debtAmount =
+            accountData.positionsDetail.get(debtReserve.address)?.borrow || (0n * debtReserveData.normalizedDebt) / RAY;
+        const collateralAmount =
+            accountData.positionsDetail.get(collateralReserve.address)?.supply ||
+            (0n * collateralReserveData.normalizedIncome) / RAY;
+        const closeFactor = Number(borrowerHealthInfo.healthFactorInRay) / Number(RAY) > 0.95 ? 5000n : 10000n;
+        console.log(`closeFactor: ${closeFactor}`);
+        let actualLiquidationAmount = (debtAmount * closeFactor) / PERCENTAGE_FACTOR;
+        console.log(`actualLiquidationAmount: ${actualLiquidationAmount}`);
+
+        const maxCollateralToLiquidate =
+            (((debtReserveData.reserveData.price * actualLiquidationAmount * collateralUint) /
+                (collateralReserveData.reserveData.price * debtUint)) *
+                collateralReserveData.reserveConfiguration.liquidationBonus) /
+            PERCENTAGE_FACTOR;
+        console.log(`maxCollateralToLiquidate: ${maxCollateralToLiquidate}`);
+        let actualCollateralToLiquidate = 0n;
+        if (maxCollateralToLiquidate > collateralAmount) {
+            actualCollateralToLiquidate = collateralAmount;
+            actualLiquidationAmount =
+                (((collateralReserveData.reserveData.price * actualCollateralToLiquidate * debtUint) /
+                    (debtReserveData.reserveData.price * collateralUint)) *
+                    PERCENTAGE_FACTOR) /
+                collateralReserveData.reserveConfiguration.liquidationBonus;
+        } else {
+            actualCollateralToLiquidate = maxCollateralToLiquidate;
+            actualLiquidationAmount = actualLiquidationAmount;
+        }
+        console.log(`actualCollateralToLiquidate: ${actualCollateralToLiquidate}`);
+        console.log(`actualLiquidationAmount: ${actualLiquidationAmount}`);
+        const expectedCollateralAfter =
+            borrowerHealthInfo.totalCollateralInBaseCurrency -
+            (actualCollateralToLiquidate * collateralReserveData.reserveData.price) / collateralUint;
+        const expectedDebtAfter =
+            borrowerHealthInfo.totalDebtInBaseCurrency -
+            (actualLiquidationAmount * debtReserveData.reserveData.price) / debtUint;
+        console.log(`expectedCollateralAfter: ${expectedCollateralAfter}`);
+        console.log(`expectedDebtAfter: ${expectedDebtAfter}`);
+
+        let bonusCollateral =
+            actualCollateralToLiquidate -
+            (actualCollateralToLiquidate * PERCENTAGE_FACTOR) /
+                collateralReserveData.reserveConfiguration.liquidationBonus;
+        let liquidationProtocolFee =
+            (bonusCollateral * collateralReserveData.reserveConfiguration.liquidationProtocolFee) / PERCENTAGE_FACTOR;
+
         let result = await liquidatorDebtReserveWallet.send(
             liquidator.getSender(),
             {
@@ -579,7 +656,7 @@ describe('Pool liquidation test', () => {
             {
                 $$type: 'TokenTransfer',
                 queryId: 0n,
-                amount: liquidationAmount,
+                amount: debtAmount,
                 destination: pool.address,
                 response_destination: liquidatorDebtReserveWallet.address,
                 custom_payload: null,
@@ -619,7 +696,7 @@ describe('Pool liquidation test', () => {
         // burn dToken
         expect(result.transactions).toHaveTransaction({
             from: pool.address,
-            to: await dToken2.getGetWalletAddress(borrower.address),
+            to: borrowerDTokenWallet.address,
             success: true,
         });
         // UpdatePosition collateral token
@@ -631,7 +708,7 @@ describe('Pool liquidation test', () => {
         // burn aToken
         expect(result.transactions).toHaveTransaction({
             from: pool.address,
-            to: await aToken1.getGetWalletAddress(borrower.address),
+            to: borrowerATokenWallet.address,
             success: true,
         });
         // tokenTransfer
@@ -651,5 +728,818 @@ describe('Pool liquidation test', () => {
         console.log(accountData);
         borrowerHealthInfo = await pool.getUserAccountHealthInfo(accountData);
         console.dir(borrowerHealthInfo, { depth: null });
+
+        // check borrower positions
+        expect(Number(expectedCollateralAfter)).toBeCloseTo(
+            Number(borrowerHealthInfo.totalCollateralInBaseCurrency),
+            -5,
+        );
+        expect(Number(expectedDebtAfter)).toBeCloseTo(Number(borrowerHealthInfo.totalDebtInBaseCurrency), -5);
+        const dTokenBalance = (await borrowerDTokenWallet.getGetWalletData()).balance;
+        const aTokenBalance = (await borrowerATokenWallet.getGetWalletData()).balance;
+        expect(dTokenBalance).toEqual(accountData.positionsDetail.get(debtReserve.address)?.borrow);
+        expect(aTokenBalance).toEqual(accountData.positionsDetail.get(collateralReserve.address)?.supply);
+        // check treasury collateral balance
+        const treasuryCollateralWalletBalance = (await treasuryCollateralWallet.getGetWalletData()).balance;
+        expect(Number(treasuryCollateralWalletBalance)).toBeCloseTo(Number(liquidationProtocolFee), -1);
+        // check liquidator collateral balance
+        const liquidatorCollateralWalletBalanceAfter = (await liquidatorCollateralWallet.getGetWalletData()).balance;
+        expect(
+            Number(liquidatorCollateralWalletBalanceBefore + actualCollateralToLiquidate - liquidationProtocolFee),
+        ).toBeCloseTo(Number(liquidatorCollateralWalletBalanceAfter), -1);
+    });
+
+    it('supply jetton1, borrow jetton2, closeFactor: 50%', async () => {
+        // provide liquidity
+        await supply(secondUser.getSender(), sampleJetton1, toNano('10000'));
+        await supply(secondUser.getSender(), sampleJetton2, toNano('10000'));
+
+        // borrower supply jetton1 and borrow jetton2
+        const borrower = deployer;
+        const collateralReserve = sampleJetton1;
+        const debtReserve = sampleJetton2;
+        const collateralUint = 10n ** reserveConfiguration1.decimals;
+        const debtUint = 10n ** reserveConfiguration2.decimals;
+        const supplyAmount = 10000n * collateralUint;
+        const borrowAmount = 5000n * debtUint;
+        await supply(deployer.getSender(), collateralReserve, supplyAmount);
+        await borrow(deployer.getSender(), debtReserve, borrowAmount);
+        const borrowerAccount = blockchain.openContract(await UserAccount.fromInit(pool.address, borrower.address));
+        console.log('borrowerAccount', borrowerAccount.address.toString());
+
+        let accountData = await borrowerAccount.getAccount();
+        let borrowerHealthInfo = await pool.getUserAccountHealthInfo(accountData);
+        console.dir(borrowerHealthInfo, { depth: null });
+
+        let collateralReserveData = await pool.getReserveDataAndConfiguration(collateralReserve.address);
+        let debtReserveData = await pool.getReserveDataAndConfiguration(debtReserve.address);
+        expect(accountData.positionsLength).toEqual(2n);
+        expect(accountData.positionsDetail.get(collateralReserve.address)?.asCollateral).toEqual(true);
+        expect(accountData.positionsDetail.get(collateralReserve.address)?.supply).toEqual(supplyAmount);
+        expect(accountData.positionsDetail.get(collateralReserve.address)?.borrow).toEqual(0n);
+        expect(accountData.positionsDetail.get(debtReserve.address)?.asCollateral).toEqual(true);
+        expect(accountData.positionsDetail.get(debtReserve.address)?.supply).toEqual(0n);
+        expect(accountData.positionsDetail.get(debtReserve.address)?.borrow).toEqual(borrowAmount);
+        expect(Number(fromNano(borrowerHealthInfo.totalCollateralInBaseCurrency))).toBeCloseTo(
+            Number(fromNano((supplyAmount * collateralReserveData.reserveData.price) / collateralUint)),
+            5,
+        );
+        expect(Number(fromNano(borrowerHealthInfo.totalDebtInBaseCurrency))).toBeCloseTo(
+            Number(fromNano((borrowAmount * debtReserveData.reserveData.price) / debtUint)),
+            5,
+        );
+        expect(borrowerHealthInfo.healthFactorInRay).toEqual(
+            (supplyAmount *
+                collateralReserveData.reserveData.price *
+                RAY *
+                debtUint *
+                collateralReserveData.reserveConfiguration.liquidationThreshold) /
+                (borrowAmount * debtReserveData.reserveData.price * PERCENTAGE_FACTOR * collateralUint),
+        );
+
+        // change debt asset price to shortfall borrower
+        await setMockOraclePrice(debtReserve.address, toNano('1.55'));
+
+        accountData = await borrowerAccount.getAccount();
+        borrowerHealthInfo = await pool.getUserAccountHealthInfo(accountData);
+        collateralReserveData = await pool.getReserveDataAndConfiguration(collateralReserve.address);
+        debtReserveData = await pool.getReserveDataAndConfiguration(debtReserve.address);
+        expect(accountData.positionsLength).toEqual(2n);
+        expect(accountData.positionsDetail.get(collateralReserve.address)?.asCollateral).toEqual(true);
+        expect(accountData.positionsDetail.get(collateralReserve.address)?.supply).toEqual(supplyAmount);
+        expect(accountData.positionsDetail.get(collateralReserve.address)?.borrow).toEqual(0n);
+        expect(accountData.positionsDetail.get(debtReserve.address)?.asCollateral).toEqual(true);
+        expect(accountData.positionsDetail.get(debtReserve.address)?.supply).toEqual(0n);
+        expect(accountData.positionsDetail.get(debtReserve.address)?.borrow).toEqual(borrowAmount);
+        expect(Number(fromNano(borrowerHealthInfo.totalCollateralInBaseCurrency))).toBeCloseTo(
+            Number(fromNano((supplyAmount * collateralReserveData.reserveData.price) / collateralUint)),
+            2,
+        );
+        expect(Number(fromNano(borrowerHealthInfo.totalDebtInBaseCurrency))).toBeCloseTo(
+            Number(fromNano((borrowAmount * debtReserveData.reserveData.price) / debtUint)),
+            2,
+        );
+        expect(borrowerHealthInfo.healthFactorInRay).toEqual(
+            (supplyAmount *
+                collateralReserveData.reserveData.price *
+                RAY *
+                debtUint *
+                collateralReserveData.reserveConfiguration.liquidationThreshold) /
+                (borrowAmount * debtReserveData.reserveData.price * PERCENTAGE_FACTOR * collateralUint),
+        );
+        console.dir(borrowerHealthInfo, { depth: null });
+
+        // send liquidation message
+        const liquidator = secondUser;
+        const liquidatorDebtReserveWallet = blockchain.openContract(
+            JettonDefaultWallet.fromAddress(await debtReserve.getGetWalletAddress(liquidator.address)),
+        );
+        const poolDebtReserveWallet = blockchain.openContract(
+            JettonDefaultWallet.fromAddress(await debtReserve.getGetWalletAddress(pool.address)),
+        );
+        const poolCollateralWallet = blockchain.openContract(
+            JettonDefaultWallet.fromAddress(await collateralReserve.getGetWalletAddress(pool.address)),
+        );
+        const liquidatorCollateralWallet = blockchain.openContract(
+            JettonDefaultWallet.fromAddress(await collateralReserve.getGetWalletAddress(liquidator.address)),
+        );
+        const liquidatorCollateralWalletBalanceBefore = (await liquidatorCollateralWallet.getGetWalletData()).balance;
+        const treasuryCollateralWallet = blockchain.openContract(
+            JettonDefaultWallet.fromAddress(
+                await collateralReserve.getGetWalletAddress(collateralReserveData.reserveConfiguration.treasury),
+            ),
+        );
+        const borrowerDTokenWallet = blockchain.openContract(
+            DTokenDefaultWallet.fromAddress(await dToken2.getGetWalletAddress(borrower.address)),
+        );
+        const borrowerATokenWallet = blockchain.openContract(
+            ATokenDefaultWallet.fromAddress(await aToken1.getGetWalletAddress(borrower.address)),
+        );
+
+        const forward_payload: Cell = beginCell()
+            .storeUint(0x1f03e59a, 32) // Liquidate opcode: 0x1f03e59a
+            .storeAddress(borrower.address) // borrower
+            .storeUint(0, 5) // collateral reserve Index
+            .endCell();
+
+        const debtAmount =
+            accountData.positionsDetail.get(debtReserve.address)?.borrow || (0n * debtReserveData.normalizedDebt) / RAY;
+        const collateralAmount =
+            accountData.positionsDetail.get(collateralReserve.address)?.supply ||
+            (0n * collateralReserveData.normalizedIncome) / RAY;
+        const closeFactor = Number(borrowerHealthInfo.healthFactorInRay) / Number(RAY) > 0.95 ? 5000n : 10000n;
+        console.log(`closeFactor: ${closeFactor}`);
+        let actualLiquidationAmount = (debtAmount * closeFactor) / PERCENTAGE_FACTOR;
+        console.log(`actualLiquidationAmount: ${actualLiquidationAmount}`);
+
+        const maxCollateralToLiquidate =
+            (((debtReserveData.reserveData.price * actualLiquidationAmount * collateralUint) /
+                (collateralReserveData.reserveData.price * debtUint)) *
+                collateralReserveData.reserveConfiguration.liquidationBonus) /
+            PERCENTAGE_FACTOR;
+        console.log(`maxCollateralToLiquidate: ${maxCollateralToLiquidate}`);
+        let actualCollateralToLiquidate = 0n;
+        if (maxCollateralToLiquidate > collateralAmount) {
+            actualCollateralToLiquidate = collateralAmount;
+            actualLiquidationAmount =
+                (((collateralReserveData.reserveData.price * actualCollateralToLiquidate * debtUint) /
+                    (debtReserveData.reserveData.price * collateralUint)) *
+                    PERCENTAGE_FACTOR) /
+                collateralReserveData.reserveConfiguration.liquidationBonus;
+        } else {
+            actualCollateralToLiquidate = maxCollateralToLiquidate;
+            actualLiquidationAmount = actualLiquidationAmount;
+        }
+        console.log(`actualCollateralToLiquidate: ${actualCollateralToLiquidate}`);
+        console.log(`actualLiquidationAmount: ${actualLiquidationAmount}`);
+        const expectedCollateralAfter =
+            borrowerHealthInfo.totalCollateralInBaseCurrency -
+            (actualCollateralToLiquidate * collateralReserveData.reserveData.price) / collateralUint;
+        const expectedDebtAfter =
+            borrowerHealthInfo.totalDebtInBaseCurrency -
+            (actualLiquidationAmount * debtReserveData.reserveData.price) / debtUint;
+        console.log(`expectedCollateralAfter: ${expectedCollateralAfter}`);
+        console.log(`expectedDebtAfter: ${expectedDebtAfter}`);
+
+        let bonusCollateral =
+            actualCollateralToLiquidate -
+            (actualCollateralToLiquidate * PERCENTAGE_FACTOR) /
+                collateralReserveData.reserveConfiguration.liquidationBonus;
+        let liquidationProtocolFee =
+            (bonusCollateral * collateralReserveData.reserveConfiguration.liquidationProtocolFee) / PERCENTAGE_FACTOR;
+
+        let result = await liquidatorDebtReserveWallet.send(
+            liquidator.getSender(),
+            {
+                value: toNano('10'),
+            },
+            {
+                $$type: 'TokenTransfer',
+                queryId: 0n,
+                amount: debtAmount,
+                destination: pool.address,
+                response_destination: liquidatorDebtReserveWallet.address,
+                custom_payload: null,
+                forward_ton_amount: toNano('4.1'),
+                forward_payload: forward_payload,
+            },
+        );
+        expect(result.transactions).toHaveTransaction({
+            from: liquidatorDebtReserveWallet.address,
+            to: poolDebtReserveWallet.address,
+            success: true,
+        });
+        // TokenNotification
+        expect(result.transactions).toHaveTransaction({
+            from: poolDebtReserveWallet.address,
+            to: pool.address,
+            success: true,
+        });
+        // GetUserAccountData
+        expect(result.transactions).toHaveTransaction({
+            from: pool.address,
+            to: borrowerAccount.address,
+            success: true,
+        });
+        // UserAccountDataResponse
+        expect(result.transactions).toHaveTransaction({
+            from: borrowerAccount.address,
+            to: pool.address,
+            success: true,
+        });
+        // UpdatePosition debt token
+        expect(result.transactions).toHaveTransaction({
+            from: pool.address,
+            to: borrowerAccount.address,
+            success: true,
+        });
+        // burn dToken
+        expect(result.transactions).toHaveTransaction({
+            from: pool.address,
+            to: borrowerDTokenWallet.address,
+            success: true,
+        });
+        // UpdatePosition collateral token
+        expect(result.transactions).toHaveTransaction({
+            from: pool.address,
+            to: borrowerAccount.address,
+            success: true,
+        });
+        // burn aToken
+        expect(result.transactions).toHaveTransaction({
+            from: pool.address,
+            to: borrowerATokenWallet.address,
+            success: true,
+        });
+        // tokenTransfer
+        expect(result.transactions).toHaveTransaction({
+            from: poolCollateralWallet.address,
+            to: liquidatorCollateralWallet.address,
+            success: true,
+        });
+        // tokenTransfer
+        expect(result.transactions).toHaveTransaction({
+            from: poolCollateralWallet.address,
+            to: treasuryCollateralWallet.address,
+            success: true,
+        });
+
+        accountData = await borrowerAccount.getAccount();
+        console.log(accountData);
+        borrowerHealthInfo = await pool.getUserAccountHealthInfo(accountData);
+        console.dir(borrowerHealthInfo, { depth: null });
+
+        // check borrower positions
+        expect(Number(expectedCollateralAfter)).toBeCloseTo(
+            Number(borrowerHealthInfo.totalCollateralInBaseCurrency),
+            -5,
+        );
+        expect(Number(expectedDebtAfter)).toBeCloseTo(Number(borrowerHealthInfo.totalDebtInBaseCurrency), -5);
+        const dTokenBalance = (await borrowerDTokenWallet.getGetWalletData()).balance;
+        const aTokenBalance = (await borrowerATokenWallet.getGetWalletData()).balance;
+        expect(dTokenBalance).toEqual(accountData.positionsDetail.get(debtReserve.address)?.borrow);
+        expect(aTokenBalance).toEqual(accountData.positionsDetail.get(collateralReserve.address)?.supply);
+        // check treasury collateral balance
+        const treasuryCollateralWalletBalance = (await treasuryCollateralWallet.getGetWalletData()).balance;
+        expect(Number(treasuryCollateralWalletBalance)).toBeCloseTo(Number(liquidationProtocolFee), -1);
+        // check liquidator collateral balance
+        const liquidatorCollateralWalletBalanceAfter = (await liquidatorCollateralWallet.getGetWalletData()).balance;
+        expect(
+            Number(liquidatorCollateralWalletBalanceBefore + actualCollateralToLiquidate - liquidationProtocolFee),
+        ).toBeCloseTo(Number(liquidatorCollateralWalletBalanceAfter), -1);
+    });
+    it('supply jetton1, borrow jetton1, closeFactor: 50%', async () => {
+        // provide liquidity
+        await supply(secondUser.getSender(), sampleJetton1, toNano('10000'));
+        await supply(secondUser.getSender(), sampleJetton2, toNano('10000'));
+
+        // borrower supply jetton1 and borrow jetton1
+        const borrower = deployer;
+        const collateralReserve = sampleJetton1;
+        const debtReserve = sampleJetton1;
+        const collateralUint = 10n ** reserveConfiguration1.decimals;
+        const debtUint = 10n ** reserveConfiguration1.decimals;
+        const supplyAmount = 10000n * collateralUint;
+        const borrowAmount = 5990n * debtUint;
+        await supply(deployer.getSender(), collateralReserve, supplyAmount);
+        await borrow(deployer.getSender(), debtReserve, borrowAmount);
+        const borrowerAccount = blockchain.openContract(await UserAccount.fromInit(pool.address, borrower.address));
+        console.log('borrowerAccount', borrowerAccount.address.toString());
+
+        let accountData = await borrowerAccount.getAccount();
+        let borrowerHealthInfo = await pool.getUserAccountHealthInfo(accountData);
+        console.dir(borrowerHealthInfo, { depth: null });
+
+        let collateralReserveData = await pool.getReserveDataAndConfiguration(collateralReserve.address);
+        let debtReserveData = await pool.getReserveDataAndConfiguration(debtReserve.address);
+        expect(accountData.positionsLength).toEqual(1n);
+        expect(accountData.positionsDetail.get(collateralReserve.address)?.asCollateral).toEqual(true);
+        expect(accountData.positionsDetail.get(collateralReserve.address)?.supply).toEqual(supplyAmount);
+        expect(accountData.positionsDetail.get(debtReserve.address)?.borrow).toEqual(borrowAmount);
+        expect(Number(fromNano(borrowerHealthInfo.totalCollateralInBaseCurrency))).toBeCloseTo(
+            Number(fromNano((supplyAmount * collateralReserveData.reserveData.price) / collateralUint)),
+            5,
+        );
+        expect(Number(fromNano(borrowerHealthInfo.totalDebtInBaseCurrency))).toBeCloseTo(
+            Number(fromNano((borrowAmount * debtReserveData.reserveData.price) / debtUint)),
+            5,
+        );
+        expect(Number(borrowerHealthInfo.healthFactorInRay) / Number(RAY)).toBeCloseTo(
+            Number(
+                (supplyAmount *
+                    collateralReserveData.reserveData.price *
+                    RAY *
+                    debtUint *
+                    collateralReserveData.reserveConfiguration.liquidationThreshold) /
+                    (borrowAmount * debtReserveData.reserveData.price * PERCENTAGE_FACTOR * collateralUint),
+            ) / Number(RAY),
+            7,
+        );
+
+        // update borrow asset LS to shortfall borrower
+        await updateReserveConfiguration(collateralReserve.address, {
+            ...reserveConfiguration1,
+            liquidationThreshold: 5900n,
+        });
+
+        accountData = await borrowerAccount.getAccount();
+        borrowerHealthInfo = await pool.getUserAccountHealthInfo(accountData);
+        collateralReserveData = await pool.getReserveDataAndConfiguration(collateralReserve.address);
+        debtReserveData = await pool.getReserveDataAndConfiguration(debtReserve.address);
+        expect(accountData.positionsLength).toEqual(1n);
+        expect(accountData.positionsDetail.get(collateralReserve.address)?.asCollateral).toEqual(true);
+        expect(accountData.positionsDetail.get(collateralReserve.address)?.supply).toEqual(supplyAmount);
+        expect(accountData.positionsDetail.get(debtReserve.address)?.borrow).toEqual(borrowAmount);
+        expect(Number(fromNano(borrowerHealthInfo.totalCollateralInBaseCurrency))).toBeCloseTo(
+            Number(fromNano((supplyAmount * collateralReserveData.reserveData.price) / collateralUint)),
+            2,
+        );
+        expect(Number(fromNano(borrowerHealthInfo.totalDebtInBaseCurrency))).toBeCloseTo(
+            Number(fromNano((borrowAmount * debtReserveData.reserveData.price) / debtUint)),
+            2,
+        );
+        expect(Number(borrowerHealthInfo.healthFactorInRay) / Number(RAY)).toBeCloseTo(
+            Number(
+                (supplyAmount *
+                    collateralReserveData.reserveData.price *
+                    RAY *
+                    debtUint *
+                    collateralReserveData.reserveConfiguration.liquidationThreshold) /
+                    (borrowAmount * debtReserveData.reserveData.price * PERCENTAGE_FACTOR * collateralUint),
+            ) / Number(RAY),
+            7,
+        );
+        console.dir(borrowerHealthInfo, { depth: null });
+
+        // send liquidation message
+        const liquidator = secondUser;
+        const liquidatorDebtReserveWallet = blockchain.openContract(
+            JettonDefaultWallet.fromAddress(await debtReserve.getGetWalletAddress(liquidator.address)),
+        );
+        const poolDebtReserveWallet = blockchain.openContract(
+            JettonDefaultWallet.fromAddress(await debtReserve.getGetWalletAddress(pool.address)),
+        );
+        const poolCollateralWallet = blockchain.openContract(
+            JettonDefaultWallet.fromAddress(await collateralReserve.getGetWalletAddress(pool.address)),
+        );
+        const liquidatorCollateralWallet = blockchain.openContract(
+            JettonDefaultWallet.fromAddress(await collateralReserve.getGetWalletAddress(liquidator.address)),
+        );
+        const liquidatorCollateralWalletBalanceBefore = (await liquidatorCollateralWallet.getGetWalletData()).balance;
+        const treasuryCollateralWallet = blockchain.openContract(
+            JettonDefaultWallet.fromAddress(
+                await collateralReserve.getGetWalletAddress(collateralReserveData.reserveConfiguration.treasury),
+            ),
+        );
+        const borrowerDTokenWallet = blockchain.openContract(
+            DTokenDefaultWallet.fromAddress(await dToken1.getGetWalletAddress(borrower.address)),
+        );
+        const borrowerATokenWallet = blockchain.openContract(
+            ATokenDefaultWallet.fromAddress(await aToken1.getGetWalletAddress(borrower.address)),
+        );
+
+        const forward_payload: Cell = beginCell()
+            .storeUint(0x1f03e59a, 32) // Liquidate opcode: 0x1f03e59a
+            .storeAddress(borrower.address) // borrower
+            .storeUint(0, 5) // collateral reserve Index
+            .endCell();
+
+        const debtAmount =
+            accountData.positionsDetail.get(debtReserve.address)?.borrow || (0n * debtReserveData.normalizedDebt) / RAY;
+        const collateralAmount =
+            accountData.positionsDetail.get(collateralReserve.address)?.supply ||
+            (0n * collateralReserveData.normalizedIncome) / RAY;
+        const closeFactor = Number(borrowerHealthInfo.healthFactorInRay) / Number(RAY) > 0.95 ? 5000n : 10000n;
+        console.log(`closeFactor: ${closeFactor}`);
+        let actualLiquidationAmount = (debtAmount * closeFactor) / PERCENTAGE_FACTOR;
+        console.log(`actualLiquidationAmount: ${actualLiquidationAmount}`);
+
+        const maxCollateralToLiquidate =
+            (((debtReserveData.reserveData.price * actualLiquidationAmount * collateralUint) /
+                (collateralReserveData.reserveData.price * debtUint)) *
+                collateralReserveData.reserveConfiguration.liquidationBonus) /
+            PERCENTAGE_FACTOR;
+        console.log(`maxCollateralToLiquidate: ${maxCollateralToLiquidate}`);
+        let actualCollateralToLiquidate = 0n;
+        if (maxCollateralToLiquidate > collateralAmount) {
+            actualCollateralToLiquidate = collateralAmount;
+            actualLiquidationAmount =
+                (((collateralReserveData.reserveData.price * actualCollateralToLiquidate * debtUint) /
+                    (debtReserveData.reserveData.price * collateralUint)) *
+                    PERCENTAGE_FACTOR) /
+                collateralReserveData.reserveConfiguration.liquidationBonus;
+        } else {
+            actualCollateralToLiquidate = maxCollateralToLiquidate;
+            actualLiquidationAmount = actualLiquidationAmount;
+        }
+        console.log(`actualCollateralToLiquidate: ${actualCollateralToLiquidate}`);
+        console.log(`actualLiquidationAmount: ${actualLiquidationAmount}`);
+        const expectedCollateralAfter =
+            borrowerHealthInfo.totalCollateralInBaseCurrency -
+            (actualCollateralToLiquidate * collateralReserveData.reserveData.price) / collateralUint;
+        const expectedDebtAfter =
+            borrowerHealthInfo.totalDebtInBaseCurrency -
+            (actualLiquidationAmount * debtReserveData.reserveData.price) / debtUint;
+        console.log(`expectedCollateralAfter: ${expectedCollateralAfter}`);
+        console.log(`expectedDebtAfter: ${expectedDebtAfter}`);
+
+        let bonusCollateral =
+            actualCollateralToLiquidate -
+            (actualCollateralToLiquidate * PERCENTAGE_FACTOR) /
+                collateralReserveData.reserveConfiguration.liquidationBonus;
+        let liquidationProtocolFee =
+            (bonusCollateral * collateralReserveData.reserveConfiguration.liquidationProtocolFee) / PERCENTAGE_FACTOR;
+
+        let result = await liquidatorDebtReserveWallet.send(
+            liquidator.getSender(),
+            {
+                value: toNano('10'),
+            },
+            {
+                $$type: 'TokenTransfer',
+                queryId: 0n,
+                amount: debtAmount,
+                destination: pool.address,
+                response_destination: liquidatorDebtReserveWallet.address,
+                custom_payload: null,
+                forward_ton_amount: toNano('4.1'),
+                forward_payload: forward_payload,
+            },
+        );
+        expect(result.transactions).toHaveTransaction({
+            from: liquidatorDebtReserveWallet.address,
+            to: poolDebtReserveWallet.address,
+            success: true,
+        });
+        // TokenNotification
+        expect(result.transactions).toHaveTransaction({
+            from: poolDebtReserveWallet.address,
+            to: pool.address,
+            success: true,
+        });
+        // GetUserAccountData
+        expect(result.transactions).toHaveTransaction({
+            from: pool.address,
+            to: borrowerAccount.address,
+            success: true,
+        });
+        // UserAccountDataResponse
+        expect(result.transactions).toHaveTransaction({
+            from: borrowerAccount.address,
+            to: pool.address,
+            success: true,
+        });
+        // UpdatePosition debt token
+        expect(result.transactions).toHaveTransaction({
+            from: pool.address,
+            to: borrowerAccount.address,
+            success: true,
+        });
+        // burn dToken
+        expect(result.transactions).toHaveTransaction({
+            from: pool.address,
+            to: borrowerDTokenWallet.address,
+            success: true,
+        });
+        // UpdatePosition collateral token
+        expect(result.transactions).toHaveTransaction({
+            from: pool.address,
+            to: borrowerAccount.address,
+            success: true,
+        });
+        // burn aToken
+        expect(result.transactions).toHaveTransaction({
+            from: pool.address,
+            to: borrowerATokenWallet.address,
+            success: true,
+        });
+        // tokenTransfer
+        expect(result.transactions).toHaveTransaction({
+            from: poolCollateralWallet.address,
+            to: liquidatorCollateralWallet.address,
+            success: true,
+        });
+        // tokenTransfer
+        expect(result.transactions).toHaveTransaction({
+            from: poolCollateralWallet.address,
+            to: treasuryCollateralWallet.address,
+            success: true,
+        });
+
+        accountData = await borrowerAccount.getAccount();
+        console.log(accountData);
+        borrowerHealthInfo = await pool.getUserAccountHealthInfo(accountData);
+        console.dir(borrowerHealthInfo, { depth: null });
+
+        // check borrower positions
+        expect(Number(expectedCollateralAfter)).toBeCloseTo(
+            Number(borrowerHealthInfo.totalCollateralInBaseCurrency),
+            -5,
+        );
+        expect(Number(expectedDebtAfter)).toBeCloseTo(Number(borrowerHealthInfo.totalDebtInBaseCurrency), -5);
+        const dTokenBalance = (await borrowerDTokenWallet.getGetWalletData()).balance;
+        const aTokenBalance = (await borrowerATokenWallet.getGetWalletData()).balance;
+        expect(dTokenBalance).toEqual(accountData.positionsDetail.get(debtReserve.address)?.borrow);
+        expect(aTokenBalance).toEqual(accountData.positionsDetail.get(collateralReserve.address)?.supply);
+        // check treasury collateral balance
+        const treasuryCollateralWalletBalance = (await treasuryCollateralWallet.getGetWalletData()).balance;
+        expect(Number(treasuryCollateralWalletBalance)).toBeCloseTo(Number(liquidationProtocolFee), -1);
+        // check liquidator collateral balance
+        const liquidatorCollateralWalletBalanceAfter = (await liquidatorCollateralWallet.getGetWalletData()).balance;
+        expect(
+            Number(
+                liquidatorCollateralWalletBalanceBefore -
+                    debtAmount +
+                    actualCollateralToLiquidate -
+                    liquidationProtocolFee,
+            ),
+        ).toBeCloseTo(Number(liquidatorCollateralWalletBalanceAfter), -5);
+    });
+    it('supply jetton1, borrow jetton1, closeFactor: 100%', async () => {
+        // provide liquidity
+        await supply(secondUser.getSender(), sampleJetton1, toNano('10000'));
+        await supply(secondUser.getSender(), sampleJetton2, toNano('10000'));
+
+        // borrower supply jetton1 and borrow jetton1
+        const borrower = deployer;
+        const collateralReserve = sampleJetton1;
+        const debtReserve = sampleJetton1;
+        const collateralUint = 10n ** reserveConfiguration1.decimals;
+        const debtUint = 10n ** reserveConfiguration1.decimals;
+        const supplyAmount = 10000n * collateralUint;
+        const borrowAmount = 5990n * debtUint;
+        await supply(deployer.getSender(), collateralReserve, supplyAmount);
+        await borrow(deployer.getSender(), debtReserve, borrowAmount);
+        const borrowerAccount = blockchain.openContract(await UserAccount.fromInit(pool.address, borrower.address));
+        console.log('borrowerAccount', borrowerAccount.address.toString());
+
+        let accountData = await borrowerAccount.getAccount();
+        let borrowerHealthInfo = await pool.getUserAccountHealthInfo(accountData);
+        console.dir(borrowerHealthInfo, { depth: null });
+
+        let collateralReserveData = await pool.getReserveDataAndConfiguration(collateralReserve.address);
+        let debtReserveData = await pool.getReserveDataAndConfiguration(debtReserve.address);
+        expect(accountData.positionsLength).toEqual(1n);
+        expect(accountData.positionsDetail.get(collateralReserve.address)?.asCollateral).toEqual(true);
+        expect(accountData.positionsDetail.get(collateralReserve.address)?.supply).toEqual(supplyAmount);
+        expect(accountData.positionsDetail.get(debtReserve.address)?.borrow).toEqual(borrowAmount);
+        expect(Number(fromNano(borrowerHealthInfo.totalCollateralInBaseCurrency))).toBeCloseTo(
+            Number(fromNano((supplyAmount * collateralReserveData.reserveData.price) / collateralUint)),
+            5,
+        );
+        expect(Number(fromNano(borrowerHealthInfo.totalDebtInBaseCurrency))).toBeCloseTo(
+            Number(fromNano((borrowAmount * debtReserveData.reserveData.price) / debtUint)),
+            5,
+        );
+        expect(Number(borrowerHealthInfo.healthFactorInRay) / Number(RAY)).toBeCloseTo(
+            Number(
+                (supplyAmount *
+                    collateralReserveData.reserveData.price *
+                    RAY *
+                    debtUint *
+                    collateralReserveData.reserveConfiguration.liquidationThreshold) /
+                    (borrowAmount * debtReserveData.reserveData.price * PERCENTAGE_FACTOR * collateralUint),
+            ) / Number(RAY),
+            7,
+        );
+
+        // update borrow asset LS to shortfall borrower
+        await updateReserveConfiguration(collateralReserve.address, {
+            ...reserveConfiguration1,
+            liquidationThreshold: 5000n,
+        });
+
+        accountData = await borrowerAccount.getAccount();
+        borrowerHealthInfo = await pool.getUserAccountHealthInfo(accountData);
+        collateralReserveData = await pool.getReserveDataAndConfiguration(collateralReserve.address);
+        debtReserveData = await pool.getReserveDataAndConfiguration(debtReserve.address);
+        expect(accountData.positionsLength).toEqual(1n);
+        expect(accountData.positionsDetail.get(collateralReserve.address)?.asCollateral).toEqual(true);
+        expect(accountData.positionsDetail.get(collateralReserve.address)?.supply).toEqual(supplyAmount);
+        expect(accountData.positionsDetail.get(debtReserve.address)?.borrow).toEqual(borrowAmount);
+        expect(Number(fromNano(borrowerHealthInfo.totalCollateralInBaseCurrency))).toBeCloseTo(
+            Number(fromNano((supplyAmount * collateralReserveData.reserveData.price) / collateralUint)),
+            2,
+        );
+        expect(Number(fromNano(borrowerHealthInfo.totalDebtInBaseCurrency))).toBeCloseTo(
+            Number(fromNano((borrowAmount * debtReserveData.reserveData.price) / debtUint)),
+            2,
+        );
+        expect(Number(borrowerHealthInfo.healthFactorInRay) / Number(RAY)).toBeCloseTo(
+            Number(
+                (supplyAmount *
+                    collateralReserveData.reserveData.price *
+                    RAY *
+                    debtUint *
+                    collateralReserveData.reserveConfiguration.liquidationThreshold) /
+                    (borrowAmount * debtReserveData.reserveData.price * PERCENTAGE_FACTOR * collateralUint),
+            ) / Number(RAY),
+            7,
+        );
+        console.dir(borrowerHealthInfo, { depth: null });
+
+        // send liquidation message
+        const liquidator = secondUser;
+        const liquidatorDebtReserveWallet = blockchain.openContract(
+            JettonDefaultWallet.fromAddress(await debtReserve.getGetWalletAddress(liquidator.address)),
+        );
+        const poolDebtReserveWallet = blockchain.openContract(
+            JettonDefaultWallet.fromAddress(await debtReserve.getGetWalletAddress(pool.address)),
+        );
+        const poolCollateralWallet = blockchain.openContract(
+            JettonDefaultWallet.fromAddress(await collateralReserve.getGetWalletAddress(pool.address)),
+        );
+        const liquidatorCollateralWallet = blockchain.openContract(
+            JettonDefaultWallet.fromAddress(await collateralReserve.getGetWalletAddress(liquidator.address)),
+        );
+        const liquidatorCollateralWalletBalanceBefore = (await liquidatorCollateralWallet.getGetWalletData()).balance;
+        const treasuryCollateralWallet = blockchain.openContract(
+            JettonDefaultWallet.fromAddress(
+                await collateralReserve.getGetWalletAddress(collateralReserveData.reserveConfiguration.treasury),
+            ),
+        );
+        const borrowerDTokenWallet = blockchain.openContract(
+            DTokenDefaultWallet.fromAddress(await dToken1.getGetWalletAddress(borrower.address)),
+        );
+        const borrowerATokenWallet = blockchain.openContract(
+            ATokenDefaultWallet.fromAddress(await aToken1.getGetWalletAddress(borrower.address)),
+        );
+
+        const forward_payload: Cell = beginCell()
+            .storeUint(0x1f03e59a, 32) // Liquidate opcode: 0x1f03e59a
+            .storeAddress(borrower.address) // borrower
+            .storeUint(0, 5) // collateral reserve Index
+            .endCell();
+
+        const debtAmount =
+            accountData.positionsDetail.get(debtReserve.address)?.borrow || (0n * debtReserveData.normalizedDebt) / RAY;
+        const collateralAmount =
+            accountData.positionsDetail.get(collateralReserve.address)?.supply ||
+            (0n * collateralReserveData.normalizedIncome) / RAY;
+        const closeFactor = Number(borrowerHealthInfo.healthFactorInRay) / Number(RAY) > 0.95 ? 5000n : 10000n;
+        console.log(`closeFactor: ${closeFactor}`);
+        let actualLiquidationAmount = (debtAmount * closeFactor) / PERCENTAGE_FACTOR;
+        console.log(`actualLiquidationAmount: ${actualLiquidationAmount}`);
+
+        const maxCollateralToLiquidate =
+            (((debtReserveData.reserveData.price * actualLiquidationAmount * collateralUint) /
+                (collateralReserveData.reserveData.price * debtUint)) *
+                collateralReserveData.reserveConfiguration.liquidationBonus) /
+            PERCENTAGE_FACTOR;
+        console.log(`maxCollateralToLiquidate: ${maxCollateralToLiquidate}`);
+        let actualCollateralToLiquidate = 0n;
+        if (maxCollateralToLiquidate > collateralAmount) {
+            actualCollateralToLiquidate = collateralAmount;
+            actualLiquidationAmount =
+                (((collateralReserveData.reserveData.price * actualCollateralToLiquidate * debtUint) /
+                    (debtReserveData.reserveData.price * collateralUint)) *
+                    PERCENTAGE_FACTOR) /
+                collateralReserveData.reserveConfiguration.liquidationBonus;
+        } else {
+            actualCollateralToLiquidate = maxCollateralToLiquidate;
+            actualLiquidationAmount = actualLiquidationAmount;
+        }
+        console.log(`actualCollateralToLiquidate: ${actualCollateralToLiquidate}`);
+        console.log(`actualLiquidationAmount: ${actualLiquidationAmount}`);
+        const expectedCollateralAfter =
+            borrowerHealthInfo.totalCollateralInBaseCurrency -
+            (actualCollateralToLiquidate * collateralReserveData.reserveData.price) / collateralUint;
+        const expectedDebtAfter =
+            borrowerHealthInfo.totalDebtInBaseCurrency -
+            (actualLiquidationAmount * debtReserveData.reserveData.price) / debtUint;
+        console.log(`expectedCollateralAfter: ${expectedCollateralAfter}`);
+        console.log(`expectedDebtAfter: ${expectedDebtAfter}`);
+
+        let bonusCollateral =
+            actualCollateralToLiquidate -
+            (actualCollateralToLiquidate * PERCENTAGE_FACTOR) /
+                collateralReserveData.reserveConfiguration.liquidationBonus;
+        let liquidationProtocolFee =
+            (bonusCollateral * collateralReserveData.reserveConfiguration.liquidationProtocolFee) / PERCENTAGE_FACTOR;
+
+        let result = await liquidatorDebtReserveWallet.send(
+            liquidator.getSender(),
+            {
+                value: toNano('10'),
+            },
+            {
+                $$type: 'TokenTransfer',
+                queryId: 0n,
+                amount: debtAmount,
+                destination: pool.address,
+                response_destination: liquidatorDebtReserveWallet.address,
+                custom_payload: null,
+                forward_ton_amount: toNano('4.1'),
+                forward_payload: forward_payload,
+            },
+        );
+        expect(result.transactions).toHaveTransaction({
+            from: liquidatorDebtReserveWallet.address,
+            to: poolDebtReserveWallet.address,
+            success: true,
+        });
+        // TokenNotification
+        expect(result.transactions).toHaveTransaction({
+            from: poolDebtReserveWallet.address,
+            to: pool.address,
+            success: true,
+        });
+        // GetUserAccountData
+        expect(result.transactions).toHaveTransaction({
+            from: pool.address,
+            to: borrowerAccount.address,
+            success: true,
+        });
+        // UserAccountDataResponse
+        expect(result.transactions).toHaveTransaction({
+            from: borrowerAccount.address,
+            to: pool.address,
+            success: true,
+        });
+        // UpdatePosition debt token
+        expect(result.transactions).toHaveTransaction({
+            from: pool.address,
+            to: borrowerAccount.address,
+            success: true,
+        });
+        // burn dToken
+        expect(result.transactions).toHaveTransaction({
+            from: pool.address,
+            to: borrowerDTokenWallet.address,
+            success: true,
+        });
+        // UpdatePosition collateral token
+        expect(result.transactions).toHaveTransaction({
+            from: pool.address,
+            to: borrowerAccount.address,
+            success: true,
+        });
+        // burn aToken
+        expect(result.transactions).toHaveTransaction({
+            from: pool.address,
+            to: borrowerATokenWallet.address,
+            success: true,
+        });
+        // tokenTransfer
+        expect(result.transactions).toHaveTransaction({
+            from: poolCollateralWallet.address,
+            to: liquidatorCollateralWallet.address,
+            success: true,
+        });
+        // tokenTransfer
+        expect(result.transactions).toHaveTransaction({
+            from: poolCollateralWallet.address,
+            to: treasuryCollateralWallet.address,
+            success: true,
+        });
+
+        accountData = await borrowerAccount.getAccount();
+        console.log(accountData);
+        borrowerHealthInfo = await pool.getUserAccountHealthInfo(accountData);
+        console.dir(borrowerHealthInfo, { depth: null });
+
+        // check borrower positions
+        expect(Number(expectedCollateralAfter)).toBeCloseTo(
+            Number(borrowerHealthInfo.totalCollateralInBaseCurrency),
+            -5,
+        );
+        expect(Number(expectedDebtAfter)).toBeCloseTo(Number(borrowerHealthInfo.totalDebtInBaseCurrency), -5);
+        const dTokenBalance = (await borrowerDTokenWallet.getGetWalletData()).balance;
+        const aTokenBalance = (await borrowerATokenWallet.getGetWalletData()).balance;
+        expect(dTokenBalance).toEqual(accountData.positionsDetail.get(debtReserve.address)?.borrow);
+        expect(aTokenBalance).toEqual(accountData.positionsDetail.get(collateralReserve.address)?.supply);
+        // check treasury collateral balance
+        const treasuryCollateralWalletBalance = (await treasuryCollateralWallet.getGetWalletData()).balance;
+        expect(treasuryCollateralWalletBalance).toEqual(liquidationProtocolFee);
+        // check liquidator collateral balance
+        const liquidatorCollateralWalletBalanceAfter = (await liquidatorCollateralWallet.getGetWalletData()).balance;
+        expect(
+            Number(
+                liquidatorCollateralWalletBalanceBefore -
+                    debtAmount +
+                    actualCollateralToLiquidate -
+                    liquidationProtocolFee,
+            ),
+        ).toBeCloseTo(Number(liquidatorCollateralWalletBalanceAfter), -5);
     });
 });

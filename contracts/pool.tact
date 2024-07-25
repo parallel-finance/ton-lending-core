@@ -11,8 +11,9 @@ import "./types/message";
 import "./libraries/logic/reserve-logic";
 import "./constants";
 import "./pool-view";
+import "./pool-configurator";
 
-contract Pool with Deployable, Ownable, Resumable, PoolView {
+contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
     const MIN_TONS_FOR_STORAGE: Int = ton("0.03");
     const TOKEN_TRANSFER_GAS_CONSUMPTION: Int = ton("0.05");
     const TOKEN_MINT_GAS_CONSUMPTION: Int = ton("0.05");
@@ -284,8 +285,8 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
             reserveData.totalBorrow -= scaledLiquidationAmount;
             reserveCache.nextScaledDebt = reserveData.totalBorrow;
 
-            reserveData.updateInterestRates(reserveCache, rateStrategy, 0, -actualLiquidationAmount);
-
+            reserveData.updateInterestRates(reserveCache, rateStrategy, actualLiquidationAmount, 0);
+            
             reserveData.availableLiquidity += actualLiquidationAmount;
             self.reservesData.set(reserveAddress, reserveData);
 
@@ -298,7 +299,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
             let collateralReserveCache: ReserveCache = collateralReserveData.cache(collateralReserveConfiguration);
 
             collateralReserveCache = collateralReserveData.updateState(collateralReserveCache);
-            collateralReserveData.updateInterestRates(collateralReserveCache, rateStrategy, -actualCollateralToLiquidate, 0);
+            collateralReserveData.updateInterestRates(collateralReserveCache, rateStrategy, 0, actualCollateralToLiquidate);
 
             let scaledCollateralAmount: Int = actualCollateralToLiquidate.rayDiv(collateralReserveCache.nextLiquidityIndex);
             collateralReserveData.availableLiquidity -= actualCollateralToLiquidate;
@@ -307,13 +308,6 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
 
             self.updateUserAccountPosition(msg.user, collateralReserve, -scaledCollateralAmount, 0, remainingValue / 2);
         }
-    }
-
-    // Notice: Only for Test
-    receive(msg: SetMockOraclePrice) {
-        let reserveData: ReserveData = self.reservesData.get(msg.asset)!!;
-        reserveData.price = msg.price;
-        self.reservesData.set(msg.asset, reserveData);
     }
 
     receive(msg: TokenExcesses) {

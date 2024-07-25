@@ -89,3 +89,7 @@ message TokenBurnBounce {
     user: Address;
     msg: TokenBurn;
 }
+message UpdateReserveConfiguration {
+    reserve: Address;
+    reserveConfiguration: ReserveConfiguration;
+}
