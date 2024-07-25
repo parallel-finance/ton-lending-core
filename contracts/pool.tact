@@ -98,7 +98,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
 
     receive(msg: BorrowToken) {
         let ctx: Context = context();
-        let fwdFee: Int = ctx.readForwardFee() * 9;
+        let fwdFee: Int = ctx.readForwardFee() * 5;
         let storageFee: Int = self.MIN_TONS_FOR_STORAGE;
         let computationAndActionFee: Int = self.TOKEN_TRANSFER_GAS_CONSUMPTION + self.TOKEN_MINT_GAS_CONSUMPTION + self.BORROW_GAS_CONSUMPTION;
         let totalFee: Int = fwdFee + storageFee + computationAndActionFee;
@@ -128,9 +128,9 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
 
     receive(msg: WithdrawToken) {
         let ctx: Context = context();
-        let fwdFee: Int = ctx.readForwardFee() * 9;
+        let fwdFee: Int = ctx.readForwardFee() * 5;
         let storageFee: Int = self.MIN_TONS_FOR_STORAGE;
-        let computationAndActionFee: Int = self.TOKEN_TRANSFER_GAS_CONSUMPTION + self.TOKEN_MINT_GAS_CONSUMPTION + self.WITHDRAW_GAS_CONSUMPTION;
+        let computationAndActionFee: Int = self.TOKEN_TRANSFER_GAS_CONSUMPTION + self.TOKEN_BURN_GAS_CONSUMPTION + self.WITHDRAW_GAS_CONSUMPTION;
         let totalFee: Int = fwdFee + storageFee + computationAndActionFee;
         require(ctx.value > totalFee, "Insufficient fee");
 
@@ -157,6 +157,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
     }
 
     receive(msg: UserAccountDataResponse) {
+        let ctx: Context = context();
         let reserveAddress: Address = msg.tokenAddress;
         let userAccountData: UserAccountData = msg.accountData;
 
@@ -182,11 +183,13 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
             reserveData.availableLiquidity -= borrowAmount;
             // set reserveData to storage back
             self.reservesData.set(reserveAddress, reserveData);
+
+            let selfConsumption: Int = self.BORROW_GAS_CONSUMPTION + self.TOKEN_TRANSFER_GAS_CONSUMPTION + ctx.readForwardFee() * 2;
+            let remainingValue: Int = self.remainingValue(ctx.value, selfConsumption);
+            self.updateUserAccountPosition(msg.user, msg.tokenAddress, 0, scaledBorrowAmount, remainingValue); 
             // Transfer borrowAmount Token(tokenAddress) to the user.
             let poolWalletAddress: Address = reserveConfigration.poolWalletAddress;
             self.sendTokenTransferByPool(poolWalletAddress, msg.user, borrowAmount);
-            // TODO: calculate fees and Ton to send
-            self.updateUserAccountPosition(msg.user, msg.tokenAddress, 0, scaledBorrowAmount); 
         }
 
         if(msg.action == ACTION_WITHDRAW) {
@@ -199,11 +202,14 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
             reserveData.totalSupply -= scaledWithdrawAmount;
             // set reserveData to storage back
             self.reservesData.set(reserveAddress, reserveData);
+
+            let selfConsumption: Int = self.WITHDRAW_GAS_CONSUMPTION + self.TOKEN_TRANSFER_GAS_CONSUMPTION + ctx.readForwardFee() * 2;
+            let remainingValue: Int = self.remainingValue(ctx.value, selfConsumption);
+            self.updateUserAccountPosition(msg.user, msg.tokenAddress, -scaledWithdrawAmount, 0, remainingValue);
+
             // Transfer withdrawAmount Token(tokenAddress) to the user.
             let poolWalletAddress: Address = reserveConfigration.poolWalletAddress;
             self.sendTokenTransferByPool(poolWalletAddress, msg.user, withdrawAmount);
-            // TODO: calculate fees and Ton to send
-            self.updateUserAccountPosition(msg.user, msg.tokenAddress, -scaledWithdrawAmount, 0);
         }
     }
 
@@ -224,6 +230,48 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
         }
     }
 
+    receive(msg: SupplyTon) {
+        let reserveAddress: Address = myAddress();
+        let optionalReserveData: ReserveData? = self.reserveData(reserveAddress);
+        require(optionalReserveData != null, "Reserve not supported");
+        let reserveData: ReserveData = optionalReserveData!!;
+
+        let ctx: Context = context();
+        let fwdFee: Int = ctx.readForwardFee() * 3;
+        let storageFee: Int = self.MIN_TONS_FOR_STORAGE;
+        let computationAndActionFee: Int = self.TOKEN_MINT_GAS_CONSUMPTION + self.SUPPLY_REPAY_GAS_CONSUMPTION;
+        let totalFee: Int = fwdFee + storageFee + computationAndActionFee;
+        require(ctx.value > totalFee + msg.amount, "Insufficient fee");
+
+        let reserveConfigration: ReserveConfiguration = self.reservesConfiguration.get(reserveAddress)!!;
+        let reserveCache: ReserveCache = reserveData.cache(reserveConfigration);
+        // _updateIndexes and _accrueToTreasury
+        reserveCache = reserveData.updateState(reserveCache);
+
+        let supplyAmount: Int = msg.amount;
+        // TODO: validateSupply
+
+        // updateInterestRates
+        let rateStrategy: ReserveInterestRateStrategy = self.reserveInterestRateStrategy.get(reserveAddress)!!;
+        reserveData.updateInterestRates(reserveCache, rateStrategy, supplyAmount, 0);
+        // update liquidity and set reserveData to storage back;
+        let scaledSupplyAmount: Int = supplyAmount.rayDiv(reserveCache.nextLiquidityIndex);
+        reserveData.availableLiquidity += supplyAmount;
+        reserveData.totalSupply += scaledSupplyAmount;
+        self.reservesData.set(reserveAddress, reserveData);
+        
+        let remainingValue: Int = self.remainingValue(ctx.value, self.SUPPLY_REPAY_GAS_CONSUMPTION + ctx.readForwardFee());
+        self.updateUserAccountPosition(ctx.sender, reserveAddress, scaledSupplyAmount, 0, remainingValue);
+    }
+    
+    fun remainingValue(value: Int, selfConsumption: Int): Int {
+        let msgValue: Int = value;
+        let tonBalanceBeforeMsg: Int = myBalance() - msgValue;
+        let storageFee: Int = self.MIN_TONS_FOR_STORAGE - min(tonBalanceBeforeMsg, self.MIN_TONS_FOR_STORAGE);
+        msgValue = msgValue - (storageFee + selfConsumption);
+        return msgValue;
+    }
+
     fun sendTokenTransferByPool(poolWalletAddress: Address, toAddress: Address, amount: Int) {
         let tokenTransferMsg: TokenTransfer = TokenTransfer{
             queryId: self.queryId,
@@ -238,7 +286,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
 
         send(SendParameters{
             to: poolWalletAddress,
-            value: ton("0.05"),
+            value: self.TOKEN_TRANSFER_GAS_CONSUMPTION,
             bounce: true,
             mode: SendPayGasSeparately,
             body: tokenTransferMsg.toCell()
@@ -402,9 +450,10 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
         let ctx: Context = context();
         let fwdFee: Int = ctx.readForwardFee() * 5;
         let storageFee: Int = self.MIN_TONS_FOR_STORAGE;
-        let computationAndActionFee: Int = self.TOKEN_TRANSFER_GAS_CONSUMPTION + self.TOKEN_MINT_GAS_CONSUMPTION + self.SUPPLY_REPAY_GAS_CONSUMPTION;
+        let computationAndActionFee: Int = self.TOKEN_MINT_GAS_CONSUMPTION + self.SUPPLY_REPAY_GAS_CONSUMPTION;
         let totalFee: Int = fwdFee + storageFee + computationAndActionFee;
         require(ctx.value > totalFee, "Insufficient fee");
+        // TODO: charge the storageFee here? Or just send the SendRemainingValue and pay as needed?
 
         let forwardPayload: Slice = msg.forward_payload;
         let opCode: Int = forwardPayload.loadUint(32);
@@ -428,7 +477,9 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
             reserveData.totalSupply += scaledSupplyAmount;
             self.reservesData.set(matchedReserve!!, reserveData);
 
-            self.updateUserAccountPosition(msg.from, matchedReserve!!, scaledSupplyAmount, 0);
+            let selfConsumption: Int = self.SUPPLY_REPAY_GAS_CONSUMPTION + ctx.readForwardFee();
+            let remainingValue: Int = self.remainingValue(ctx.value, selfConsumption);
+            self.updateUserAccountPosition(msg.from, matchedReserve!!, scaledSupplyAmount, 0, remainingValue);
         }
 
         // use crc32 code of 'Repay': utils.calculateRequestOpcode_1('Repay')
@@ -446,11 +497,13 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
             reserveData.totalBorrow -= scaledBorrowAmount;
             self.reservesData.set(matchedReserve!!, reserveData);
 
-            self.updateUserAccountPosition(msg.from, matchedReserve!!, 0, -scaledBorrowAmount);
+            let selfConsumption: Int = self.SUPPLY_REPAY_GAS_CONSUMPTION + ctx.readForwardFee();
+            let remainingValue: Int = self.remainingValue(ctx.value, selfConsumption);
+            self.updateUserAccountPosition(msg.from, matchedReserve!!, 0, -scaledBorrowAmount, remainingValue);
         }
     }
 
-    fun updateUserAccountPosition(ownerAddress: Address, reserveAddress: Address, supply: Int, borrow: Int) {
+    fun updateUserAccountPosition(ownerAddress: Address, reserveAddress: Address, supply: Int, borrow: Int, msgValue: Int) {
         let queryId: Int = self.queryId;
         let userAccountInit: StateInit = self.getUserAccountInit(ownerAddress);
         let userAccountAddress: Address = contractAddress(userAccountInit);
@@ -471,9 +524,9 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
         
         send(SendParameters{
             to: userAccountAddress,
-            value: 0,
+            value: msgValue,
             bounce: true,
-            mode: SendRemainingValue,
+            mode: SendPayGasSeparately,
             body: msg.toCell(),
             code: userAccountInit.code,
             data: userAccountInit.data
