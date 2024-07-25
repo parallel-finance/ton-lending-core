@@ -11,8 +11,9 @@ import "./types/message";
 import "./libraries/logic/reserve-logic";
 import "./constants";
 import "./pool-view";
+import "./pool-configurator";
 
-contract Pool with Deployable, Ownable, Resumable, PoolView {
+contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
     const MIN_TONS_FOR_STORAGE: Int = ton("0.03");
     const TOKEN_TRANSFER_GAS_CONSUMPTION: Int = ton("0.05");
     const TOKEN_MINT_GAS_CONSUMPTION: Int = ton("0.05");
@@ -170,8 +171,8 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
         let healthInfo: UserAccountHealthInfo = self.validateForAction(msg);
 
         let reserveData: ReserveData = self.reservesData.get(reserveAddress)!!;
-        let reserveConfigration: ReserveConfiguration = self.reservesConfiguration.get(reserveAddress)!!;
-        let reserveCache: ReserveCache = reserveData.cache(reserveConfigration);
+        let reserveConfiguration: ReserveConfiguration = self.reservesConfiguration.get(reserveAddress)!!;
+        let reserveCache: ReserveCache = reserveData.cache(reserveConfiguration);
         // _updateIndexes and _accrueToTreasury
         reserveCache = reserveData.updateState(reserveCache);
 
@@ -194,7 +195,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
             let remainingValue: Int = self.remainingValue(ctx.value, selfConsumption);
             self.updateUserAccountPosition(msg.user, msg.tokenAddress, 0, scaledBorrowAmount, remainingValue);
             // Transfer borrowAmount Token(tokenAddress) to the user.
-            let poolWalletAddress: Address = reserveConfigration.poolWalletAddress;
+            let poolWalletAddress: Address = reserveConfiguration.poolWalletAddress;
             self.sendTokenTransferByPool(poolWalletAddress, msg.user, borrowAmount);
         }
 
@@ -214,7 +215,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
             self.updateUserAccountPosition(msg.user, msg.tokenAddress, -scaledWithdrawAmount, 0, remainingValue);
 
             // Transfer withdrawAmount Token(tokenAddress) to the user.
-            let poolWalletAddress: Address = reserveConfigration.poolWalletAddress;
+            let poolWalletAddress: Address = reserveConfiguration.poolWalletAddress;
             self.sendTokenTransferByPool(poolWalletAddress, msg.user, withdrawAmount);
         }
 
@@ -233,7 +234,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
 
             // fetch collateral ReserveData and ReserveConfiguration
             let collateralReserveData: ReserveData = self.reservesData.get(collateralReserve)!!;
-            let collateralReserveConfigration: ReserveConfiguration = self.reservesConfiguration.get(collateralReserve)!!;
+            let collateralReserveConfiguration: ReserveConfiguration = self.reservesConfiguration.get(collateralReserve)!!;
             // calculate collateral nextLiquidityIndex
             let collateralNextLiquidityIndex: Int = collateralReserveData.getNormalizedIncome();
 
@@ -247,44 +248,47 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
             // calculate user collateral amount
             let userCollateral: Int = userCollateralPosition!!.supply.rayMul(collateralNextLiquidityIndex);
 
+            let collateralUint: Int = pow(10, collateralReserveConfiguration.decimals);
+            let debtUint: Int = pow(10, reserveConfiguration.decimals);
+            
             // calculate the max collateral amount based on the actualLiquidationAmount
             let maxCollateralToLiquidate: Int = (
-                reserveData.price * actualLiquidationAmount / collateralReserveData.price
-            ).percentMul(collateralReserveConfigration.liquidationBonus);
+                (reserveData.price * actualLiquidationAmount * collateralUint) / (collateralReserveData.price * debtUint)
+            ).percentMul(collateralReserveConfiguration.liquidationBonus);
 
             // if user collateral amount can't cover `maxCollateralToLiquidate`, calculate the actualLiquidationAmount based on the user collateral
             let actualCollateralToLiquidate: Int = 0;
             if (maxCollateralToLiquidate > userCollateral) {
                 actualCollateralToLiquidate = userCollateral;
                 actualLiquidationAmount = (
-                    collateralReserveData.price * actualCollateralToLiquidate / reserveData.price
-                ).percentDiv(collateralReserveConfigration.liquidationBonus);
+                    (collateralReserveData.price * actualCollateralToLiquidate * debtUint) / (reserveData.price * collateralUint)
+                ).percentDiv(collateralReserveConfiguration.liquidationBonus);
             } else {
                 actualCollateralToLiquidate = maxCollateralToLiquidate;
             }
 
-            // calculate the liquidation protocol fee = liquidation Bouns * configration.liquidationProtocolFee
+            // calculate the liquidation protocol fee = liquidation Bouns * configuration.liquidationProtocolFee
             let liquidationFee: Int = 0;
-            if (collateralReserveConfigration.liquidationProtocolFee != 0) {
-                let bonusCollateral: Int = actualCollateralToLiquidate -
-                    actualCollateralToLiquidate.percentDiv(collateralReserveConfigration.liquidationBonus);
-                liquidationFee = bonusCollateral.percentMul(collateralReserveConfigration.liquidationProtocolFee);
+            if (collateralReserveConfiguration.liquidationProtocolFee != 0) {
+                let bonusCollateral: Int = actualCollateralToLiquidate - 
+                    actualCollateralToLiquidate.percentDiv(collateralReserveConfiguration.liquidationBonus);
+                liquidationFee = bonusCollateral.percentMul(collateralReserveConfiguration.liquidationProtocolFee);
                 // actualCollateralToLiquidate = actualCollateralToLiquidate - liquidationFee;
             }
 
             // Transfer collateral Token to the liquidator.
-            let poolWalletAddress: Address = collateralReserveConfigration.poolWalletAddress;
+            let poolWalletAddress: Address = collateralReserveConfiguration.poolWalletAddress;
             self.sendTokenTransferByPool(poolWalletAddress, liquidator, actualCollateralToLiquidate - liquidationFee);
             // Transfer collateral Token to the reserve treasury.
-            self.sendTokenTransferByPool(poolWalletAddress, collateralReserveConfigration.treasury, liquidationFee);
-
+            self.sendTokenTransferByPool(poolWalletAddress, collateralReserveConfiguration.treasury, liquidationFee);
+            
             // update user debt token position and burn dToken
             let scaledLiquidationAmount: Int = actualLiquidationAmount.rayDiv(reserveCache.nextBorrowIndex);
             reserveData.totalBorrow -= scaledLiquidationAmount;
             reserveCache.nextScaledDebt = reserveData.totalBorrow;
 
-            reserveData.updateInterestRates(reserveCache, rateStrategy, 0, -actualLiquidationAmount);
-
+            reserveData.updateInterestRates(reserveCache, rateStrategy, actualLiquidationAmount, 0);
+            
             reserveData.availableLiquidity += actualLiquidationAmount;
             self.reservesData.set(reserveAddress, reserveData);
 
@@ -294,10 +298,10 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
 
             // update user collateral token position and burn aToken
             collateralReserveData = self.reservesData.get(collateralReserve)!!;
-            let collateralReserveCache: ReserveCache = collateralReserveData.cache(collateralReserveConfigration);
+            let collateralReserveCache: ReserveCache = collateralReserveData.cache(collateralReserveConfiguration);
 
             collateralReserveCache = collateralReserveData.updateState(collateralReserveCache);
-            collateralReserveData.updateInterestRates(collateralReserveCache, rateStrategy, -actualCollateralToLiquidate, 0);
+            collateralReserveData.updateInterestRates(collateralReserveCache, rateStrategy, 0, actualCollateralToLiquidate);
 
             let scaledCollateralAmount: Int = actualCollateralToLiquidate.rayDiv(collateralReserveCache.nextLiquidityIndex);
             collateralReserveData.availableLiquidity -= actualCollateralToLiquidate;
@@ -306,13 +310,6 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
 
             self.updateUserAccountPosition(msg.user, collateralReserve, -scaledCollateralAmount, 0, remainingValue / 2);
         }
-    }
-
-    // Notice: Only for Test
-    receive(msg: SetMockOraclePrice) {
-        let reserveData: ReserveData = self.reservesData.get(msg.asset)!!;
-        reserveData.price = msg.price;
-        self.reservesData.set(msg.asset, reserveData);
     }
 
     receive(msg: TokenExcesses) {
@@ -426,19 +423,20 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
 
         let healthInfo: UserAccountHealthInfo = self.userAccountHealthInfo(userAccountData);
         let reserveData: ReserveData = self.reservesData.get(reserve)!!;
-        let reserveConfigration: ReserveConfiguration = self.reservesConfiguration.get(reserve)!!;
+        let reserveConfiguration: ReserveConfiguration = self.reservesConfiguration.get(reserve)!!;
         if (msg.action == ACTION_BORROW) {
             // 1. check borrowingEnabled
             // 2. check reserve isActive / isFrozen
             // 3. check reserve availableLiquidity
             // 4. check HF for borrow
-            require(reserveConfigration.borrowingEnabled, "Borrowing disable for this token");
-            require(reserveConfigration.isActive, "Token inactive");
-            require(!reserveConfigration.isFrozen, "Token Frozen");
+            require(reserveConfiguration.borrowingEnabled, "Borrowing disable for this token");
+            require(reserveConfiguration.isActive, "Token inactive");
+            require(!reserveConfiguration.isFrozen, "Token Frozen");
             require(reserveData.availableLiquidity >= amount, "invalid available liquidity");
 
             require(healthInfo.healthFactorInRay >= RAY, "HF < 1");
-            let borrowAmountValue: Int = amount * reserveData.price / JETTON_UNIT;
+            let reserveUint: Int = pow(10, reserveConfiguration.decimals);
+            let borrowAmountValue: Int = amount * reserveData.price / reserveUint;
             let collateralNeeded: Int = borrowAmountValue.percentDiv(healthInfo.avgLtv);
             require(healthInfo.totalDebtInBaseCurrency + collateralNeeded <= healthInfo.totalCollateralInBaseCurrency, "collateral can't cover new borrow");
         }
@@ -447,7 +445,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
             // 2. check reserve availableLiquidity
             // 3. check withdraw amount <= supply position
             // 4. check HF
-            require(reserveConfigration.isActive, "Token inactive");
+            require(reserveConfiguration.isActive, "Token inactive");
             require(reserveData.availableLiquidity >= amount, "invalid available liquidity");
 
             let userReservePosition: TokenData = userAccountData.positionsDetail.get(reserve)!!;
@@ -455,8 +453,9 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
             require(userReservePosition.supply.rayMul(normalizedIncome) >= amount, "invalid user supply position");
 
             require(healthInfo.healthFactorInRay >= RAY, "HF < 1");
-            let withdrawValue: Int = amount * reserveData.price / JETTON_UNIT;
-            let withdrawValueMulLT: Int = withdrawValue.percentMul(reserveConfigration.liquidationThreshold);
+            let reserveUint: Int = pow(10, reserveConfiguration.decimals);
+            let withdrawValue: Int = amount * reserveData.price / reserveUint;
+            let withdrawValueMulLT: Int = withdrawValue.percentMul(reserveConfiguration.liquidationThreshold);
             let totalCollateralMulLT: Int = healthInfo.totalCollateralInBaseCurrency.percentMul(healthInfo.avgLiquidationThreshold);
             require(totalCollateralMulLT - withdrawValueMulLT >= healthInfo.totalDebtInBaseCurrency, "the left collateral can't cover debt");
         }
@@ -464,14 +463,14 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
             require(healthInfo.healthFactorInRay < RAY, "HF >= 1");
             let liquidation: Liquidation = self.liquidationMsg.get(msg.queryId)!!;
             let collateralReserve: Address = liquidation.collateralReserve;
-            let collateralReserveConfigration: ReserveConfiguration = self.reservesConfiguration.get(collateralReserve)!!;
+            let collateralReserveConfiguration: ReserveConfiguration = self.reservesConfiguration.get(collateralReserve)!!;
             let userCollateralPosition: TokenData = userAccountData.positionsDetail.get(collateralReserve)!!;
             require(
-                userCollateralPosition.asCollateral &&
-                collateralReserveConfigration.liquidationThreshold != 0,
+                userCollateralPosition.asCollateral && 
+                collateralReserveConfiguration.liquidationThreshold != 0, 
                 "collateral can't be liquidated"
             );
-            require(collateralReserveConfigration.isActive && reserveConfigration.isActive, "reserve isn not active");
+            require(collateralReserveConfiguration.isActive && reserveConfiguration.isActive, "reserve isn not active");
         }
 
         return healthInfo;
@@ -593,8 +592,8 @@ contract Pool with Deployable, Ownable, Resumable, PoolView {
         let forwardPayload: Slice = msg.forward_payload;
         let opCode: Int = forwardPayload.loadUint(32);
         let reserveData: ReserveData = self.reserveData(matchedReserve!!);
-        let reserveConfigration: ReserveConfiguration = self.reservesConfiguration.get(matchedReserve!!)!!;
-        let reserveCache: ReserveCache = reserveData.cache(reserveConfigration);
+        let reserveConfiguration: ReserveConfiguration = self.reservesConfiguration.get(matchedReserve!!)!!;
+        let reserveCache: ReserveCache = reserveData.cache(reserveConfiguration);
         // _updateIndexes and _accrueToTreasury
         reserveCache = reserveData.updateState(reserveCache);
 
