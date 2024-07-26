@@ -491,8 +491,8 @@ describe('Pool liquidation test', () => {
 
     it('supply jetton1, borrow jetton2, closeFactor: 100%', async () => {
         // provide liquidity
-        await supply(secondUser.getSender(), sampleJetton1, toNano('10000'));
-        await supply(secondUser.getSender(), sampleJetton2, toNano('10000'));
+        await supply(secondUser.getSender(), sampleJetton1, 10000n * 10n ** reserveConfiguration1.decimals);
+        await supply(secondUser.getSender(), sampleJetton2, 10000n * 10n ** reserveConfiguration2.decimals);
 
         // borrower supply jetton1 and borrow jetton2
         const borrower = deployer;
@@ -751,8 +751,8 @@ describe('Pool liquidation test', () => {
 
     it('supply jetton1, borrow jetton2, closeFactor: 50%', async () => {
         // provide liquidity
-        await supply(secondUser.getSender(), sampleJetton1, toNano('10000'));
-        await supply(secondUser.getSender(), sampleJetton2, toNano('10000'));
+        await supply(secondUser.getSender(), sampleJetton1, 10000n * 10n ** reserveConfiguration1.decimals);
+        await supply(secondUser.getSender(), sampleJetton2, 10000n * 10n ** reserveConfiguration2.decimals);
 
         // borrower supply jetton1 and borrow jetton2
         const borrower = deployer;
@@ -1010,8 +1010,8 @@ describe('Pool liquidation test', () => {
     });
     it('supply jetton1, borrow jetton1, closeFactor: 50%', async () => {
         // provide liquidity
-        await supply(secondUser.getSender(), sampleJetton1, toNano('10000'));
-        await supply(secondUser.getSender(), sampleJetton2, toNano('10000'));
+        await supply(secondUser.getSender(), sampleJetton1, 10000n * 10n ** reserveConfiguration1.decimals);
+        await supply(secondUser.getSender(), sampleJetton2, 10000n * 10n ** reserveConfiguration2.decimals);
 
         // borrower supply jetton1 and borrow jetton1
         const borrower = deployer;
@@ -1277,8 +1277,8 @@ describe('Pool liquidation test', () => {
     });
     it('supply jetton1, borrow jetton1, closeFactor: 100%', async () => {
         // provide liquidity
-        await supply(secondUser.getSender(), sampleJetton1, toNano('10000'));
-        await supply(secondUser.getSender(), sampleJetton2, toNano('10000'));
+        await supply(secondUser.getSender(), sampleJetton1, 10000n * 10n ** reserveConfiguration1.decimals);
+        await supply(secondUser.getSender(), sampleJetton2, 10000n * 10n ** reserveConfiguration2.decimals);
 
         // borrower supply jetton1 and borrow jetton1
         const borrower = deployer;

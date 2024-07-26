@@ -212,6 +212,12 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
 
         if(msg.action == ACTION_WITHDRAW) {
             let withdrawAmount: Int = msg.amount;
+            let userReservePosition: TokenData = msg.accountData.positionsDetail.get(reserveAddress)!!;
+            let userSupplyPosition: Int = userReservePosition.supply.rayMul(reserveCache.nextLiquidityIndex);
+            if (withdrawAmount == UINT256_MAX) {
+                withdrawAmount = userSupplyPosition;
+            }
+
             // updateInterestRates
             reserveData.updateInterestRates(reserveCache, rateStrategy, 0, withdrawAmount);
             // update (scaled) total supply and available liquidity
@@ -459,15 +465,24 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
             // 3. check withdraw amount <= supply position
             // 4. check HF
             require(reserveConfiguration.isActive, "Token inactive");
-            require(reserveData.availableLiquidity >= amount, "invalid available liquidity");
+            let withdrawAmount: Int = amount;
 
-            let userReservePosition: TokenData = userAccountData.positionsDetail.get(reserve)!!;
+            let userReservePosition: TokenData? = userAccountData.positionsDetail.get(reserve);
+            require(userReservePosition != null && userReservePosition!!.supply != 0, "zero supply position");
+
             let normalizedIncome: Int = reserveData.getNormalizedIncome();
-            require(userReservePosition.supply.rayMul(normalizedIncome) >= amount, "invalid user supply position");
+            let userSupplyPosition: Int = userReservePosition!!.supply.rayMul(normalizedIncome);
+
+            if (amount == UINT256_MAX) {
+                withdrawAmount = userSupplyPosition;
+            }
+            require(reserveData.availableLiquidity >= withdrawAmount, "invalid available liquidity");
+            require(reserveData.totalSupply.rayMul(normalizedIncome) >= withdrawAmount, "scaled totalSupply overflow");
+            require(userSupplyPosition >= withdrawAmount, "invalid user supply position");
 
             require(healthInfo.healthFactorInRay >= RAY, "HF < 1");
             let reserveUint: Int = pow(10, reserveConfiguration.decimals);
-            let withdrawValue: Int = amount * reserveData.price / reserveUint;
+            let withdrawValue: Int = withdrawAmount * reserveData.price / reserveUint;
             let withdrawValueMulLT: Int = withdrawValue.percentMul(reserveConfiguration.liquidationThreshold);
             let totalCollateralMulLT: Int = healthInfo.totalCollateralInBaseCurrency.percentMul(healthInfo.avgLiquidationThreshold);
             require(totalCollateralMulLT - withdrawValueMulLT >= healthInfo.totalDebtInBaseCurrency, "the left collateral can't cover debt");
@@ -591,6 +606,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
 
 
     fun processTokenNotification(msg: TokenNotification) {
+        self.requireNotStopped();
         let matchedReserve: Address? = self.findReserveByPoolWalletAddress(context().sender);
         require(matchedReserve != null, "Reserve not found");
 
@@ -613,7 +629,15 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
         // use crc32 code of 'Supply': utils.calculateRequestOpcode_1('Supply')
         if (opCode == 0x55b591ba) {
             let supplyAmount: Int = msg.amount;
-            // TODO: validateSupply
+            require(supplyAmount > 0, "amount zero");
+            require(reserveConfiguration.isActive, "Token inactive");
+            require(!reserveConfiguration.isFrozen, "Token Frozen");
+            let reserveUint: Int = pow(10, reserveConfiguration.decimals);
+            require(
+                reserveConfiguration.supplyCap == 0 ||
+                supplyAmount + reserveData.totalSupply.rayMul(reserveCache.nextLiquidityIndex) <= reserveConfiguration.supplyCap * reserveUint,
+                "Supply cap is exceeded"
+            );
 
             // updateInterestRates
             let rateStrategy: ReserveInterestRateStrategy = self.reserveInterestRateStrategy.get(matchedReserve!!)!!;
