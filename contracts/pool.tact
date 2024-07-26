@@ -102,6 +102,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
     }
 
     receive(msg: BorrowToken) {
+        self.requireNotStopped();
         let reserveAddress: Address = msg.tokenAddress;
         let optionalReserveConfiguration: ReserveConfiguration? = self.reservesConfiguration.get(reserveAddress);
         require(optionalReserveConfiguration != null, "Reserve not supported");
@@ -133,6 +134,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
     }
 
     receive(msg: WithdrawToken) {
+        self.requireNotStopped();
         let reserveAddress: Address = msg.tokenAddress;
         let optionalReserveConfiguration: ReserveConfiguration? = self.reservesConfiguration.get(reserveAddress);
         require(optionalReserveConfiguration != null, "Reserve not supported");
@@ -340,6 +342,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
     }
 
     receive(msg: SupplyTon) {
+        self.requireNotStopped();
         let reserveAddress: Address = myAddress();
         let optionalReserveData: ReserveData? = self.reserveData(reserveAddress);
         require(optionalReserveData != null, "Reserve not supported");
@@ -352,13 +355,21 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
         let totalFee: Int = fwdFee + storageFee + computationAndActionFee;
         require(ctx.value > totalFee + msg.amount, "Insufficient fee");
 
-        let reserveConfigration: ReserveConfiguration = self.reservesConfiguration.get(reserveAddress)!!;
-        let reserveCache: ReserveCache = reserveData.cache(reserveConfigration);
+        let reserveConfiguration: ReserveConfiguration = self.reservesConfiguration.get(reserveAddress)!!;
+        let reserveCache: ReserveCache = reserveData.cache(reserveConfiguration);
         // _updateIndexes and _accrueToTreasury
         reserveCache = reserveData.updateState(reserveCache);
 
         let supplyAmount: Int = msg.amount;
-        // TODO: validateSupply
+        require(supplyAmount > 0, "amount zero");
+        require(reserveConfiguration.isActive, "Token inactive");
+        require(!reserveConfiguration.isFrozen, "Token Frozen");
+        let reserveUint: Int = pow(10, reserveConfiguration.decimals);
+        require(
+            reserveConfiguration.supplyCap == 0 ||
+            supplyAmount + reserveData.totalSupply.rayMul(reserveCache.nextLiquidityIndex) <= reserveConfiguration.supplyCap * reserveUint,
+            "Supply cap is exceeded"
+        );
 
         // updateInterestRates
         let rateStrategy: ReserveInterestRateStrategy = self.reserveInterestRateStrategy.get(reserveAddress)!!;
@@ -374,6 +385,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
     }
 
     receive(msg: BorrowTon) {
+        self.requireNotStopped();
         let reserveAddress: Address = myAddress();
         let optionalReserveData: ReserveData? = self.reserveData(reserveAddress);
         require(optionalReserveData != null, "Reserve not supported");
