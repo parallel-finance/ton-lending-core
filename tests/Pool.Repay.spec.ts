@@ -50,7 +50,7 @@ describe('Pool', () => {
     });
 
     describe('Repay', () => {
-        it('should repay successfully', async () => {
+        it('should repay jetton successfully', async () => {
             const userWalletAddress = await sampleJetton.getGetWalletAddress(deployer.address);
             const userJettonDefaultWallet = blockchain.openContract(JettonDefaultWallet.fromAddress(userWalletAddress));
             const poolWalletAddress = await sampleJetton.getGetWalletAddress(pool.address);
@@ -154,6 +154,78 @@ describe('Pool', () => {
 
             const totalTransactionFee = sumTransactionsFee(result.transactions);
             expect(totalTransactionFee).toBeLessThanOrEqual(0.1);
+        });
+
+        it('should repay max ton successfully', async () => {
+            await addReserve(pool, deployer, pool.address, pool.address);
+
+            const supplyAmount = toNano(100);
+            // Supply Ton first to add liquidity
+            await pool.send(
+                deployer.getSender(),
+                {
+                    value: toNano('100.25'),
+                },
+                {
+                    $$type: 'SupplyTon',
+                    amount: supplyAmount,
+                },
+            );
+            // Borrow Ton
+            const borrowAmount = toNano(50);
+            await pool.send(
+                deployer.getSender(),
+                {
+                    value: toNano('0.4'),
+                },
+                {
+                    $$type: 'BorrowTon',
+                    amount: borrowAmount,
+                },
+            );
+            // Check user account data
+            const userAccountContract = blockchain.openContract(
+                await UserAccount.fromInit(pool.address, deployer.address),
+            );
+            const userAccountAddress = userAccountContract.address;
+
+            // check user account
+            let accountData = await userAccountContract.getAccount();
+            expect(accountData.positionsLength).toEqual(2n);
+            expect(accountData.positions?.get(1n)!!.equals(pool.address)).toBeTruthy();
+            expect(Number(fromNano(accountData.positionsDetail?.get(pool.address)!!.supply))).toBeCloseTo(100, 3);
+            expect(Number(fromNano(accountData.positionsDetail?.get(pool.address)!!.borrow))).toBeCloseTo(50, 3);
+
+            const result = await pool.send(
+                deployer.getSender(),
+                {
+                    value: toNano('0.4'),
+                },
+                {
+                    $$type: 'RepayTon',
+                    amount: borrowAmount,
+                },
+            );
+
+            // UpdatePosition
+            expect(result.transactions).toHaveTransaction({
+                from: pool.address,
+                to: userAccountAddress,
+                success: true,
+            });
+
+            // UserPositionUpdated
+            expect(result.transactions).toHaveTransaction({
+                from: userAccountAddress,
+                to: pool.address,
+                success: true,
+            });
+
+            accountData = await userAccountContract.getAccount();
+            expect(accountData.positionsLength).toEqual(2n);
+            expect(accountData.positions?.get(1n)!!.equals(pool.address)).toBeTruthy();
+            expect(Number(fromNano(accountData.positionsDetail?.get(pool.address)!!.supply))).toBeCloseTo(100, 3);
+            expect(Number(fromNano(accountData.positionsDetail?.get(pool.address)!!.borrow))).toBeCloseTo(0, 3);
         });
     });
 });

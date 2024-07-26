@@ -419,14 +419,15 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
         let ctx: Context = context();
         let fwdFee: Int = ctx.readForwardFee() * 5;
         let storageFee: Int = self.MIN_TONS_FOR_STORAGE;
-        let computationAndActionFee: Int = self.TOKEN_TRANSFER_GAS_CONSUMPTION + self.TOKEN_BURN_GAS_CONSUMPTION + self.BORROW_GAS_CONSUMPTION;
+        // TODO: TON transfer is cheaper than token transfer
+        let computationAndActionFee: Int = self.TOKEN_TRANSFER_GAS_CONSUMPTION + self.TOKEN_BURN_GAS_CONSUMPTION + self.WITHDRAW_GAS_CONSUMPTION;
         let totalFee: Int = fwdFee + storageFee + computationAndActionFee;
         require(ctx.value > totalFee, "Insufficient fee");
 
         // send message to get user account data
         let userAccountAddress: Address = self.userAccountAddress(sender());
 
-        let remainingValue: Int = self.remainingValue(ctx.value, self.BORROW_GAS_CONSUMPTION + ctx.readForwardFee());
+        let remainingValue: Int = self.remainingValue(ctx.value, self.WITHDRAW_GAS_CONSUMPTION + ctx.readForwardFee());
         // GetUserAccountData don'tSendRemainingValue need to handle bounce
         send(SendParameters{
             to: userAccountAddress,
@@ -442,6 +443,41 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
             }.toCell()
         });
         self.queryId += 1;
+    }
+
+    receive(msg: RepayTon) {
+        let reserveAddress: Address = myAddress();
+        let optionalReserveData: ReserveData? = self.reserveData(reserveAddress);
+        require(optionalReserveData != null, "Reserve not supported");
+        let reserveData: ReserveData = optionalReserveData!!;
+
+        let ctx: Context = context();
+        let fwdFee: Int = ctx.readForwardFee() * 5;
+        let storageFee: Int = self.MIN_TONS_FOR_STORAGE;
+        let computationAndActionFee: Int = self.TOKEN_BURN_GAS_CONSUMPTION + self.SUPPLY_REPAY_GAS_CONSUMPTION;
+        let totalFee: Int = fwdFee + storageFee + computationAndActionFee;
+        require(ctx.value > totalFee, "Insufficient fee");
+
+        let reserveConfigration: ReserveConfiguration = self.reservesConfiguration.get(reserveAddress)!!;
+        let reserveCache: ReserveCache = reserveData.cache(reserveConfigration);
+        // _updateIndexes and _accrueToTreasury
+        reserveCache = reserveData.updateState(reserveCache);
+
+        let repayAmount: Int = msg.amount;
+        // TODO: validate repay
+
+        // updateInterestRates
+        let rateStrategy: ReserveInterestRateStrategy = self.reserveInterestRateStrategy.get(reserveAddress)!!;
+        reserveData.updateInterestRates(reserveCache, rateStrategy, repayAmount, 0);
+        // update liquidity and set reserveData to storage back;
+        let scaledBorrowAmount: Int = repayAmount.rayDiv(reserveCache.nextBorrowIndex);
+        reserveData.availableLiquidity += repayAmount;
+        reserveData.totalBorrow -= scaledBorrowAmount;
+        self.reservesData.set(reserveAddress, reserveData);
+
+        let selfConsumption: Int = self.SUPPLY_REPAY_GAS_CONSUMPTION + ctx.readForwardFee();
+        let remainingValue: Int = self.remainingValue(ctx.value, selfConsumption);
+        self.updateUserAccountPosition(ctx.sender, reserveAddress, 0, -scaledBorrowAmount, remainingValue);
     }
 
     fun remainingValue(value: Int, selfConsumption: Int): Int {
