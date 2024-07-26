@@ -282,7 +282,7 @@ describe('Pool', () => {
             const result = await pool.send(
                 deployer.getSender(),
                 {
-                    value: toNano('100.25'),
+                    value: toNano('0.4'),
                 },
                 {
                     $$type: 'BorrowTon',
@@ -317,7 +317,7 @@ describe('Pool', () => {
             expect(Number(fromNano(accountData.positionsDetail?.get(pool.address)!!.borrow))).toBeCloseTo(50, 3);
             expect(accountData.positionsDetail?.get(pool.address)!!.asCollateral).toBeTruthy();
         });
-    })
+    });
 
     it('should bounce if the borrowed asset is not configured for borrowing', async () => {
         const result = await pool.send(

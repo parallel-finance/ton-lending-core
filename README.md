@@ -65,3 +65,54 @@ The liquidator can perform the following actions:
 ## Release
 
 - Before deploying to the mainnet, make sure to update the compiler 
+
+## Development
+
+### Deploying the contracts and preparing the environment
+
+We are using pnpm and use p as the pnpm alias. If you are using npm or yarn, you can replace p with npm or yarn.
+
+1. Install the dependencies
+
+```bash
+p install
+``` 
+2. Build the contracts
+
+```bash
+p build:all
+```
+
+3. Deploy the pool
+
+```bash
+p start deployPool
+```
+
+4. Add reserves
+
+It will use the deployed tokens as the reserve    
+```bash
+p start addReserve
+p start setOraclePrice
+```
+
+5. Mint test tokens
+You can add the jettonAddress after the command or input it when prompted
+```bash
+p start mintJetton ${jettonAddress}
+```
+
+6. Play with pool
+```bash
+p start supplyJetton
+p start borrowJetton
+p start repayJetton
+p start withdrawJetton
+
+p start supplyTon
+p start borrowTon
+```
+
+
+

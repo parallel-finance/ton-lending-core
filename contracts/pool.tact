@@ -196,7 +196,18 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
             self.updateUserAccountPosition(msg.user, msg.tokenAddress, 0, scaledBorrowAmount, remainingValue);
             // Transfer borrowAmount Token(tokenAddress) to the user.
             let poolWalletAddress: Address = reserveConfiguration.poolWalletAddress;
-            self.sendTokenTransferByPool(poolWalletAddress, msg.user, borrowAmount);
+            if (poolWalletAddress == myAddress()) {
+                // The ton received should be borrowAmount + remaining value
+                send(SendParameters{
+                    to: msg.user,
+                    value: borrowAmount,
+                    bounce: false,
+                    mode: SendRemainingValue,
+                    body: emptyCell(),
+                });
+            } else {
+                self.sendTokenTransferByPool(poolWalletAddress, msg.user, borrowAmount);
+            }
         }
 
         if(msg.action == ACTION_WITHDRAW) {
@@ -370,12 +381,14 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
 
         // send message to get user account data
         let userAccountAddress: Address = self.userAccountAddress(sender());
-        // GetUserAccountData don't need to handle bounce
+
+        let remainingValue: Int = self.remainingValue(ctx.value, self.BORROW_GAS_CONSUMPTION + ctx.readForwardFee());
+        // GetUserAccountData don'tSendRemainingValue need to handle bounce
         send(SendParameters{
             to: userAccountAddress,
-            value: 0,
+            value: remainingValue,
             bounce: false,
-            mode: SendRemainingValue,
+            mode: SendPayGasSeparately,
             body: GetUserAccountData{
                 queryId: self.queryId,
                 user: sender(),
