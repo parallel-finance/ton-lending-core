@@ -118,6 +118,18 @@ describe('Pool', () => {
             const userAccountAddress = await UserAccount.fromInit(pool.address, deployer.address);
             const userAccountContract = blockchain.openContract(userAccountAddress);
 
+            // GetUserAccountData
+            expect(result.transactions).toHaveTransaction({
+                from: pool.address,
+                to: userAccountAddress.address,
+                success: true,
+            });
+            // UserAccountDataResponse
+            expect(result.transactions).toHaveTransaction({
+                from: userAccountAddress.address,
+                to: pool.address,
+                success: true,
+            });
             // Update UserAccountData
             expect(result.transactions).toHaveTransaction({
                 from: pool.address,
