@@ -31,4 +31,5 @@ export async function run(provider: NetworkProvider) {
     await setMockPrice(provider, pool, 'EQBvOgGXLdZOysRTnw2UDc_KRwcD5HLVH139DZ3AnK04LcxH', toNano('0.016'));
     await setMockPrice(provider, pool, 'EQD8-IT-fOEuBqY5bG_NY3lcZTKnnKv-7_UuILidV2eCa4W-', toNano('7.16'));
     await setMockPrice(provider, pool, 'EQColXOG7C2X8x0ZFT-3Ot5sYknz-JbLnJzI1eVNldQlX2Bu', toNano('1'));
+    await setMockPrice(provider, pool, pool.address.toString(), toNano('6.58'));
 }

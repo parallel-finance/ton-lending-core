@@ -6,18 +6,32 @@ import { buildOnchainMetadata, JettonMetaData } from './utils';
 
 const RAY = 10n ** 27n;
 
-const addReserve = async (
+const addJettonReserve = async (
     provider: NetworkProvider,
     pool: OpenedContract<Pool>,
     reserveAddress: Address,
     aTokenJettonParams: JettonMetaData,
     dTokenJettonParams: JettonMetaData,
     targetReserveLength: bigint,
+    decimals: bigint = 9n,
 ) => {
     await sleep(1000);
     const jetton = provider.open(SampleJetton.fromAddress(reserveAddress));
     const poolWalletAddress = await jetton.getGetWalletAddress(pool.address);
 
+    await addReserve(provider, pool, poolWalletAddress, reserveAddress, aTokenJettonParams, dTokenJettonParams, targetReserveLength, decimals);
+};
+
+const addReserve = async (
+    provider: NetworkProvider,
+    pool: OpenedContract<Pool>,
+    poolWalletAddress: Address,
+    reserveAddress: Address,
+    aTokenJettonParams: JettonMetaData,
+    dTokenJettonParams: JettonMetaData,
+    targetReserveLength: bigint,
+    decimals: bigint = 9n,
+) => {
     const aTokenContent = buildOnchainMetadata(aTokenJettonParams);
     const dTokenContent = buildOnchainMetadata(dTokenJettonParams);
     const contents: ATokenDTokenContents = {
@@ -26,11 +40,11 @@ const addReserve = async (
         dTokenContent,
     };
 
-    const aTokenAddress = await pool.getCalculateATokenAddress(contents.aTokenContent, jetton.address);
+    const aTokenAddress = await pool.getCalculateATokenAddress(contents.aTokenContent, reserveAddress);
     await sleep(2000);
     console.log(`aTokenAddress: ${aTokenAddress.toString()}`);
 
-    const dTokenAddress = await pool.getCalculateDTokenAddress(contents.dTokenContent, jetton.address);
+    const dTokenAddress = await pool.getCalculateDTokenAddress(contents.dTokenContent, reserveAddress);
     await sleep(2000);
     console.log(`dTokenAddress: ${dTokenAddress.toString()}`);
 
@@ -50,6 +64,8 @@ const addReserve = async (
         borrowingEnabled: true,
         supplyCap: toNano(1000000n),
         borrowCap: toNano(1000000n),
+        treasury: provider.sender().address!!,
+        decimals,
     };
 
     const reserveInterestRateStrategy: ReserveInterestRateStrategy = {
@@ -103,7 +119,7 @@ const addMasReserve = async (provider: NetworkProvider, pool: OpenedContract<Poo
         image: 'https://ipfs.io/ipfs/bafybeicn7i3soqdgr7dwnrwytgq4zxy7a5jpkizrvhm5mv6bgjd32wm3q4/welcome-to-IPFS.jpg',
         symbol: 'dMAS',
     };
-    await addReserve(
+    await addJettonReserve(
         provider,
         pool,
         address('EQBe9prUeNqHJHRw4YWDZhXI91kiGaGTTHuCWIaY975Uw2AU'),
@@ -130,7 +146,7 @@ const addNotCoinReserve = async (provider: NetworkProvider, pool: OpenedContract
         symbol: 'dNOT',
     };
 
-    await addReserve(
+    await addJettonReserve(
         provider,
         pool,
         address('EQD8-IT-fOEuBqY5bG_NY3lcZTKnnKv-7_UuILidV2eCa4W-'),
@@ -157,7 +173,7 @@ const addProxyTonReserve = async (provider: NetworkProvider, pool: OpenedContrac
         symbol: 'dpTON',
     };
 
-    await addReserve(
+    await addJettonReserve(
         provider,
         pool,
         address('EQBvOgGXLdZOysRTnw2UDc_KRwcD5HLVH139DZ3AnK04LcxH'),
@@ -184,14 +200,35 @@ const addUSDTReserve = async (provider: NetworkProvider, pool: OpenedContract<Po
         symbol: 'dUSDT',
     };
 
-    await addReserve(
+    await addJettonReserve(
         provider,
         pool,
         address('EQColXOG7C2X8x0ZFT-3Ot5sYknz-JbLnJzI1eVNldQlX2Bu'),
         aTokenJettonParams,
         dTokenJettonParams,
         4n,
+        6n,
     );
+};
+
+const addTonReserve = async (provider: NetworkProvider, pool: OpenedContract<Pool>) => {
+    const aTokenJettonParams = {
+        name: 'Ton aToken',
+        description: 'Ton aToken',
+        decimals: '9',
+        image: 'https://cache.tonapi.io/imgproxy/X7T-fLahBBVIxXacXAqrsCHIgFgTQE3Jt2HAdnc5_Mc/rs:fill:200:200:1/g:no/aHR0cHM6Ly9zdGF0aWMuc3Rvbi5maS9sb2dvL3Rvbl9zeW1ib2wucG5n.webp',
+        symbol: 'aTON',
+    };
+
+    const dTokenJettonParams = {
+        name: 'Ton dToken',
+        description: 'Ton dToken',
+        decimals: '9',
+        image: 'https://cache.tonapi.io/imgproxy/X7T-fLahBBVIxXacXAqrsCHIgFgTQE3Jt2HAdnc5_Mc/rs:fill:200:200:1/g:no/aHR0cHM6Ly9zdGF0aWMuc3Rvbi5maS9sb2dvL3Rvbl9zeW1ib2wucG5n.webp',
+        symbol: 'dTON',
+    };
+
+    await addReserve(provider, pool, pool.address, pool.address, aTokenJettonParams, dTokenJettonParams, 5n, 9n);
 };
 
 const printCurrentReserveLength = async (provider: NetworkProvider, pool: OpenedContract<Pool>) => {
@@ -214,6 +251,7 @@ export async function run(provider: NetworkProvider) {
     await addNotCoinReserve(provider, pool);
     await addProxyTonReserve(provider, pool);
     await addUSDTReserve(provider, pool);
+    await addTonReserve(provider, pool);
 
     await printCurrentReserveLength(provider, pool);
 }
