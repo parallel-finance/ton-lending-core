@@ -9,6 +9,7 @@ import { DTokenDefaultWallet } from '../build/DToken/tact_DTokenDefaultWallet';
 import { DToken } from '../wrappers/DToken';
 import { sumTransactionsFee } from '../jest.setup';
 import { addReserve, deployJetton, deployPool, mintJetton, supplyJetton } from './utils';
+import { sleep } from '@ton/blueprint';
 
 describe('Pool', () => {
     let blockchain: Blockchain;
@@ -80,6 +81,8 @@ describe('Pool', () => {
             expect(walletData.owner.toString()).toEqual(deployer.address.toString());
 
             const forward_payload: Cell = beginCell().storeUint(0x9c797a9, 32).endCell();
+
+            await sleep(1000);
 
             const result = await userJettonDefaultWallet.send(
                 deployer.getSender(),
@@ -153,7 +156,7 @@ describe('Pool', () => {
             );
 
             const totalTransactionFee = sumTransactionsFee(result.transactions);
-            expect(totalTransactionFee).toBeLessThanOrEqual(0.1);
+            expect(totalTransactionFee).toBeLessThanOrEqual(0.11);
         });
     });
 });

@@ -238,6 +238,28 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
             self.sendTokenTransferByPool(poolWalletAddress, msg.user, withdrawAmount);
         }
 
+        if(msg.action == ACTION_REPAY) {
+            let repayAmount: Int = msg.amount;
+            let userReservePosition: TokenData = msg.accountData.positionsDetail.get(reserveAddress)!!;
+            let userBorrowPosition: Int = userReservePosition.borrow.rayMul(reserveCache.nextBorrowIndex);
+            if (repayAmount > userBorrowPosition) {
+                repayAmount = userBorrowPosition;
+            }
+
+            // updateInterestRates
+            reserveData.updateInterestRates(reserveCache, rateStrategy, repayAmount, 0);
+            // update liquidity and set reserveData to storage back;
+            let scaledRepayAmount: Int = repayAmount.rayDiv(reserveCache.nextBorrowIndex);
+            reserveData.availableLiquidity += repayAmount;
+            require(reserveData.totalBorrow >= scaledRepayAmount, "scaled totalBorrow overflow");
+            reserveData.totalBorrow -= scaledRepayAmount;
+            self.reservesData.set(reserveAddress, reserveData);
+
+            let selfConsumption: Int = self.SUPPLY_REPAY_GAS_CONSUMPTION + ctx.readForwardFee();
+            let remainingValue: Int = self.remainingValue(ctx.value, selfConsumption);
+            self.updateUserAccountPosition(msg.user, reserveAddress, 0, -scaledRepayAmount, remainingValue);
+        }
+
         if (msg.action == ACTION_LIQUIDATION) {
             let liquidation: Liquidation = self.liquidationMsg.get(msg.queryId)!!;
             let liquidationAmount: Int = msg.amount;
@@ -497,7 +519,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
                 withdrawAmount = userSupplyPosition;
             }
             require(reserveData.availableLiquidity >= withdrawAmount, "invalid available liquidity");
-            require(reserveData.totalSupply.rayMul(normalizedIncome) >= withdrawAmount, "scaled totalSupply overflow");
+            require(reserveData.totalSupply >= withdrawAmount.rayDiv(normalizedIncome), "scaled totalSupply overflow");
             require(userSupplyPosition >= withdrawAmount, "invalid user supply position");
 
             require(healthInfo.healthFactorInRay >= RAY, "HF < 1");
@@ -506,6 +528,15 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
             let withdrawValueMulLT: Int = withdrawValue.percentMul(reserveConfiguration.liquidationThreshold);
             let totalCollateralMulLT: Int = healthInfo.totalCollateralInBaseCurrency.percentMul(healthInfo.avgLiquidationThreshold);
             require(totalCollateralMulLT - withdrawValueMulLT >= healthInfo.totalDebtInBaseCurrency, "the left collateral can't cover debt");
+        }
+        if (msg.action == ACTION_REPAY) {
+            // 1. check reserve isActive
+            // 2. check SAME_BLOCK_BORROW_REPAY
+            require(reserveConfiguration.isActive, "Token inactive");
+            let userReservePosition: TokenData? = userAccountData.positionsDetail.get(reserve);
+            require(userReservePosition != null && userReservePosition!!.borrow != 0, "zero borrow position");
+            let normalizedDebt: Int = reserveData.getNormalizedDebt();
+            require(normalizedDebt != reserveData.borrowIndex, "Borrow and repay in same block");
         }
         if (msg.action == ACTION_LIQUIDATION) {
             require(healthInfo.healthFactorInRay < RAY, "HF >= 1");
@@ -676,21 +707,22 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
         // use crc32 code of 'Repay': utils.calculateRequestOpcode_1('Repay')
         if (opCode == 0x9c797a9) {
             let repayAmount: Int = msg.amount;
-            // TODO: validate repay
-            // reserve.totalBorrow >= scaledBorrowAmount?
-
-            // updateInterestRates
-            let rateStrategy: ReserveInterestRateStrategy = self.reserveInterestRateStrategy.get(matchedReserve!!)!!;
-            reserveData.updateInterestRates(reserveCache, rateStrategy, repayAmount, 0);
-            // update liquidity and set reserveData to storage back;
-            let scaledBorrowAmount: Int = repayAmount.rayDiv(reserveCache.nextBorrowIndex);
-            reserveData.availableLiquidity += repayAmount;
-            reserveData.totalBorrow -= scaledBorrowAmount;
-            self.reservesData.set(matchedReserve!!, reserveData);
-
-            let selfConsumption: Int = self.SUPPLY_REPAY_GAS_CONSUMPTION + ctx.readForwardFee();
-            let remainingValue: Int = self.remainingValue(ctx.value, selfConsumption);
-            self.updateUserAccountPosition(msg.from, matchedReserve!!, 0, -scaledBorrowAmount, remainingValue);
+            let user: Address = msg.from;
+            let userAccountAddress: Address = self.userAccountAddress(user);
+            send(SendParameters{
+                to: userAccountAddress,
+                value: 0,
+                bounce: true,
+                mode: SendRemainingValue,
+                body: GetUserAccountData{
+                    queryId: self.queryId,
+                    user: user,
+                    action: ACTION_REPAY,
+                    tokenAddress: matchedReserve!!,
+                    amount: repayAmount
+                }.toCell()
+            });
+            self.queryId += 1;
         }
 
         // use crc32 code of 'Liquidate': utils.calculateRequestOpcode_1('Liquidate')
