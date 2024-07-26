@@ -1,3 +1,4 @@
+import { WithdrawToken } from './../build/Pool/tact_DTokenDefaultWallet';
 import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
 import { fromNano, toNano } from '@ton/core';
 import { Pool } from '../wrappers/Pool';
@@ -120,7 +121,59 @@ describe('Pool Withdraw', () => {
         poolWallet = blockchain.openContract(JettonDefaultWallet.fromAddress(poolWalletAddress));
     });
 
-    it('withdraw successfully with no debt', async () => {
+    it('withdraw max ton successfully with no debt', async () => {
+        // Add TON as reserve
+        await addReserve(pool, deployer, pool.address, pool.address);
+
+        const supplyAmount = toNano(100);
+        // Supply Ton first to add liquidity
+        await pool.send(
+            deployer.getSender(),
+            {
+                value: toNano('100.25'),
+            },
+            {
+                $$type: 'SupplyTon',
+                amount: supplyAmount,
+            },
+        );
+        // Withdraw Ton
+        const result = await pool.send(
+            deployer.getSender(),
+            {
+                value: toNano('0.4'),
+            },
+            {
+                $$type: 'WithdrawTon',
+                amount: supplyAmount,
+            },
+        );
+        // Check user account data
+        const userAccountContract = blockchain.openContract(await UserAccount.fromInit(pool.address, deployer.address));
+
+        const userAccountAddress = userAccountContract.address;
+        // UpdatePosition
+        expect(result.transactions).toHaveTransaction({
+            from: pool.address,
+            to: userAccountAddress,
+            success: true,
+        });
+
+        // UserPositionUpdated
+        expect(result.transactions).toHaveTransaction({
+            from: userAccountAddress,
+            to: pool.address,
+            success: true,
+        });
+
+        // check user account
+        const accountData = await userAccountContract.getAccount();
+        expect(accountData.positionsLength).toEqual(2n);
+        expect(accountData.positions?.get(1n)!!.equals(pool.address)).toBeTruthy();
+        expect(Number(fromNano(accountData.positionsDetail?.get(pool.address)!!.supply))).toBeCloseTo(0, 3);
+    });
+
+    it('withdraw jetton successfully with no debt', async () => {
         const userAccountAddress = await UserAccount.fromInit(pool.address, deployer.address);
         const withdrawAmount = toNano(50n);
         const deployerJettonBalanceBefore = (await deployerJettonDefaultWallet.getGetWalletData()).balance;

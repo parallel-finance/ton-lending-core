@@ -1,11 +1,5 @@
 import { Pool } from '../wrappers/Pool';
 import { NetworkProvider, sleep } from '@ton/blueprint';
-import { address } from '@ton/core';
-
-// @ts-ignore
-BigInt.prototype["toJSON"] = function () {
-    return this.toString();
-};
 
 export async function run(provider: NetworkProvider) {
     const pool = provider.open(await Pool.fromInit());

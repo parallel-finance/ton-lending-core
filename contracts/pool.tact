@@ -227,7 +227,18 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
 
             // Transfer withdrawAmount Token(tokenAddress) to the user.
             let poolWalletAddress: Address = reserveConfiguration.poolWalletAddress;
-            self.sendTokenTransferByPool(poolWalletAddress, msg.user, withdrawAmount);
+            if (poolWalletAddress == myAddress()) {
+                // The ton received should be withdrawAmount + remaining value
+                send(SendParameters{
+                    to: msg.user,
+                    value: withdrawAmount,
+                    bounce: false,
+                    mode: SendRemainingValue,
+                    body: emptyCell(),
+                });
+            } else {
+                self.sendTokenTransferByPool(poolWalletAddress, msg.user, withdrawAmount);
+            }
         }
 
         if (msg.action == ACTION_LIQUIDATION) {
@@ -393,6 +404,39 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
                 queryId: self.queryId,
                 user: sender(),
                 action: ACTION_BORROW,
+                tokenAddress: reserveAddress,
+                amount: msg.amount
+            }.toCell()
+        });
+        self.queryId += 1;
+    }
+
+    receive(msg: WithdrawTon) {
+        let reserveAddress: Address = myAddress();
+        let optionalReserveData: ReserveData? = self.reserveData(reserveAddress);
+        require(optionalReserveData != null, "Reserve not supported");
+
+        let ctx: Context = context();
+        let fwdFee: Int = ctx.readForwardFee() * 5;
+        let storageFee: Int = self.MIN_TONS_FOR_STORAGE;
+        let computationAndActionFee: Int = self.TOKEN_TRANSFER_GAS_CONSUMPTION + self.TOKEN_BURN_GAS_CONSUMPTION + self.BORROW_GAS_CONSUMPTION;
+        let totalFee: Int = fwdFee + storageFee + computationAndActionFee;
+        require(ctx.value > totalFee, "Insufficient fee");
+
+        // send message to get user account data
+        let userAccountAddress: Address = self.userAccountAddress(sender());
+
+        let remainingValue: Int = self.remainingValue(ctx.value, self.BORROW_GAS_CONSUMPTION + ctx.readForwardFee());
+        // GetUserAccountData don'tSendRemainingValue need to handle bounce
+        send(SendParameters{
+            to: userAccountAddress,
+            value: remainingValue,
+            bounce: false,
+            mode: SendPayGasSeparately,
+            body: GetUserAccountData{
+                queryId: self.queryId,
+                user: sender(),
+                action: ACTION_WITHDRAW,
                 tokenAddress: reserveAddress,
                 amount: msg.amount
             }.toCell()
