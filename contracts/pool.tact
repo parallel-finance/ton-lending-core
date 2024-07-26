@@ -447,15 +447,23 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
             // 1. check borrowingEnabled
             // 2. check reserve isActive / isFrozen
             // 3. check reserve availableLiquidity
-            // 4. check HF for borrow
+            // 4. check borrow cap
+            // 5. check HF for borrow
             require(reserveConfiguration.borrowingEnabled, "Borrowing disable for this token");
             require(reserveConfiguration.isActive, "Token inactive");
             require(!reserveConfiguration.isFrozen, "Token Frozen");
             require(reserveData.availableLiquidity >= amount, "invalid available liquidity");
+            let reserveUint: Int = pow(10, reserveConfiguration.decimals);
+            let normalizedDebt: Int = reserveData.getNormalizedDebt();
+            require(
+                reserveConfiguration.borrowCap == 0 ||
+                amount + reserveData.totalBorrow.rayMul(normalizedDebt) <= reserveConfiguration.borrowCap * reserveUint,
+                "Borrow cap is exceeded"
+            );
 
             require(healthInfo.healthFactorInRay >= RAY, "HF < 1");
-            let reserveUint: Int = pow(10, reserveConfiguration.decimals);
             let borrowAmountValue: Int = amount * reserveData.price / reserveUint;
+            require(healthInfo.avgLtv != 0, "zero user avgLtv");
             let collateralNeeded: Int = borrowAmountValue.percentDiv(healthInfo.avgLtv);
             require(healthInfo.totalDebtInBaseCurrency + collateralNeeded <= healthInfo.totalCollateralInBaseCurrency, "collateral can't cover new borrow");
         }

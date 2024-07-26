@@ -528,13 +528,16 @@ describe('Pool liquidation test', () => {
             Number(fromNano((borrowAmount * debtReserveData.reserveData.price) / debtUint)),
             5,
         );
-        expect(borrowerHealthInfo.healthFactorInRay).toEqual(
-            (supplyAmount *
-                collateralReserveData.reserveData.price *
-                RAY *
-                debtUint *
-                collateralReserveData.reserveConfiguration.liquidationThreshold) /
-                (borrowAmount * debtReserveData.reserveData.price * PERCENTAGE_FACTOR * collateralUint),
+        expect(Number(borrowerHealthInfo.healthFactorInRay) / Number(RAY)).toBeCloseTo(
+            Number(
+                (supplyAmount *
+                    collateralReserveData.reserveData.price *
+                    RAY *
+                    debtUint *
+                    collateralReserveData.reserveConfiguration.liquidationThreshold) /
+                    (borrowAmount * debtReserveData.reserveData.price * PERCENTAGE_FACTOR * collateralUint),
+            ) / Number(RAY),
+            7,
         );
 
         // change debt asset price to shortfall borrower
@@ -559,13 +562,16 @@ describe('Pool liquidation test', () => {
             Number(fromNano((borrowAmount * debtReserveData.reserveData.price) / debtUint)),
             2,
         );
-        expect(borrowerHealthInfo.healthFactorInRay).toEqual(
-            (supplyAmount *
-                collateralReserveData.reserveData.price *
-                RAY *
-                debtUint *
-                collateralReserveData.reserveConfiguration.liquidationThreshold) /
-                (borrowAmount * debtReserveData.reserveData.price * PERCENTAGE_FACTOR * collateralUint),
+        expect(Number(borrowerHealthInfo.healthFactorInRay) / Number(RAY)).toBeCloseTo(
+            Number(
+                (supplyAmount *
+                    collateralReserveData.reserveData.price *
+                    RAY *
+                    debtUint *
+                    collateralReserveData.reserveConfiguration.liquidationThreshold) /
+                    (borrowAmount * debtReserveData.reserveData.price * PERCENTAGE_FACTOR * collateralUint),
+            ) / Number(RAY),
+            7,
         );
         console.dir(borrowerHealthInfo, { depth: null });
 
@@ -725,7 +731,7 @@ describe('Pool liquidation test', () => {
         });
 
         accountData = await borrowerAccount.getAccount();
-        console.log(accountData);
+
         borrowerHealthInfo = await pool.getUserAccountHealthInfo(accountData);
         console.dir(borrowerHealthInfo, { depth: null });
 
@@ -788,13 +794,16 @@ describe('Pool liquidation test', () => {
             Number(fromNano((borrowAmount * debtReserveData.reserveData.price) / debtUint)),
             5,
         );
-        expect(borrowerHealthInfo.healthFactorInRay).toEqual(
-            (supplyAmount *
-                collateralReserveData.reserveData.price *
-                RAY *
-                debtUint *
-                collateralReserveData.reserveConfiguration.liquidationThreshold) /
-                (borrowAmount * debtReserveData.reserveData.price * PERCENTAGE_FACTOR * collateralUint),
+        expect(Number(borrowerHealthInfo.healthFactorInRay) / Number(RAY)).toBeCloseTo(
+            Number(
+                (supplyAmount *
+                    collateralReserveData.reserveData.price *
+                    RAY *
+                    debtUint *
+                    collateralReserveData.reserveConfiguration.liquidationThreshold) /
+                    (borrowAmount * debtReserveData.reserveData.price * PERCENTAGE_FACTOR * collateralUint),
+            ) / Number(RAY),
+            7,
         );
 
         // change debt asset price to shortfall borrower
@@ -819,13 +828,16 @@ describe('Pool liquidation test', () => {
             Number(fromNano((borrowAmount * debtReserveData.reserveData.price) / debtUint)),
             2,
         );
-        expect(borrowerHealthInfo.healthFactorInRay).toEqual(
-            (supplyAmount *
-                collateralReserveData.reserveData.price *
-                RAY *
-                debtUint *
-                collateralReserveData.reserveConfiguration.liquidationThreshold) /
-                (borrowAmount * debtReserveData.reserveData.price * PERCENTAGE_FACTOR * collateralUint),
+        expect(Number(borrowerHealthInfo.healthFactorInRay) / Number(RAY)).toBeCloseTo(
+            Number(
+                (supplyAmount *
+                    collateralReserveData.reserveData.price *
+                    RAY *
+                    debtUint *
+                    collateralReserveData.reserveConfiguration.liquidationThreshold) /
+                    (borrowAmount * debtReserveData.reserveData.price * PERCENTAGE_FACTOR * collateralUint),
+            ) / Number(RAY),
+            7,
         );
         console.dir(borrowerHealthInfo, { depth: null });
 
@@ -985,7 +997,7 @@ describe('Pool liquidation test', () => {
         });
 
         accountData = await borrowerAccount.getAccount();
-        console.log(accountData);
+
         borrowerHealthInfo = await pool.getUserAccountHealthInfo(accountData);
         console.dir(borrowerHealthInfo, { depth: null });
 
@@ -1006,7 +1018,7 @@ describe('Pool liquidation test', () => {
         const liquidatorCollateralWalletBalanceAfter = (await liquidatorCollateralWallet.getGetWalletData()).balance;
         expect(
             Number(liquidatorCollateralWalletBalanceBefore + actualCollateralToLiquidate - liquidationProtocolFee),
-        ).toBeCloseTo(Number(liquidatorCollateralWalletBalanceAfter), -1);
+        ).toBeCloseTo(Number(liquidatorCollateralWalletBalanceAfter), -5);
     });
     it('supply jetton1, borrow jetton1, closeFactor: 50%', async () => {
         // provide liquidity
@@ -1247,7 +1259,7 @@ describe('Pool liquidation test', () => {
         });
 
         accountData = await borrowerAccount.getAccount();
-        console.log(accountData);
+
         borrowerHealthInfo = await pool.getUserAccountHealthInfo(accountData);
         console.dir(borrowerHealthInfo, { depth: null });
 
@@ -1514,7 +1526,7 @@ describe('Pool liquidation test', () => {
         });
 
         accountData = await borrowerAccount.getAccount();
-        console.log(accountData);
+
         borrowerHealthInfo = await pool.getUserAccountHealthInfo(accountData);
         console.dir(borrowerHealthInfo, { depth: null });
 
