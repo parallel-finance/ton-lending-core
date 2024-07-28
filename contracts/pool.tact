@@ -77,9 +77,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
     }
 
     receive(msg: UserPositionUpdated) {
-        // TODO: check ctx sender is user's userAccount address
-        let userAccount: Address = self.userAccountAddress(msg.user);
-        require(userAccount == context().sender, "Not from the user account");
+        self.requireFromUserAccount(msg.user);
         // delete stored updatePositionMsg
         self.updatePositionMsg.del(msg.queryId);
 
@@ -166,7 +164,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
     }
 
     receive(msg: UserAccountDataResponse) {
-        // TODO: check sender
+        self.requireFromUserAccount(msg.user);
         let ctx: Context = context();
         let reserveAddress: Address = msg.tokenAddress;
 
@@ -655,7 +653,6 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
         });
     }
 
-
     fun processTokenNotification(msg: TokenNotification) {
         self.requireNotStopped();
         let matchedReserve: Address? = self.findReserveByPoolWalletAddress(context().sender);
@@ -918,5 +915,10 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
         require(reserveData.accruedToTreasury == 0, "Treasury share not zero");
         require(reserveData.totalSupply == 0, "Liability not zero");
         require(reserveData.totalBorrow == 0, "Debt not zero");
+    }
+
+    fun requireFromUserAccount(user: Address) {
+        let userAccount: Address = self.userAccountAddress(user);
+        require(userAccount == sender(), "Not from the user account");
     }
 }
