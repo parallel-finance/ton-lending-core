@@ -40,24 +40,13 @@ message TokenUpdateContent {
     content: Cell;
 }
 message TokenTransferByPool {
-    queryId: Int as uint64;
-    amount: Int as coins;
-    destination: Address;
-    response_destination: Address;
-    custom_payload: Cell?;
-    forward_ton_amount: Int as coins;
-    forward_payload: Slice as remaining;
+    payload: Slice;
 }
 message CheckAndTransferAToken {
     asset: Address;
     from: Address;
-    queryId: Int as uint64;
     amount: Int as coins;
-    destination: Address;
-    response_destination: Address;
-    custom_payload: Cell?;
-    forward_ton_amount: Int as coins;
-    forward_payload: Slice as remaining;
+    payload: Slice;
 }
 
 // custom Mint message

@@ -30,14 +30,15 @@ contract ATokenDefaultWallet
         // Check sender
         let ctx: Context = context();
         require(ctx.sender == self.pool, "Invalid sender");
+        let tokenTransferMsg: TokenTransfer = TokenTransfer.fromCell(msg.payload.loadRef());
         // Gas checks
         let fwdFee: Int = (ctx.readForwardFee() + ctx.readForwardFee());
         let final: Int = ((2 * self.gasConsumption + self.minTonsForStorage) + fwdFee);
         require(ctx.value > min(final, ton("0.01")), "Invalid value!!");
         // Update balance
-        self.balance = (self.balance - msg.amount);
+        self.balance = (self.balance - tokenTransferMsg.amount);
         require(self.balance >= 0, "Invalid balance");
-        let init: StateInit = self.getJettonWalletInit(msg.destination);
+        let init: StateInit = self.getJettonWalletInit(tokenTransferMsg.destination);
         let walletAddress: Address = contractAddress(init);
         send(SendParameters{
                 to: walletAddress,
@@ -45,12 +46,12 @@ contract ATokenDefaultWallet
                 mode: SendRemainingValue,
                 bounce: false,
                 body: TokenTransferInternal{
-                    queryId: msg.queryId,
-                    amount: msg.amount,
+                    queryId: tokenTransferMsg.queryId,
+                    amount: tokenTransferMsg.amount,
                     from: self.owner,
-                    response_destination: msg.response_destination,
-                    forward_ton_amount: msg.forward_ton_amount,
-                    forward_payload: msg.forward_payload
+                    response_destination: tokenTransferMsg.response_destination,
+                    forward_ton_amount: tokenTransferMsg.forward_ton_amount,
+                    forward_payload: tokenTransferMsg.forward_payload
                 }.toCell(),
                 code: init.code,
                 data: init.data
@@ -66,6 +67,15 @@ contract ATokenDefaultWallet
         // TODO: Gas checks
         // check balance
         require(self.balance >= msg.amount, "Invalid balance");
+        let tokenTransferMsg: TokenTransfer = TokenTransfer{
+            queryId: msg.queryId,
+            amount: msg.amount,
+            destination: msg.destination,
+            response_destination: msg.response_destination,
+            custom_payload: msg.custom_payload,
+            forward_ton_amount: msg.forward_ton_amount,
+            forward_payload: msg.forward_payload
+        };
         send(SendParameters{
                 to: self.pool,
                 value: 0,
@@ -74,13 +84,8 @@ contract ATokenDefaultWallet
                 body: CheckAndTransferAToken{
                     asset: self.asset,
                     from: ctx.sender,
-                    queryId: msg.queryId,
                     amount: msg.amount,
-                    destination: msg.destination,
-                    response_destination: msg.response_destination,
-                    custom_payload: msg.custom_payload,
-                    forward_ton_amount: msg.forward_ton_amount,
-                    forward_payload: msg.forward_payload
+                    payload: beginCell().storeRef(tokenTransferMsg.toCell()).asSlice()
                 }.toCell()
             }
         );

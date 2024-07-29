@@ -359,6 +359,20 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
 
             self.updateUserAccountPosition(msg.user, collateralReserve, -scaledCollateralAmount, 0, remainingValue / 2);
         }
+
+        if (msg.action == ACTION_TRANSFER_ATOKEN) {
+            let userATokenWallet: Address = self.userATokenWalletAddress(msg.tokenAddress, msg.user);
+            // send TokenTransferByPool back to aTokenWallet
+            send(SendParameters{
+                to: userATokenWallet,
+                value: 0,
+                bounce: true,
+                mode: SendRemainingValue,
+                body: TokenTransferByPool{
+                    payload: msg.payload
+                }.toCell()
+            });
+        }
     }
 
     receive(msg: TokenExcesses) {
@@ -631,6 +645,23 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
             );
             require(collateralReserveConfiguration.isActive && reserveConfiguration.isActive, "reserve isn not active");
         }
+        if (msg.action == ACTION_TRANSFER_ATOKEN) {
+            require(reserveConfiguration.isActive, "Token inactive");
+            let transferAmount: Int = amount;
+
+            let userReservePosition: TokenData? = userAccountData.positionsDetail.get(reserve);
+            require(userReservePosition != null && userReservePosition!!.supply >= transferAmount, "invalid aToken position");
+            require(healthInfo.healthFactorInRay >= RAY, "HF < 1");
+
+            let normalizedIncome: Int = reserveData.getNormalizedIncome();
+            let userSupplyPosition: Int = userReservePosition!!.supply.rayMul(normalizedIncome);
+
+            let reserveUint: Int = pow(10, reserveConfiguration.decimals);
+            let transferValue: Int = transferAmount.rayMul(normalizedIncome) * reserveData.price / reserveUint;
+            let transferValueMulLT: Int = transferValue.percentMul(reserveConfiguration.liquidationThreshold);
+            let totalCollateralMulLT: Int = healthInfo.totalCollateralInBaseCurrency.percentMul(healthInfo.avgLiquidationThreshold);
+            require(totalCollateralMulLT - transferValueMulLT >= healthInfo.totalDebtInBaseCurrency, "the left collateral can't cover debt");
+        }
 
         return healthInfo;
     }
@@ -711,28 +742,26 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
     }
 
     fun checkHFAndTransferAToken(msg: CheckAndTransferAToken) {
-        let userATokenWallet: Address = self.userATokenWalletAddress(msg.asset, msg.from);
-        require(context().sender == userATokenWallet, "invalid sender");
-        // TODO: check user health factor
-        let isHealthy: Bool = true;
-        // chech HF
-        require(isHealthy == true, "invalid health factor");
-        // send TokenTransferByPool back to aTokenWallet
+        let user: Address = msg.from;
+        let userATokenWallet: Address = self.userATokenWalletAddress(msg.asset, user);
+        require(sender() == userATokenWallet, "invalid sender");
+        let userAccountAddress: Address = self.userAccountAddress(user);
+
         send(SendParameters{
-            to: userATokenWallet,
+            to: userAccountAddress,
             value: 0,
-            bounce: false,
+            bounce: true,
             mode: SendRemainingValue,
-            body: TokenTransferByPool{
-                queryId: msg.queryId,
+            body: GetUserAccountData{
+                queryId: self.queryId,
+                user: user,
+                action: ACTION_TRANSFER_ATOKEN,
+                tokenAddress: msg.asset,
                 amount: msg.amount,
-                destination: msg.destination,
-                response_destination: msg.response_destination,
-                custom_payload: msg.custom_payload,
-                forward_ton_amount: msg.forward_ton_amount,
-                forward_payload: msg.forward_payload
+                payload: msg.payload
             }.toCell()
         });
+        self.queryId += 1;
     }
 
     fun processTokenNotification(msg: TokenNotification) {
