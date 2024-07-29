@@ -40,13 +40,13 @@ message TokenUpdateContent {
     content: Cell;
 }
 message TokenTransferByPool {
-    payload: Slice;
+    payload: Slice as remaining;
 }
 message CheckAndTransferAToken {
     asset: Address;
     from: Address;
     amount: Int as coins;
-    payload: Slice;
+    payload: Slice as remaining;
 }
 
 // custom Mint message

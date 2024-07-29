@@ -41,6 +41,4 @@ export const waitForTx = async (provider: NetworkProvider, sender: Address, usin
         await sleep(1500);
         currentHash = (await client.provider(sender).getState()).last?.hash;
     }
-
-    console.log(``);
 };
