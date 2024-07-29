@@ -77,9 +77,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
     }
 
     receive(msg: UserPositionUpdated) {
-        // TODO: check ctx sender is user's userAccount address
-        let userAccount: Address = self.userAccountAddress(msg.user);
-        require(userAccount == context().sender, "Not from the user account");
+        self.requireFromUserAccount(msg.user);
         // delete stored updatePositionMsg
         self.updatePositionMsg.del(msg.queryId);
 
@@ -102,6 +100,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
     }
 
     receive(msg: BorrowToken) {
+        self.requireNotStopped();
         let reserveAddress: Address = msg.tokenAddress;
         let optionalReserveConfiguration: ReserveConfiguration? = self.reservesConfiguration.get(reserveAddress);
         require(optionalReserveConfiguration != null, "Reserve not supported");
@@ -133,6 +132,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
     }
 
     receive(msg: WithdrawToken) {
+        self.requireNotStopped();
         let reserveAddress: Address = msg.tokenAddress;
         let optionalReserveConfiguration: ReserveConfiguration? = self.reservesConfiguration.get(reserveAddress);
         require(optionalReserveConfiguration != null, "Reserve not supported");
@@ -164,7 +164,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
     }
 
     receive(msg: UserAccountDataResponse) {
-        // TODO: check sender
+        self.requireFromUserAccount(msg.user);
         let ctx: Context = context();
         let reserveAddress: Address = msg.tokenAddress;
 
@@ -212,6 +212,12 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
 
         if(msg.action == ACTION_WITHDRAW) {
             let withdrawAmount: Int = msg.amount;
+            let userReservePosition: TokenData = msg.accountData.positionsDetail.get(reserveAddress)!!;
+            let userSupplyPosition: Int = userReservePosition.supply.rayMul(reserveCache.nextLiquidityIndex);
+            if (withdrawAmount == UINT256_MAX) {
+                withdrawAmount = userSupplyPosition;
+            }
+
             // updateInterestRates
             reserveData.updateInterestRates(reserveCache, rateStrategy, 0, withdrawAmount);
             // update (scaled) total supply and available liquidity
@@ -239,6 +245,28 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
             } else {
                 self.sendTokenTransferByPool(poolWalletAddress, msg.user, withdrawAmount);
             }
+        }
+
+        if(msg.action == ACTION_REPAY) {
+            let repayAmount: Int = msg.amount;
+            let userReservePosition: TokenData = msg.accountData.positionsDetail.get(reserveAddress)!!;
+            let userBorrowPosition: Int = userReservePosition.borrow.rayMul(reserveCache.nextBorrowIndex);
+            if (repayAmount > userBorrowPosition) {
+                repayAmount = userBorrowPosition;
+            }
+
+            // updateInterestRates
+            reserveData.updateInterestRates(reserveCache, rateStrategy, repayAmount, 0);
+            // update liquidity and set reserveData to storage back;
+            let scaledRepayAmount: Int = repayAmount.rayDiv(reserveCache.nextBorrowIndex);
+            reserveData.availableLiquidity += repayAmount;
+            require(reserveData.totalBorrow >= scaledRepayAmount, "scaled totalBorrow overflow");
+            reserveData.totalBorrow -= scaledRepayAmount;
+            self.reservesData.set(reserveAddress, reserveData);
+
+            let selfConsumption: Int = self.SUPPLY_REPAY_GAS_CONSUMPTION + ctx.readForwardFee();
+            let remainingValue: Int = self.remainingValue(ctx.value, selfConsumption);
+            self.updateUserAccountPosition(msg.user, reserveAddress, 0, -scaledRepayAmount, remainingValue);
         }
 
         if (msg.action == ACTION_LIQUIDATION) {
@@ -345,6 +373,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
     }
 
     receive(msg: SupplyTon) {
+        self.requireNotStopped();
         let reserveAddress: Address = myAddress();
         let optionalReserveData: ReserveData? = self.reserveData(reserveAddress);
         require(optionalReserveData != null, "Reserve not supported");
@@ -357,13 +386,21 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
         let totalFee: Int = fwdFee + storageFee + computationAndActionFee;
         require(ctx.value > totalFee + msg.amount, "Insufficient fee");
 
-        let reserveConfigration: ReserveConfiguration = self.reservesConfiguration.get(reserveAddress)!!;
-        let reserveCache: ReserveCache = reserveData.cache(reserveConfigration);
+        let reserveConfiguration: ReserveConfiguration = self.reservesConfiguration.get(reserveAddress)!!;
+        let reserveCache: ReserveCache = reserveData.cache(reserveConfiguration);
         // _updateIndexes and _accrueToTreasury
         reserveCache = reserveData.updateState(reserveCache);
 
         let supplyAmount: Int = msg.amount;
-        // TODO: validateSupply
+        require(supplyAmount > 0, "amount zero");
+        require(reserveConfiguration.isActive, "Token inactive");
+        require(!reserveConfiguration.isFrozen, "Token Frozen");
+        let reserveUint: Int = pow(10, reserveConfiguration.decimals);
+        require(
+            reserveConfiguration.supplyCap == 0 ||
+            supplyAmount + reserveData.totalSupply.rayMul(reserveCache.nextLiquidityIndex) <= reserveConfiguration.supplyCap * reserveUint,
+            "Supply cap is exceeded"
+        );
 
         // updateInterestRates
         let rateStrategy: ReserveInterestRateStrategy = self.reserveInterestRateStrategy.get(reserveAddress)!!;
@@ -379,6 +416,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
     }
 
     receive(msg: BorrowTon) {
+        self.requireNotStopped();
         let reserveAddress: Address = myAddress();
         let optionalReserveData: ReserveData? = self.reserveData(reserveAddress);
         require(optionalReserveData != null, "Reserve not supported");
@@ -521,15 +559,23 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
             // 1. check borrowingEnabled
             // 2. check reserve isActive / isFrozen
             // 3. check reserve availableLiquidity
-            // 4. check HF for borrow
+            // 4. check borrow cap
+            // 5. check HF for borrow
             require(reserveConfiguration.borrowingEnabled, "Borrowing disable for this token");
             require(reserveConfiguration.isActive, "Token inactive");
             require(!reserveConfiguration.isFrozen, "Token Frozen");
             require(reserveData.availableLiquidity >= amount, "invalid available liquidity");
+            let reserveUint: Int = pow(10, reserveConfiguration.decimals);
+            let normalizedDebt: Int = reserveData.getNormalizedDebt();
+            require(
+                reserveConfiguration.borrowCap == 0 ||
+                amount + reserveData.totalBorrow.rayMul(normalizedDebt) <= reserveConfiguration.borrowCap * reserveUint,
+                "Borrow cap is exceeded"
+            );
 
             require(healthInfo.healthFactorInRay >= RAY, "HF < 1");
-            let reserveUint: Int = pow(10, reserveConfiguration.decimals);
             let borrowAmountValue: Int = amount * reserveData.price / reserveUint;
+            require(healthInfo.avgLtv != 0, "zero user avgLtv");
             let collateralNeeded: Int = borrowAmountValue.percentDiv(healthInfo.avgLtv);
             require(healthInfo.totalDebtInBaseCurrency + collateralNeeded <= healthInfo.totalCollateralInBaseCurrency, "collateral can't cover new borrow");
         }
@@ -539,18 +585,33 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
             // 3. check withdraw amount <= supply position
             // 4. check HF
             require(reserveConfiguration.isActive, "Token inactive");
-            require(reserveData.availableLiquidity >= amount, "invalid available liquidity");
+            let withdrawAmount: Int = amount;
 
-            let userReservePosition: TokenData = userAccountData.positionsDetail.get(reserve)!!;
+            let userReservePosition: TokenData? = userAccountData.positionsDetail.get(reserve);
+            require(userReservePosition != null && userReservePosition!!.supply != 0, "zero supply position");
+
             let normalizedIncome: Int = reserveData.getNormalizedIncome();
-            require(userReservePosition.supply.rayMul(normalizedIncome) >= amount, "invalid user supply position");
+            let userSupplyPosition: Int = userReservePosition!!.supply.rayMul(normalizedIncome);
+
+            if (amount == UINT256_MAX) {
+                withdrawAmount = userSupplyPosition;
+            }
+            require(reserveData.availableLiquidity >= withdrawAmount, "invalid available liquidity");
+            require(reserveData.totalSupply >= withdrawAmount.rayDiv(normalizedIncome), "scaled totalSupply overflow");
+            require(userSupplyPosition >= withdrawAmount, "invalid user supply position");
 
             require(healthInfo.healthFactorInRay >= RAY, "HF < 1");
             let reserveUint: Int = pow(10, reserveConfiguration.decimals);
-            let withdrawValue: Int = amount * reserveData.price / reserveUint;
+            let withdrawValue: Int = withdrawAmount * reserveData.price / reserveUint;
             let withdrawValueMulLT: Int = withdrawValue.percentMul(reserveConfiguration.liquidationThreshold);
             let totalCollateralMulLT: Int = healthInfo.totalCollateralInBaseCurrency.percentMul(healthInfo.avgLiquidationThreshold);
             require(totalCollateralMulLT - withdrawValueMulLT >= healthInfo.totalDebtInBaseCurrency, "the left collateral can't cover debt");
+        }
+        if (msg.action == ACTION_REPAY) {
+            // 1. check reserve isActive
+            require(reserveConfiguration.isActive, "Token inactive");
+            let userReservePosition: TokenData? = userAccountData.positionsDetail.get(reserve);
+            require(userReservePosition != null && userReservePosition!!.borrow != 0, "zero borrow position");
         }
         if (msg.action == ACTION_LIQUIDATION) {
             require(healthInfo.healthFactorInRay < RAY, "HF >= 1");
@@ -669,8 +730,8 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
         });
     }
 
-
     fun processTokenNotification(msg: TokenNotification) {
+        self.requireNotStopped();
         let matchedReserve: Address? = self.findReserveByPoolWalletAddress(context().sender);
         require(matchedReserve != null, "Reserve not found");
 
@@ -693,7 +754,15 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
         // use crc32 code of 'Supply': utils.calculateRequestOpcode_1('Supply')
         if (opCode == 0x55b591ba) {
             let supplyAmount: Int = msg.amount;
-            // TODO: validateSupply
+            require(supplyAmount > 0, "amount zero");
+            require(reserveConfiguration.isActive, "Token inactive");
+            require(!reserveConfiguration.isFrozen, "Token Frozen");
+            let reserveUint: Int = pow(10, reserveConfiguration.decimals);
+            require(
+                reserveConfiguration.supplyCap == 0 ||
+                supplyAmount + reserveData.totalSupply.rayMul(reserveCache.nextLiquidityIndex) <= reserveConfiguration.supplyCap * reserveUint,
+                "Supply cap is exceeded"
+            );
 
             // updateInterestRates
             let rateStrategy: ReserveInterestRateStrategy = self.reserveInterestRateStrategy.get(matchedReserve!!)!!;
@@ -712,21 +781,22 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
         // use crc32 code of 'Repay': utils.calculateRequestOpcode_1('Repay')
         if (opCode == 0x9c797a9) {
             let repayAmount: Int = msg.amount;
-            // TODO: validate repay
-            // reserve.totalBorrow >= scaledBorrowAmount?
-
-            // updateInterestRates
-            let rateStrategy: ReserveInterestRateStrategy = self.reserveInterestRateStrategy.get(matchedReserve!!)!!;
-            reserveData.updateInterestRates(reserveCache, rateStrategy, repayAmount, 0);
-            // update liquidity and set reserveData to storage back;
-            let scaledBorrowAmount: Int = repayAmount.rayDiv(reserveCache.nextBorrowIndex);
-            reserveData.availableLiquidity += repayAmount;
-            reserveData.totalBorrow -= scaledBorrowAmount;
-            self.reservesData.set(matchedReserve!!, reserveData);
-
-            let selfConsumption: Int = self.SUPPLY_REPAY_GAS_CONSUMPTION + ctx.readForwardFee();
-            let remainingValue: Int = self.remainingValue(ctx.value, selfConsumption);
-            self.updateUserAccountPosition(msg.from, matchedReserve!!, 0, -scaledBorrowAmount, remainingValue);
+            let user: Address = msg.from;
+            let userAccountAddress: Address = self.userAccountAddress(user);
+            send(SendParameters{
+                to: userAccountAddress,
+                value: 0,
+                bounce: true,
+                mode: SendRemainingValue,
+                body: GetUserAccountData{
+                    queryId: self.queryId,
+                    user: user,
+                    action: ACTION_REPAY,
+                    tokenAddress: matchedReserve!!,
+                    amount: repayAmount
+                }.toCell()
+            });
+            self.queryId += 1;
         }
 
         // use crc32 code of 'Liquidate': utils.calculateRequestOpcode_1('Liquidate')
@@ -922,5 +992,10 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
         require(reserveData.accruedToTreasury == 0, "Treasury share not zero");
         require(reserveData.totalSupply == 0, "Liability not zero");
         require(reserveData.totalBorrow == 0, "Debt not zero");
+    }
+
+    fun requireFromUserAccount(user: Address) {
+        let userAccount: Address = self.userAccountAddress(user);
+        require(userAccount == sender(), "Not from the user account");
     }
 }

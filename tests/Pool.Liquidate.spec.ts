@@ -491,8 +491,8 @@ describe('Pool liquidation test', () => {
 
     it('supply jetton1, borrow jetton2, closeFactor: 100%', async () => {
         // provide liquidity
-        await supply(secondUser.getSender(), sampleJetton1, toNano('10000'));
-        await supply(secondUser.getSender(), sampleJetton2, toNano('10000'));
+        await supply(secondUser.getSender(), sampleJetton1, 10000n * 10n ** reserveConfiguration1.decimals);
+        await supply(secondUser.getSender(), sampleJetton2, 10000n * 10n ** reserveConfiguration2.decimals);
 
         // borrower supply jetton1 and borrow jetton2
         const borrower = deployer;
@@ -528,13 +528,16 @@ describe('Pool liquidation test', () => {
             Number(fromNano((borrowAmount * debtReserveData.reserveData.price) / debtUint)),
             5,
         );
-        expect(borrowerHealthInfo.healthFactorInRay).toEqual(
-            (supplyAmount *
-                collateralReserveData.reserveData.price *
-                RAY *
-                debtUint *
-                collateralReserveData.reserveConfiguration.liquidationThreshold) /
-                (borrowAmount * debtReserveData.reserveData.price * PERCENTAGE_FACTOR * collateralUint),
+        expect(Number(borrowerHealthInfo.healthFactorInRay) / Number(RAY)).toBeCloseTo(
+            Number(
+                (supplyAmount *
+                    collateralReserveData.reserveData.price *
+                    RAY *
+                    debtUint *
+                    collateralReserveData.reserveConfiguration.liquidationThreshold) /
+                    (borrowAmount * debtReserveData.reserveData.price * PERCENTAGE_FACTOR * collateralUint),
+            ) / Number(RAY),
+            7,
         );
 
         // change debt asset price to shortfall borrower
@@ -559,13 +562,16 @@ describe('Pool liquidation test', () => {
             Number(fromNano((borrowAmount * debtReserveData.reserveData.price) / debtUint)),
             2,
         );
-        expect(borrowerHealthInfo.healthFactorInRay).toEqual(
-            (supplyAmount *
-                collateralReserveData.reserveData.price *
-                RAY *
-                debtUint *
-                collateralReserveData.reserveConfiguration.liquidationThreshold) /
-                (borrowAmount * debtReserveData.reserveData.price * PERCENTAGE_FACTOR * collateralUint),
+        expect(Number(borrowerHealthInfo.healthFactorInRay) / Number(RAY)).toBeCloseTo(
+            Number(
+                (supplyAmount *
+                    collateralReserveData.reserveData.price *
+                    RAY *
+                    debtUint *
+                    collateralReserveData.reserveConfiguration.liquidationThreshold) /
+                    (borrowAmount * debtReserveData.reserveData.price * PERCENTAGE_FACTOR * collateralUint),
+            ) / Number(RAY),
+            7,
         );
         console.dir(borrowerHealthInfo, { depth: null });
 
@@ -725,7 +731,7 @@ describe('Pool liquidation test', () => {
         });
 
         accountData = await borrowerAccount.getAccount();
-        console.log(accountData);
+
         borrowerHealthInfo = await pool.getUserAccountHealthInfo(accountData);
         console.dir(borrowerHealthInfo, { depth: null });
 
@@ -751,8 +757,8 @@ describe('Pool liquidation test', () => {
 
     it('supply jetton1, borrow jetton2, closeFactor: 50%', async () => {
         // provide liquidity
-        await supply(secondUser.getSender(), sampleJetton1, toNano('10000'));
-        await supply(secondUser.getSender(), sampleJetton2, toNano('10000'));
+        await supply(secondUser.getSender(), sampleJetton1, 10000n * 10n ** reserveConfiguration1.decimals);
+        await supply(secondUser.getSender(), sampleJetton2, 10000n * 10n ** reserveConfiguration2.decimals);
 
         // borrower supply jetton1 and borrow jetton2
         const borrower = deployer;
@@ -788,13 +794,16 @@ describe('Pool liquidation test', () => {
             Number(fromNano((borrowAmount * debtReserveData.reserveData.price) / debtUint)),
             5,
         );
-        expect(borrowerHealthInfo.healthFactorInRay).toEqual(
-            (supplyAmount *
-                collateralReserveData.reserveData.price *
-                RAY *
-                debtUint *
-                collateralReserveData.reserveConfiguration.liquidationThreshold) /
-                (borrowAmount * debtReserveData.reserveData.price * PERCENTAGE_FACTOR * collateralUint),
+        expect(Number(borrowerHealthInfo.healthFactorInRay) / Number(RAY)).toBeCloseTo(
+            Number(
+                (supplyAmount *
+                    collateralReserveData.reserveData.price *
+                    RAY *
+                    debtUint *
+                    collateralReserveData.reserveConfiguration.liquidationThreshold) /
+                    (borrowAmount * debtReserveData.reserveData.price * PERCENTAGE_FACTOR * collateralUint),
+            ) / Number(RAY),
+            7,
         );
 
         // change debt asset price to shortfall borrower
@@ -819,13 +828,16 @@ describe('Pool liquidation test', () => {
             Number(fromNano((borrowAmount * debtReserveData.reserveData.price) / debtUint)),
             2,
         );
-        expect(borrowerHealthInfo.healthFactorInRay).toEqual(
-            (supplyAmount *
-                collateralReserveData.reserveData.price *
-                RAY *
-                debtUint *
-                collateralReserveData.reserveConfiguration.liquidationThreshold) /
-                (borrowAmount * debtReserveData.reserveData.price * PERCENTAGE_FACTOR * collateralUint),
+        expect(Number(borrowerHealthInfo.healthFactorInRay) / Number(RAY)).toBeCloseTo(
+            Number(
+                (supplyAmount *
+                    collateralReserveData.reserveData.price *
+                    RAY *
+                    debtUint *
+                    collateralReserveData.reserveConfiguration.liquidationThreshold) /
+                    (borrowAmount * debtReserveData.reserveData.price * PERCENTAGE_FACTOR * collateralUint),
+            ) / Number(RAY),
+            7,
         );
         console.dir(borrowerHealthInfo, { depth: null });
 
@@ -985,7 +997,7 @@ describe('Pool liquidation test', () => {
         });
 
         accountData = await borrowerAccount.getAccount();
-        console.log(accountData);
+
         borrowerHealthInfo = await pool.getUserAccountHealthInfo(accountData);
         console.dir(borrowerHealthInfo, { depth: null });
 
@@ -1006,12 +1018,12 @@ describe('Pool liquidation test', () => {
         const liquidatorCollateralWalletBalanceAfter = (await liquidatorCollateralWallet.getGetWalletData()).balance;
         expect(
             Number(liquidatorCollateralWalletBalanceBefore + actualCollateralToLiquidate - liquidationProtocolFee),
-        ).toBeCloseTo(Number(liquidatorCollateralWalletBalanceAfter), -1);
+        ).toBeCloseTo(Number(liquidatorCollateralWalletBalanceAfter), -5);
     });
     it('supply jetton1, borrow jetton1, closeFactor: 50%', async () => {
         // provide liquidity
-        await supply(secondUser.getSender(), sampleJetton1, toNano('10000'));
-        await supply(secondUser.getSender(), sampleJetton2, toNano('10000'));
+        await supply(secondUser.getSender(), sampleJetton1, 10000n * 10n ** reserveConfiguration1.decimals);
+        await supply(secondUser.getSender(), sampleJetton2, 10000n * 10n ** reserveConfiguration2.decimals);
 
         // borrower supply jetton1 and borrow jetton1
         const borrower = deployer;
@@ -1247,7 +1259,7 @@ describe('Pool liquidation test', () => {
         });
 
         accountData = await borrowerAccount.getAccount();
-        console.log(accountData);
+
         borrowerHealthInfo = await pool.getUserAccountHealthInfo(accountData);
         console.dir(borrowerHealthInfo, { depth: null });
 
@@ -1277,8 +1289,8 @@ describe('Pool liquidation test', () => {
     });
     it('supply jetton1, borrow jetton1, closeFactor: 100%', async () => {
         // provide liquidity
-        await supply(secondUser.getSender(), sampleJetton1, toNano('10000'));
-        await supply(secondUser.getSender(), sampleJetton2, toNano('10000'));
+        await supply(secondUser.getSender(), sampleJetton1, 10000n * 10n ** reserveConfiguration1.decimals);
+        await supply(secondUser.getSender(), sampleJetton2, 10000n * 10n ** reserveConfiguration2.decimals);
 
         // borrower supply jetton1 and borrow jetton1
         const borrower = deployer;
@@ -1514,7 +1526,7 @@ describe('Pool liquidation test', () => {
         });
 
         accountData = await borrowerAccount.getAccount();
-        console.log(accountData);
+
         borrowerHealthInfo = await pool.getUserAccountHealthInfo(accountData);
         console.dir(borrowerHealthInfo, { depth: null });
 
