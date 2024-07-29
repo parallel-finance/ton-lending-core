@@ -44,8 +44,6 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
 
     // bounce messages
     updatePositionMsg: map<Int, UpdatePositionBounce>;
-    // liquidation messages
-    liquidationMsg: map<Int, Liquidation>;
 
     init() {
         self.owner = sender();
@@ -125,7 +123,8 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
                 user: context().sender,
                 action: ACTION_BORROW,
                 tokenAddress: reserveAddress,
-                amount: msg.amount
+                amount: msg.amount,
+                payload: emptySlice()
             }.toCell()
         });
         self.queryId += 1;
@@ -157,7 +156,8 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
                 user: sender(),
                 action: ACTION_WITHDRAW,
                 tokenAddress: msg.tokenAddress,
-                amount: msg.amount
+                amount: msg.amount,
+                payload: emptySlice()
             }.toCell()
         });
         self.queryId += 1;
@@ -270,11 +270,10 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
         }
 
         if (msg.action == ACTION_LIQUIDATION) {
-            let liquidation: Liquidation = self.liquidationMsg.get(msg.queryId)!!;
+            let liquidation: Liquidation = Liquidation.fromCell(msg.payload.loadRef());
             let liquidationAmount: Int = msg.amount;
             let collateralReserve: Address = liquidation.collateralReserve;
             let liquidator: Address = liquidation.liquidator;
-            self.liquidationMsg.del(msg.queryId);
 
             // check borrower debt and collateral are not zero
             let userLiquidationPosition: TokenData? = msg.accountData.positionsDetail.get(reserveAddress);
@@ -443,7 +442,8 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
                 user: sender(),
                 action: ACTION_BORROW,
                 tokenAddress: reserveAddress,
-                amount: msg.amount
+                amount: msg.amount,
+                payload: emptySlice()
             }.toCell()
         });
         self.queryId += 1;
@@ -477,7 +477,8 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
                 user: sender(),
                 action: ACTION_WITHDRAW,
                 tokenAddress: reserveAddress,
-                amount: msg.amount
+                amount: msg.amount,
+                payload: emptySlice()
             }.toCell()
         });
         self.queryId += 1;
@@ -515,7 +516,8 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
                 user: user,
                 action: ACTION_REPAY,
                 tokenAddress: reserveAddress,
-                amount: repayAmount
+                amount: repayAmount,
+                payload: emptySlice()
             }.toCell()
         });
         self.queryId += 1;
@@ -618,7 +620,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
         }
         if (msg.action == ACTION_LIQUIDATION) {
             require(healthInfo.healthFactorInRay < RAY, "HF >= 1");
-            let liquidation: Liquidation = self.liquidationMsg.get(msg.queryId)!!;
+            let liquidation: Liquidation = Liquidation.fromCell(msg.payload.loadRef());
             let collateralReserve: Address = liquidation.collateralReserve;
             let collateralReserveConfiguration: ReserveConfiguration = self.reservesConfiguration.get(collateralReserve)!!;
             let userCollateralPosition: TokenData = userAccountData.positionsDetail.get(collateralReserve)!!;
@@ -796,7 +798,8 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
                     user: user,
                     action: ACTION_REPAY,
                     tokenAddress: matchedReserve!!,
-                    amount: repayAmount
+                    amount: repayAmount,
+                    payload: emptySlice()
                 }.toCell()
             });
             self.queryId += 1;
@@ -818,13 +821,14 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
             let liquidationAmount: Int = msg.amount;
             let userAccountAddress: Address = self.userAccountAddress(borrower);
             // store collateralReserve
-            self.liquidationMsg.set(self.queryId, Liquidation{
+            let lqMsg: Liquidation = Liquidation{
                 liquidator: msg.from,
                 borrower: borrower,
                 liquidationReserve: liquidationReserve!!,
                 collateralReserve: collateralReserve!!,
                 liquidationAmount: liquidationAmount
-            });
+            };
+            let payload: Slice = beginCell().storeRef(lqMsg.toCell()).asSlice();
             // TODO: This GetUserAccountData need to do bounce
             send(SendParameters{
                 to: userAccountAddress,
@@ -836,7 +840,8 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
                     user: borrower,
                     action: ACTION_LIQUIDATION,
                     tokenAddress: liquidationReserve!!,
-                    amount: liquidationAmount
+                    amount: liquidationAmount,
+                    payload: payload
                 }.toCell()
             });
             self.queryId += 1;
