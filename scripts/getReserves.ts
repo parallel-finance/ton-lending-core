@@ -1,6 +1,16 @@
 import { Pool } from '../wrappers/Pool';
 import { NetworkProvider, sleep } from '@ton/blueprint';
 
+declare global {
+    interface BigInt {
+        toJSON(): string;
+    }
+}
+
+BigInt.prototype.toJSON = function () {
+    return this.toString();
+};
+
 export async function run(provider: NetworkProvider) {
     const pool = provider.open(await Pool.fromInit());
 
