@@ -529,12 +529,9 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
         }
         if (msg.action == ACTION_REPAY) {
             // 1. check reserve isActive
-            // 2. check SAME_BLOCK_BORROW_REPAY
             require(reserveConfiguration.isActive, "Token inactive");
             let userReservePosition: TokenData? = userAccountData.positionsDetail.get(reserve);
             require(userReservePosition != null && userReservePosition!!.borrow != 0, "zero borrow position");
-            let normalizedDebt: Int = reserveData.getNormalizedDebt();
-            require(normalizedDebt != reserveData.borrowIndex, "Borrow and repay in same block");
         }
         if (msg.action == ACTION_LIQUIDATION) {
             require(healthInfo.healthFactorInRay < RAY, "HF >= 1");
