@@ -63,6 +63,12 @@ message(0x66660009) SupplyTon {
 message(0x66660010) BorrowTon {
     amount: Int as coins;
 }
+message(0x66660011) WithdrawTon {
+    amount: Int as coins;
+}
+message(0x66660012) RepayTon {
+    amount: Int as coins;
+}
 // Notice: Only for Test
 message SetMockOraclePrice {
     asset: Address;
