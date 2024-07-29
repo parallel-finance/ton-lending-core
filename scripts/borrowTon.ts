@@ -33,5 +33,5 @@ export async function run(provider: NetworkProvider) {
         i++;
     }
 
-    console.log(`Supply Ton: ${amount.toString()} to Pool at ${pool.address.toString()}`);
+    console.log(`Borrow Ton: ${amount.toString()} to Pool at ${pool.address.toString()}`);
 }

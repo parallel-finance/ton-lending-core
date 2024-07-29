@@ -502,20 +502,23 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
         reserveCache = reserveData.updateState(reserveCache);
 
         let repayAmount: Int = msg.amount;
-        // TODO: validate repay
-
-        // updateInterestRates
-        let rateStrategy: ReserveInterestRateStrategy = self.reserveInterestRateStrategy.get(reserveAddress)!!;
-        reserveData.updateInterestRates(reserveCache, rateStrategy, repayAmount, 0);
-        // update liquidity and set reserveData to storage back;
-        let scaledBorrowAmount: Int = repayAmount.rayDiv(reserveCache.nextBorrowIndex);
-        reserveData.availableLiquidity += repayAmount;
-        reserveData.totalBorrow -= scaledBorrowAmount;
-        self.reservesData.set(reserveAddress, reserveData);
-
-        let selfConsumption: Int = self.SUPPLY_REPAY_GAS_CONSUMPTION + ctx.readForwardFee();
-        let remainingValue: Int = self.remainingValue(ctx.value, selfConsumption);
-        self.updateUserAccountPosition(ctx.sender, reserveAddress, 0, -scaledBorrowAmount, remainingValue);
+        let user: Address = sender();
+        let userAccountAddress: Address = self.userAccountAddress(user);
+        let remainingValue: Int = self.remainingValue(ctx.value, self.SUPPLY_REPAY_GAS_CONSUMPTION + ctx.readForwardFee());
+        send(SendParameters{
+            to: userAccountAddress,
+            value: remainingValue,
+            bounce: true,
+            mode: SendPayGasSeparately,
+            body: GetUserAccountData{
+                queryId: self.queryId,
+                user: user,
+                action: ACTION_REPAY,
+                tokenAddress: reserveAddress,
+                amount: repayAmount
+            }.toCell()
+        });
+        self.queryId += 1;
     }
 
     fun remainingValue(value: Int, selfConsumption: Int): Int {

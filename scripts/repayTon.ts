@@ -8,7 +8,7 @@ export async function run(provider: NetworkProvider) {
     const poolAddress = pool.address;
     const providerAddress = Address.parse(provider.sender().address?.toString() || '');
 
-    const amount = toNano('0.1');
+    const amount = toNano('0.02');
     await pool.send(
         provider.sender(),
         {
