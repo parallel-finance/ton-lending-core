@@ -11,6 +11,9 @@ importers:
       '@aws-crypto/sha256-js':
         specifier: ^5.2.0
         version: 5.2.0
+      axios:
+        specifier: ^1.7.2
+        version: 1.7.2
       crc-32:
         specifier: ^1.2.2
         version: 1.2.2
