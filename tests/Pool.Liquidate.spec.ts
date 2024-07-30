@@ -11,7 +11,7 @@ import { DToken } from '../wrappers/DToken';
 import { sleep } from '@ton/blueprint';
 import { PERCENTAGE_FACTOR, RAY } from '../helpers/constant';
 import { TestMathUtils } from '../wrappers/TestMathUtils';
-import { DTokenDefaultWallet } from '../build/DToken/tact_DTokenDefaultWallet';
+import { DTokenDefaultWallet } from '../build/Pool/tact_DTokenDefaultWallet';
 import { ATokenDefaultWallet } from '../build/Pool/tact_ATokenDefaultWallet';
 
 describe('Pool liquidation test', () => {

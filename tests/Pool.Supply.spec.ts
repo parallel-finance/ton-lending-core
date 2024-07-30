@@ -5,12 +5,12 @@ import '@ton/test-utils';
 import { SampleJetton } from '../build/SampleJetton/tact_SampleJetton';
 import { JettonDefaultWallet } from '../build/SampleJetton/tact_JettonDefaultWallet';
 import { UserAccount } from '../build/Pool/tact_UserAccount';
-import { ATokenDefaultWallet } from '../build/AToken/tact_ATokenDefaultWallet';
 import { AToken } from '../wrappers/AToken';
 import { sumTransactionsFee } from '../jest.setup';
 import { PERCENTAGE_FACTOR, RERUN_ACTION_UPDATE_POSITION } from '../helpers/constant';
 import { parsePoolBounceMessage } from '../helpers/pool';
 import { addReserve, deployJetton, deployPool, mintJetton } from './utils';
+import { ATokenDefaultWallet } from '../build/Pool/tact_ATokenDefaultWallet';
 
 describe('Pool Supply', () => {
     let blockchain: Blockchain;
@@ -162,6 +162,17 @@ describe('Pool Supply', () => {
                     await pool.getUserATokenWalletAddress(sampleJetton.address, deployer.getSender().address),
                 ),
             );
+            expect(aTokenWallet.address).toEqualAddress(
+                (
+                    await ATokenDefaultWallet.fromInit(
+                        aToken.address,
+                        pool.address,
+                        sampleJetton.address,
+                        deployer.getSender().address,
+                    )
+                ).address,
+            );
+            expect(aTokenWallet.address).toEqualAddress(await aToken.getGetWalletAddress(deployer.getSender().address));
             const walletData = await aTokenWallet.getGetWalletData();
             expect(walletData.balance).toEqual(amount);
             expect(walletData.owner.toString()).toEqual(deployer.address.toString());

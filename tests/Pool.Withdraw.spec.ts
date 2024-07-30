@@ -1,4 +1,3 @@
-import { WithdrawToken } from './../build/Pool/tact_DTokenDefaultWallet';
 import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
 import { fromNano, toNano } from '@ton/core';
 import { Pool } from '../wrappers/Pool';
@@ -9,7 +8,7 @@ import { UserAccount } from '../build/Pool/tact_UserAccount';
 import { AToken } from '../wrappers/AToken';
 import { DToken } from '../wrappers/DToken';
 import { PERCENTAGE_FACTOR } from '../helpers/constant';
-import { ATokenDefaultWallet } from '../build/AToken/tact_ATokenDefaultWallet';
+import { ATokenDefaultWallet } from '../build/Pool/tact_ATokenDefaultWallet';
 import { sleep } from '@ton/blueprint';
 import { sumTransactionsFee } from '../jest.setup';
 import { addReserve, deployJetton, deployPool, mintJetton, reserveConfiguration, supplyJetton } from './utils';

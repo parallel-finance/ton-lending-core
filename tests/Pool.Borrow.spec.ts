@@ -5,7 +5,7 @@ import '@ton/test-utils';
 import { SampleJetton } from '../build/SampleJetton/tact_SampleJetton';
 import { JettonDefaultWallet } from '../build/SampleJetton/tact_JettonDefaultWallet';
 import { UserAccount } from '../build/Pool/tact_UserAccount';
-import { DTokenDefaultWallet } from '../build/DToken/tact_DTokenDefaultWallet';
+import { DTokenDefaultWallet } from '../build/Pool/tact_DTokenDefaultWallet';
 import { DToken } from '../wrappers/DToken';
 import { PERCENTAGE_FACTOR, RAY } from '../helpers/constant';
 import { sumTransactionsFee } from '../jest.setup';
@@ -137,6 +137,19 @@ describe('Pool', () => {
             const deployerDTokenDefaultWalletAddress = await dToken.getGetWalletAddress(deployer.address);
             const deployerDTokenDefaultWallet = blockchain.openContract(
                 DTokenDefaultWallet.fromAddress(deployerDTokenDefaultWalletAddress),
+            );
+            expect(deployerDTokenDefaultWalletAddress).toEqualAddress(
+                (
+                    await DTokenDefaultWallet.fromInit(
+                        dToken.address,
+                        pool.address,
+                        sampleJetton.address,
+                        deployer.address,
+                    )
+                ).address,
+            );
+            expect(deployerDTokenDefaultWalletAddress).toEqualAddress(
+                await pool.getUserDTokenWalletAddress(sampleJetton.address, deployer.address),
             );
 
             const walletData = await deployerDTokenDefaultWallet.getGetWalletData();
