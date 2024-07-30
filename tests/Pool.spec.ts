@@ -3,8 +3,8 @@ import { address, toNano } from '@ton/core';
 import { ATokenDTokenContents, Pool, ReserveConfiguration, ReserveInterestRateStrategy } from '../wrappers/Pool';
 import '@ton/test-utils';
 import { buildOnchainMetadata } from '../scripts/utils';
-import { AToken } from '../wrappers/AToken';
 import { RAY } from '../helpers/constant';
+import { AToken } from '../build/Pool/tact_AToken';
 
 describe('Pool', () => {
     let blockchain: Blockchain;

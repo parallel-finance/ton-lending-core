@@ -156,6 +156,7 @@ export const addReserve = async (
     );
 
     return {
+        aTokenDTokenContents: contents,
         aTokenAddress: calculateATokenAddress,
         dTokenAddress: calculateDTokenAddress,
     };
