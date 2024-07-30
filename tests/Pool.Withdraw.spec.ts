@@ -1,4 +1,3 @@
-import { WithdrawToken } from './../build/Pool/tact_DTokenDefaultWallet';
 import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
 import { fromNano, toNano } from '@ton/core';
 import { Pool } from '../wrappers/Pool';
@@ -6,13 +5,13 @@ import '@ton/test-utils';
 import { SampleJetton } from '../build/SampleJetton/tact_SampleJetton';
 import { JettonDefaultWallet } from '../build/SampleJetton/tact_JettonDefaultWallet';
 import { UserAccount } from '../build/Pool/tact_UserAccount';
-import { AToken } from '../wrappers/AToken';
-import { DToken } from '../wrappers/DToken';
 import { PERCENTAGE_FACTOR } from '../helpers/constant';
-import { ATokenDefaultWallet } from '../build/AToken/tact_ATokenDefaultWallet';
+import { ATokenDefaultWallet } from '../build/Pool/tact_ATokenDefaultWallet';
 import { sleep } from '@ton/blueprint';
 import { sumTransactionsFee } from '../jest.setup';
 import { addReserve, deployJetton, deployPool, mintJetton, reserveConfiguration, supplyJetton } from './utils';
+import { AToken } from '../build/Pool/tact_AToken';
+import { DToken } from '../build/Pool/tact_DToken';
 
 describe('Pool Withdraw', () => {
     let blockchain: Blockchain;

@@ -5,11 +5,11 @@ import '@ton/test-utils';
 import { SampleJetton } from '../build/SampleJetton/tact_SampleJetton';
 import { JettonDefaultWallet } from '../build/SampleJetton/tact_JettonDefaultWallet';
 import { UserAccount } from '../build/Pool/tact_UserAccount';
-import { DTokenDefaultWallet } from '../build/DToken/tact_DTokenDefaultWallet';
-import { DToken } from '../wrappers/DToken';
+import { DTokenDefaultWallet } from '../build/Pool/tact_DTokenDefaultWallet';
 import { sumTransactionsFee } from '../jest.setup';
 import { addReserve, deployJetton, deployPool, mintJetton, supplyJetton } from './utils';
 import { sleep } from '@ton/blueprint';
+import { DToken } from '../build/Pool/tact_DToken';
 
 describe('Pool', () => {
     let blockchain: Blockchain;
