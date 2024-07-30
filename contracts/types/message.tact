@@ -23,6 +23,7 @@ message(0x66660004) GetUserAccountData {
     action: Int as uint8;
     tokenAddress: Address;
     amount: Int as coins;
+    payload: Slice as remaining;
 }
 // gas cost:
 //      borrow: 0.027
@@ -34,6 +35,7 @@ message(0x66660005) UserAccountDataResponse {
     tokenAddress: Address;
     amount: Int as coins;
     accountData: UserAccountData;
+    payload: Slice as remaining;
 }
 //
 message(0x66660006) WithdrawToken {
