@@ -850,14 +850,14 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
             let liquidationAmount: Int = msg.amount;
             let userAccountAddress: Address = self.userAccountAddress(borrower);
             // store collateralReserve
-            let lqMsg: Liquidation = Liquidation{
+            let liquidationMsg: Liquidation = Liquidation{
                 liquidator: msg.from,
                 borrower: borrower,
                 liquidationReserve: liquidationReserve!!,
                 collateralReserve: collateralReserve!!,
                 liquidationAmount: liquidationAmount
             };
-            let payload: Slice = beginCell().storeRef(lqMsg.toCell()).asSlice();
+            let payload: Slice = beginCell().storeRef(liquidationMsg.toCell()).asSlice();
             // TODO: This GetUserAccountData need to do bounce
             send(SendParameters{
                 to: userAccountAddress,
