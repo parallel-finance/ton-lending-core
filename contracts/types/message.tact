@@ -104,3 +104,10 @@ message UpdateReserveConfiguration {
     reserve: Address;
     reserveConfiguration: ReserveConfiguration;
 }
+message SyncPrices {
+    prices: map<Address, Int>;
+    responseDestination: Address;
+}
+message UpdateOracleProvider {
+    oracle: Address;
+}

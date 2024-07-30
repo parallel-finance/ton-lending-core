@@ -24,6 +24,8 @@ trait PoolConfigurator with Ownable, Resumable {
     // baseTokenAddress -> reserveConfiguration
     reservesConfiguration: map<Address, ReserveConfiguration>;
     reserveInterestRateStrategy: map<Address, ReserveInterestRateStrategy>;
+    // oracle provider address
+    oracleProvider: Address?;
     // bounce messages
     updatePositionMsg: map<Int, UpdatePositionBounce>;
 
@@ -37,5 +39,12 @@ trait PoolConfigurator with Ownable, Resumable {
         let reserveData: ReserveData = self.reservesData.get(msg.asset)!!;
         reserveData.price = msg.price;
         self.reservesData.set(msg.asset, reserveData);
+    }
+
+    // update oracle provider address
+    receive(msg: UpdateOracleProvider){
+        // self.requireOwner();
+        // TODO: add ACL check
+        self.oracleProvider = msg.oracle;
     }
 }

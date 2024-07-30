@@ -25,6 +25,10 @@ trait PoolView with Ownable, Resumable {
     // baseTokenAddress -> reserveConfiguration
     reservesConfiguration: map<Address, ReserveConfiguration>;
     reserveInterestRateStrategy: map<Address, ReserveInterestRateStrategy>;
+
+    // oracle provider address
+    oracleProvider: Address?;
+    
     // bounce messages
     updatePositionMsg: map<Int, UpdatePositionBounce>;
 
@@ -176,5 +180,9 @@ trait PoolView with Ownable, Resumable {
             return updatePositionMsg!!.toCell();
         }
         return null;
+    }
+
+    get fun oracleProvider(): Address? {
+        return self.oracleProvider;
     }
 }

@@ -1,18 +1,6 @@
 import "@stdlib/deploy";
 import "./types/message";
 
-struct TokenData {
-    supply: Int as coins;
-    borrow: Int as coins;
-    asCollateral: Bool;
-}
-
-struct UserAccountData {
-    positions: map<Int, Address>;
-    positionsLength: Int;
-    positionsDetail: map<Address, TokenData>;
-}
-
 contract UserAccount with Deployable {
     const MIN_TONS_FOR_STORAGE: Int = ton("0.01");
     const GAS_CONSUMPTION: Int = ton("0.01");

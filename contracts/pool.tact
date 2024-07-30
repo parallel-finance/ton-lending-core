@@ -41,6 +41,9 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
     // baseTokenAddress -> reserveConfiguration
     reservesConfiguration: map<Address, ReserveConfiguration>;
     reserveInterestRateStrategy: map<Address, ReserveInterestRateStrategy>;
+    
+    // oracle provider address
+    oracleProvider: Address?;
 
     // bounce messages
     updatePositionMsg: map<Int, UpdatePositionBounce>;
@@ -535,6 +538,29 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
             }.toCell()
         });
         self.queryId += 1;
+    }
+
+    receive(msg: SyncPrices) {
+        self.syncPrices(msg);
+    }
+
+    fun syncPrices(msg: SyncPrices) {
+        foreach (reserve, price in msg.prices) {
+            let reserveData: ReserveData? = self.reservesData.get(reserve);
+            if (reserveData != null) {
+                let reserveDataAsserted: ReserveData = reserveData!!;
+                reserveDataAsserted.price = price;
+                self.reservesData.set(reserve, reserveDataAsserted);
+            }
+        }
+        // Cashback
+        send(SendParameters{
+            to: msg.responseDestination,
+            value: 0,
+            bounce: false,
+            mode: (SendRemainingValue + SendIgnoreErrors),
+            body: emptyCell()
+        });
     }
 
     fun remainingValue(value: Int, selfConsumption: Int): Int {
