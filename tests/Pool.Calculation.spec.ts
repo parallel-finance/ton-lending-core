@@ -6,11 +6,11 @@ import { SampleJetton } from '../build/SampleJetton/tact_SampleJetton';
 import { buildOnchainMetadata } from '../scripts/utils';
 import { JettonDefaultWallet } from '../build/SampleJetton/tact_JettonDefaultWallet';
 import { UserAccount } from '../build/Pool/tact_UserAccount';
-import { AToken } from '../wrappers/AToken';
-import { DToken } from '../wrappers/DToken';
 import { sleep } from '@ton/blueprint';
 import { PERCENTAGE_FACTOR, RAY } from '../helpers/constant';
 import { TestMathUtils } from '../wrappers/TestMathUtils';
+import { AToken } from '../build/Pool/tact_AToken';
+import { DToken } from '../build/Pool/tact_DToken';
 
 describe('Pool indexes calculation', () => {
     let blockchain: Blockchain;

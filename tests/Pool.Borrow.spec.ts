@@ -5,11 +5,11 @@ import '@ton/test-utils';
 import { SampleJetton } from '../build/SampleJetton/tact_SampleJetton';
 import { JettonDefaultWallet } from '../build/SampleJetton/tact_JettonDefaultWallet';
 import { UserAccount } from '../build/Pool/tact_UserAccount';
-import { DTokenDefaultWallet } from '../build/DToken/tact_DTokenDefaultWallet';
-import { DToken } from '../wrappers/DToken';
+import { DTokenDefaultWallet } from '../build/Pool/tact_DTokenDefaultWallet';
 import { PERCENTAGE_FACTOR, RAY } from '../helpers/constant';
 import { sumTransactionsFee } from '../jest.setup';
 import { addReserve, deployJetton, deployPool, mintJetton, reserveConfiguration, supplyJetton } from './utils';
+import { DToken } from '../build/Pool/tact_DToken';
 
 describe('Pool', () => {
     let blockchain: Blockchain;
@@ -37,7 +37,15 @@ describe('Pool', () => {
         await mintJetton(sampleJetton, sender, deployer.address, toNano(100n));
 
         const poolWalletAddress = await sampleJetton.getGetWalletAddress(pool.address);
-        const { dTokenAddress } = await addReserve(pool, deployer, sampleJetton.address, poolWalletAddress);
+        const { dTokenAddress, aTokenDTokenContents } = await addReserve(
+            pool,
+            deployer,
+            sampleJetton.address,
+            poolWalletAddress,
+        );
+        expect(dTokenAddress).toEqualAddress(
+            (await DToken.fromInit(pool.address, aTokenDTokenContents.dTokenContent, sampleJetton.address)).address,
+        );
 
         dToken = blockchain.openContract(DToken.fromAddress(dTokenAddress));
 
@@ -137,6 +145,19 @@ describe('Pool', () => {
             const deployerDTokenDefaultWalletAddress = await dToken.getGetWalletAddress(deployer.address);
             const deployerDTokenDefaultWallet = blockchain.openContract(
                 DTokenDefaultWallet.fromAddress(deployerDTokenDefaultWalletAddress),
+            );
+            expect(deployerDTokenDefaultWalletAddress).toEqualAddress(
+                (
+                    await DTokenDefaultWallet.fromInit(
+                        dToken.address,
+                        pool.address,
+                        sampleJetton.address,
+                        deployer.address,
+                    )
+                ).address,
+            );
+            expect(deployerDTokenDefaultWalletAddress).toEqualAddress(
+                await pool.getUserDTokenWalletAddress(sampleJetton.address, deployer.address),
             );
 
             const walletData = await deployerDTokenDefaultWallet.getGetWalletData();

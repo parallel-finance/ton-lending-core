@@ -94,7 +94,8 @@ contract UserAccount with Deployable {
                     positions: self.positions,
                     positionsLength: self.positionsLength,
                     positionsDetail: self.positionsDetail
-                }
+                },
+                payload: msg.payload
             }.toCell()
         });
     }
