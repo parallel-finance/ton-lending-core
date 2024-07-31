@@ -77,20 +77,7 @@ contract OracleProvider with Deployable, Ownable, Resumable {
 
     // Pull mode: fetch prices
     receive(msg: FetchPrices) {
-        let prices: map<Address, Int> = msg.prices;
-        foreach(reserve, _ in prices) {
-            prices.set(reserve, self.price(reserve));
-        }
-        send(SendParameters{
-            to: sender(),
-            value: 0,
-            bounce: false,
-            mode: SendRemainingValue,
-            body: FetchPricesResponse{
-                prices: prices,
-                payload: msg.payload
-            }.toCell()
-        });
+        self.fetchPrices(msg);
     }
 
     // Push mode: feed prices to pool
@@ -141,6 +128,23 @@ contract OracleProvider with Deployable, Ownable, Resumable {
             body: SyncPrices{
                 prices: prices,
                 responseDestination: sender()
+            }.toCell()
+        });
+    }
+
+    fun fetchPrices(msg: FetchPrices) {
+        let prices: map<Address, Int> = msg.prices;
+        foreach(reserve, _ in prices) {
+            prices.set(reserve, self.price(reserve));
+        }
+        send(SendParameters{
+            to: sender(),
+            value: 0,
+            bounce: false,
+            mode: SendRemainingValue,
+            body: FetchPricesResponse{
+                prices: prices,
+                payload: msg.payload
             }.toCell()
         });
     }

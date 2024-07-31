@@ -33,12 +33,12 @@ export const waitForTx = async (provider: NetworkProvider, sender: Address, usin
     if (usingOrbsRpc) {
         client = new TonClient4({ endpoint: await getHttpV4Endpoint({ network: provider.network() as Network }) });
     }
-    const hash = (await getAddressState(provider, sender)).last?.hash;
+    const hash = (await getAddressState(provider, sender)).last?.hash as Buffer;
 
     let currentHash = hash;
-    while (hash == currentHash) {
+    while (hash.equals(currentHash)) {
         console.log(`Waiting for sender stateHash update...`);
         await sleep(1500);
-        currentHash = (await client.provider(sender).getState()).last?.hash;
+        currentHash = (await client.provider(sender).getState()).last?.hash as Buffer;
     }
 };
