@@ -2,7 +2,8 @@
   "name": "ton-lending-core",
   "version": "0.0.1",
   "scripts": {
-    "start": "blueprint run",
+    "dev": "blueprint run",
+    "start": "blueprint run --mnemonic",
     "build": "blueprint build",
     "build:all": "blueprint build --all",
     "test": "jest --verbose",

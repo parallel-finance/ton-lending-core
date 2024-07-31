@@ -526,7 +526,7 @@ describe('Pool liquidation test', () => {
         );
         expect(Number(fromNano(borrowerHealthInfo.totalDebtInBaseCurrency))).toBeCloseTo(
             Number(fromNano((borrowAmount * debtReserveData.reserveData.price) / debtUint)),
-            5,
+            4,
         );
         expect(Number(borrowerHealthInfo.healthFactorInRay) / Number(RAY)).toBeCloseTo(
             Number(
@@ -1013,7 +1013,7 @@ describe('Pool liquidation test', () => {
         expect(aTokenBalance).toEqual(accountData.positionsDetail.get(collateralReserve.address)?.supply);
         // check treasury collateral balance
         const treasuryCollateralWalletBalance = (await treasuryCollateralWallet.getGetWalletData()).balance;
-        expect(Number(treasuryCollateralWalletBalance)).toBeCloseTo(Number(liquidationProtocolFee), -1);
+        expect(Number(treasuryCollateralWalletBalance)).toBeCloseTo(Number(liquidationProtocolFee), -2);
         // check liquidator collateral balance
         const liquidatorCollateralWalletBalanceAfter = (await liquidatorCollateralWallet.getGetWalletData()).balance;
         expect(

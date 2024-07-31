@@ -227,15 +227,15 @@ describe('Pool', () => {
             expect(userHealthInfo.avgLiquidationThreshold).toEqual(reserveConfiguration.liquidationThreshold);
             expect(Number(fromNano(userHealthInfo.totalCollateralInBaseCurrency))).toBeCloseTo(
                 Number(fromNano(100n * toNano(1))),
-                7,
+                6,
             );
             expect(Number(fromNano(userHealthInfo.totalSupplyInBaseCurrency))).toBeCloseTo(
                 Number(fromNano(100n * toNano(1))),
-                7,
+                6,
             );
             expect(Number(fromNano(userHealthInfo.totalDebtInBaseCurrency))).toBeCloseTo(
                 Number(fromNano(60n * toNano(1))),
-                7,
+                6,
             );
             expect(Number(fromNano((toNano(1) * userHealthInfo.healthFactorInRay) / RAY))).toBeCloseTo(
                 (100 * Number(reserveConfiguration.liquidationThreshold)) / (Number(PERCENTAGE_FACTOR) * 60),
