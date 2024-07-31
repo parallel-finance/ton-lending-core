@@ -27,6 +27,9 @@ export async function run(provider: NetworkProvider) {
         await sleep(1000);
         const configuration = await pool.getReserveConfiguration(reserveAddress);
         console.log(`Reserve poolWalletAddress: ${configuration.poolWalletAddress.toString()}`);
+        console.log(`Reserve aTokenAddress: ${configuration.aTokenAddress.toString()}`);
+        console.log(`Reserve dTokenAddress: ${configuration.dTokenAddress.toString()}`);
+        console.log(`Reserve treasuryAddress: ${configuration.treasury.toString()}`);
         console.log(`Reserve configuration: ${JSON.stringify(configuration)}`)
 
         await sleep(1000);
