@@ -17,7 +17,7 @@ import { randomAddress } from '@ton/test-utils';
 import { sumTransactionsFee } from '../jest.setup';
 import { sleep } from '@ton/blueprint';
 
-describe('Pool liquidation test', () => {
+describe('Oracle Provider test', () => {
     let blockchain: Blockchain;
     let snapshot: BlockchainSnapshot;
     let deployer: SandboxContract<TreasuryContract>;
