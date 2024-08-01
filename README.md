@@ -1,31 +1,10 @@
-# ton-lending-core
+# Tonlayer protocol
 
-## Project structure
+## What is Tonlayer protocol?
 
--   `contracts` - source code of all the smart contracts of the project and their dependencies.
--   `wrappers` - wrapper classes (implementing `Contract` from ton-core) for the contracts, including any [de]serialization primitives and compilation functions.
--   `tests` - tests for the contracts.
--   `scripts` - scripts used by the project, mainly the deployment scripts.
+Tonlayer protocol is a decentralized money market protocol on the TON blockchain. It allows users to supply liquidity to the pool and borrow assets from the pool. The protocol is designed to be composable, allowing users to supply liquidity to the pool and borrow assets from the pool.
 
-## How to use
-
-### Build
-
-`npx blueprint build` or `yarn blueprint build`
-
-### Test
-
-`npx blueprint test` or `yarn blueprint test`
-
-### Deploy or run another script
-
-`npx blueprint run` or `yarn blueprint run`
-
-### Add a new contract
-
-`npx blueprint create ContractName` or `yarn blueprint create ContractName`
-
-## Functions
+##  Functions
 
 ### Admin
 
@@ -42,7 +21,7 @@ The admin can perform the following actions:
 
 Once the token is supplied to the pool, the liquidity provider will receive the aToken(Asset token).
 The aToken can be used to withdraw the liquidity from the pool.
-The ratio of lToken to token will increase as time passes because of the interest.
+The ratio of aToken to token will increase as time passes because of the interest.
 
 The liquidity provider can perform the following actions:
 - The liquidity provider can deposit liquidity in the pool
@@ -57,16 +36,22 @@ The ratio of dToken to token will increase as time passes because of the interes
 
 ### Liquidator
 
-The liquidator can liquidate the position of the borrower if the borrower's position is undercollateralized.
+The liquidator can liquidate the position of the borrower if the borrower's position is under collateralized.
 
 The liquidator can perform the following actions:
 - The liquidator can liquidate the position of the borrower. The liquidator can only liquidate one position at a time.
 
-## Release
 
-- Before deploying to the mainnet, make sure to update the compiler 
+## Getting started
 
-## Development
+###  Project structure
+
+- `contracts` - source code of all the smart contracts of the project and their dependencies
+- `wrappers` - wrapper classes (implementing `Contract` from ton-core) for the contracts, including any [de]serialization primitives and compilation functions
+- `tests` - tests for the contracts
+- `scripts` - scripts used by the project, mainly the deployment scripts
+- `compilables`- the contracts compile config
+- `helpers` - helper functions used by the project
 
 ### Deploying the contracts and preparing the environment
 
@@ -112,6 +97,15 @@ p start withdrawJetton
 
 p start supplyTon
 p start borrowTon
+p start repayTon
+p start withdrawTon
+```
+
+7. Liquidate the position
+```bash
+p start findToLiquidateUser
+# update the user address to liquidate
+p start liquidateUser
 ```
 
 

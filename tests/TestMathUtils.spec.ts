@@ -1,5 +1,5 @@
 import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
-import { toNano } from '@ton/core';
+import { fromNano, toNano } from '@ton/core';
 import '@ton/test-utils';
 import { TestMathUtils } from '../build/TestMathUtils/tact_TestMathUtils';
 import { TestWadRayPercentageMath } from '../build/TestWadRayPercentageMath/tact_TestWadRayPercentageMath';
@@ -64,7 +64,7 @@ describe('TestMathUtils', () => {
         const lastUpdateTimestamp = now - BigInt(100);
         const expected = RAY + (rate * (now - lastUpdateTimestamp)) / SECONDS_PER_YEAR;
         const rst = await mathUtils.getCalculateLinearInterest(rate, lastUpdateTimestamp);
-        expect(Number(rst) / Number(RAY)).toEqual(Number(expected) / Number(RAY));
+        expect(rst).toEqual(expected);
     });
 
     it('calculateCompoundedInterest', async () => {
@@ -81,6 +81,7 @@ describe('TestMathUtils', () => {
 
         const expected = RAY + (rate * exp) / SECONDS_PER_YEAR + secondTerm + thirdTerm;
         const rst = await mathUtils.getCalculateCompoundedInterest(rate, lastUpdateTimestamp);
-        expect(Number(rst) / Number(RAY)).toEqual(Number(expected) / Number(RAY));
+        expect(rst).toEqual(expected);
+        // expect(Number(rst) / Number(RAY)).toEqual(Number(expected) / Number(RAY));
     });
 });

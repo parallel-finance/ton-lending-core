@@ -306,8 +306,7 @@ describe('Pool liquidation test', () => {
         Object.entries(addresses).forEach(([key, value]) => {
             printAddress[key] = (value as Address).toString();
         });
-        console.table(printAddress);
-    };
+           };
 
     const setMockOraclePrice = async (jetton: Address, price: bigint) => {
         const rst = await pool.send(
@@ -505,12 +504,10 @@ describe('Pool liquidation test', () => {
         await supply(deployer.getSender(), collateralReserve, supplyAmount);
         await borrow(deployer.getSender(), debtReserve, borrowAmount);
         const borrowerAccount = blockchain.openContract(await UserAccount.fromInit(pool.address, borrower.address));
-        console.log('borrowerAccount', borrowerAccount.address.toString());
-
+       
         let accountData = await borrowerAccount.getAccount();
         let borrowerHealthInfo = await pool.getUserAccountHealthInfo(accountData);
-        console.dir(borrowerHealthInfo, { depth: null });
-
+       
         let collateralReserveData = await pool.getReserveDataAndConfiguration(collateralReserve.address);
         let debtReserveData = await pool.getReserveDataAndConfiguration(debtReserve.address);
         expect(accountData.positionsLength).toEqual(2n);
@@ -573,8 +570,7 @@ describe('Pool liquidation test', () => {
             ) / Number(RAY),
             7,
         );
-        console.dir(borrowerHealthInfo, { depth: null });
-
+       
         // send liquidation message
         const liquidator = secondUser;
         const liquidatorDebtReserveWallet = blockchain.openContract(
@@ -614,17 +610,14 @@ describe('Pool liquidation test', () => {
             accountData.positionsDetail.get(collateralReserve.address)?.supply ||
             (0n * collateralReserveData.normalizedIncome) / RAY;
         const closeFactor = Number(borrowerHealthInfo.healthFactorInRay) / Number(RAY) > 0.95 ? 5000n : 10000n;
-        console.log(`closeFactor: ${closeFactor}`);
-        let actualLiquidationAmount = (debtAmount * closeFactor) / PERCENTAGE_FACTOR;
-        console.log(`actualLiquidationAmount: ${actualLiquidationAmount}`);
-
+               let actualLiquidationAmount = (debtAmount * closeFactor) / PERCENTAGE_FACTOR;
+       
         const maxCollateralToLiquidate =
             (((debtReserveData.reserveData.price * actualLiquidationAmount * collateralUint) /
                 (collateralReserveData.reserveData.price * debtUint)) *
                 collateralReserveData.reserveConfiguration.liquidationBonus) /
             PERCENTAGE_FACTOR;
-        console.log(`maxCollateralToLiquidate: ${maxCollateralToLiquidate}`);
-        let actualCollateralToLiquidate = 0n;
+               let actualCollateralToLiquidate = 0n;
         if (maxCollateralToLiquidate > collateralAmount) {
             actualCollateralToLiquidate = collateralAmount;
             actualLiquidationAmount =
@@ -636,17 +629,13 @@ describe('Pool liquidation test', () => {
             actualCollateralToLiquidate = maxCollateralToLiquidate;
             actualLiquidationAmount = actualLiquidationAmount;
         }
-        console.log(`actualCollateralToLiquidate: ${actualCollateralToLiquidate}`);
-        console.log(`actualLiquidationAmount: ${actualLiquidationAmount}`);
-        const expectedCollateralAfter =
+                      const expectedCollateralAfter =
             borrowerHealthInfo.totalCollateralInBaseCurrency -
             (actualCollateralToLiquidate * collateralReserveData.reserveData.price) / collateralUint;
         const expectedDebtAfter =
             borrowerHealthInfo.totalDebtInBaseCurrency -
             (actualLiquidationAmount * debtReserveData.reserveData.price) / debtUint;
-        console.log(`expectedCollateralAfter: ${expectedCollateralAfter}`);
-        console.log(`expectedDebtAfter: ${expectedDebtAfter}`);
-
+              
         let bonusCollateral =
             actualCollateralToLiquidate -
             (actualCollateralToLiquidate * PERCENTAGE_FACTOR) /
@@ -733,8 +722,7 @@ describe('Pool liquidation test', () => {
         accountData = await borrowerAccount.getAccount();
 
         borrowerHealthInfo = await pool.getUserAccountHealthInfo(accountData);
-        console.dir(borrowerHealthInfo, { depth: null });
-
+       
         // check borrower positions
         expect(Number(expectedCollateralAfter)).toBeCloseTo(
             Number(borrowerHealthInfo.totalCollateralInBaseCurrency),
@@ -771,12 +759,10 @@ describe('Pool liquidation test', () => {
         await supply(deployer.getSender(), collateralReserve, supplyAmount);
         await borrow(deployer.getSender(), debtReserve, borrowAmount);
         const borrowerAccount = blockchain.openContract(await UserAccount.fromInit(pool.address, borrower.address));
-        console.log('borrowerAccount', borrowerAccount.address.toString());
-
+       
         let accountData = await borrowerAccount.getAccount();
         let borrowerHealthInfo = await pool.getUserAccountHealthInfo(accountData);
-        console.dir(borrowerHealthInfo, { depth: null });
-
+       
         let collateralReserveData = await pool.getReserveDataAndConfiguration(collateralReserve.address);
         let debtReserveData = await pool.getReserveDataAndConfiguration(debtReserve.address);
         expect(accountData.positionsLength).toEqual(2n);
@@ -839,8 +825,7 @@ describe('Pool liquidation test', () => {
             ) / Number(RAY),
             7,
         );
-        console.dir(borrowerHealthInfo, { depth: null });
-
+       
         // send liquidation message
         const liquidator = secondUser;
         const liquidatorDebtReserveWallet = blockchain.openContract(
@@ -880,17 +865,14 @@ describe('Pool liquidation test', () => {
             accountData.positionsDetail.get(collateralReserve.address)?.supply ||
             (0n * collateralReserveData.normalizedIncome) / RAY;
         const closeFactor = Number(borrowerHealthInfo.healthFactorInRay) / Number(RAY) > 0.95 ? 5000n : 10000n;
-        console.log(`closeFactor: ${closeFactor}`);
-        let actualLiquidationAmount = (debtAmount * closeFactor) / PERCENTAGE_FACTOR;
-        console.log(`actualLiquidationAmount: ${actualLiquidationAmount}`);
-
+               let actualLiquidationAmount = (debtAmount * closeFactor) / PERCENTAGE_FACTOR;
+       
         const maxCollateralToLiquidate =
             (((debtReserveData.reserveData.price * actualLiquidationAmount * collateralUint) /
                 (collateralReserveData.reserveData.price * debtUint)) *
                 collateralReserveData.reserveConfiguration.liquidationBonus) /
             PERCENTAGE_FACTOR;
-        console.log(`maxCollateralToLiquidate: ${maxCollateralToLiquidate}`);
-        let actualCollateralToLiquidate = 0n;
+               let actualCollateralToLiquidate = 0n;
         if (maxCollateralToLiquidate > collateralAmount) {
             actualCollateralToLiquidate = collateralAmount;
             actualLiquidationAmount =
@@ -902,17 +884,13 @@ describe('Pool liquidation test', () => {
             actualCollateralToLiquidate = maxCollateralToLiquidate;
             actualLiquidationAmount = actualLiquidationAmount;
         }
-        console.log(`actualCollateralToLiquidate: ${actualCollateralToLiquidate}`);
-        console.log(`actualLiquidationAmount: ${actualLiquidationAmount}`);
-        const expectedCollateralAfter =
+                      const expectedCollateralAfter =
             borrowerHealthInfo.totalCollateralInBaseCurrency -
             (actualCollateralToLiquidate * collateralReserveData.reserveData.price) / collateralUint;
         const expectedDebtAfter =
             borrowerHealthInfo.totalDebtInBaseCurrency -
             (actualLiquidationAmount * debtReserveData.reserveData.price) / debtUint;
-        console.log(`expectedCollateralAfter: ${expectedCollateralAfter}`);
-        console.log(`expectedDebtAfter: ${expectedDebtAfter}`);
-
+              
         let bonusCollateral =
             actualCollateralToLiquidate -
             (actualCollateralToLiquidate * PERCENTAGE_FACTOR) /
@@ -999,8 +977,7 @@ describe('Pool liquidation test', () => {
         accountData = await borrowerAccount.getAccount();
 
         borrowerHealthInfo = await pool.getUserAccountHealthInfo(accountData);
-        console.dir(borrowerHealthInfo, { depth: null });
-
+       
         // check borrower positions
         expect(Number(expectedCollateralAfter)).toBeCloseTo(
             Number(borrowerHealthInfo.totalCollateralInBaseCurrency),
@@ -1036,12 +1013,10 @@ describe('Pool liquidation test', () => {
         await supply(deployer.getSender(), collateralReserve, supplyAmount);
         await borrow(deployer.getSender(), debtReserve, borrowAmount);
         const borrowerAccount = blockchain.openContract(await UserAccount.fromInit(pool.address, borrower.address));
-        console.log('borrowerAccount', borrowerAccount.address.toString());
-
+       
         let accountData = await borrowerAccount.getAccount();
         let borrowerHealthInfo = await pool.getUserAccountHealthInfo(accountData);
-        console.dir(borrowerHealthInfo, { depth: null });
-
+       
         let collateralReserveData = await pool.getReserveDataAndConfiguration(collateralReserve.address);
         let debtReserveData = await pool.getReserveDataAndConfiguration(debtReserve.address);
         expect(accountData.positionsLength).toEqual(1n);
@@ -1101,8 +1076,7 @@ describe('Pool liquidation test', () => {
             ) / Number(RAY),
             7,
         );
-        console.dir(borrowerHealthInfo, { depth: null });
-
+       
         // send liquidation message
         const liquidator = secondUser;
         const liquidatorDebtReserveWallet = blockchain.openContract(
@@ -1142,17 +1116,14 @@ describe('Pool liquidation test', () => {
             accountData.positionsDetail.get(collateralReserve.address)?.supply ||
             (0n * collateralReserveData.normalizedIncome) / RAY;
         const closeFactor = Number(borrowerHealthInfo.healthFactorInRay) / Number(RAY) > 0.95 ? 5000n : 10000n;
-        console.log(`closeFactor: ${closeFactor}`);
-        let actualLiquidationAmount = (debtAmount * closeFactor) / PERCENTAGE_FACTOR;
-        console.log(`actualLiquidationAmount: ${actualLiquidationAmount}`);
-
+               let actualLiquidationAmount = (debtAmount * closeFactor) / PERCENTAGE_FACTOR;
+       
         const maxCollateralToLiquidate =
             (((debtReserveData.reserveData.price * actualLiquidationAmount * collateralUint) /
                 (collateralReserveData.reserveData.price * debtUint)) *
                 collateralReserveData.reserveConfiguration.liquidationBonus) /
             PERCENTAGE_FACTOR;
-        console.log(`maxCollateralToLiquidate: ${maxCollateralToLiquidate}`);
-        let actualCollateralToLiquidate = 0n;
+               let actualCollateralToLiquidate = 0n;
         if (maxCollateralToLiquidate > collateralAmount) {
             actualCollateralToLiquidate = collateralAmount;
             actualLiquidationAmount =
@@ -1164,17 +1135,13 @@ describe('Pool liquidation test', () => {
             actualCollateralToLiquidate = maxCollateralToLiquidate;
             actualLiquidationAmount = actualLiquidationAmount;
         }
-        console.log(`actualCollateralToLiquidate: ${actualCollateralToLiquidate}`);
-        console.log(`actualLiquidationAmount: ${actualLiquidationAmount}`);
-        const expectedCollateralAfter =
+                      const expectedCollateralAfter =
             borrowerHealthInfo.totalCollateralInBaseCurrency -
             (actualCollateralToLiquidate * collateralReserveData.reserveData.price) / collateralUint;
         const expectedDebtAfter =
             borrowerHealthInfo.totalDebtInBaseCurrency -
             (actualLiquidationAmount * debtReserveData.reserveData.price) / debtUint;
-        console.log(`expectedCollateralAfter: ${expectedCollateralAfter}`);
-        console.log(`expectedDebtAfter: ${expectedDebtAfter}`);
-
+              
         let bonusCollateral =
             actualCollateralToLiquidate -
             (actualCollateralToLiquidate * PERCENTAGE_FACTOR) /
@@ -1261,8 +1228,7 @@ describe('Pool liquidation test', () => {
         accountData = await borrowerAccount.getAccount();
 
         borrowerHealthInfo = await pool.getUserAccountHealthInfo(accountData);
-        console.dir(borrowerHealthInfo, { depth: null });
-
+       
         // check borrower positions
         expect(Number(expectedCollateralAfter)).toBeCloseTo(
             Number(borrowerHealthInfo.totalCollateralInBaseCurrency),
@@ -1303,12 +1269,10 @@ describe('Pool liquidation test', () => {
         await supply(deployer.getSender(), collateralReserve, supplyAmount);
         await borrow(deployer.getSender(), debtReserve, borrowAmount);
         const borrowerAccount = blockchain.openContract(await UserAccount.fromInit(pool.address, borrower.address));
-        console.log('borrowerAccount', borrowerAccount.address.toString());
-
+       
         let accountData = await borrowerAccount.getAccount();
         let borrowerHealthInfo = await pool.getUserAccountHealthInfo(accountData);
-        console.dir(borrowerHealthInfo, { depth: null });
-
+       
         let collateralReserveData = await pool.getReserveDataAndConfiguration(collateralReserve.address);
         let debtReserveData = await pool.getReserveDataAndConfiguration(debtReserve.address);
         expect(accountData.positionsLength).toEqual(1n);
@@ -1368,8 +1332,7 @@ describe('Pool liquidation test', () => {
             ) / Number(RAY),
             7,
         );
-        console.dir(borrowerHealthInfo, { depth: null });
-
+       
         // send liquidation message
         const liquidator = secondUser;
         const liquidatorDebtReserveWallet = blockchain.openContract(
@@ -1409,17 +1372,14 @@ describe('Pool liquidation test', () => {
             accountData.positionsDetail.get(collateralReserve.address)?.supply ||
             (0n * collateralReserveData.normalizedIncome) / RAY;
         const closeFactor = Number(borrowerHealthInfo.healthFactorInRay) / Number(RAY) > 0.95 ? 5000n : 10000n;
-        console.log(`closeFactor: ${closeFactor}`);
-        let actualLiquidationAmount = (debtAmount * closeFactor) / PERCENTAGE_FACTOR;
-        console.log(`actualLiquidationAmount: ${actualLiquidationAmount}`);
-
+               let actualLiquidationAmount = (debtAmount * closeFactor) / PERCENTAGE_FACTOR;
+       
         const maxCollateralToLiquidate =
             (((debtReserveData.reserveData.price * actualLiquidationAmount * collateralUint) /
                 (collateralReserveData.reserveData.price * debtUint)) *
                 collateralReserveData.reserveConfiguration.liquidationBonus) /
             PERCENTAGE_FACTOR;
-        console.log(`maxCollateralToLiquidate: ${maxCollateralToLiquidate}`);
-        let actualCollateralToLiquidate = 0n;
+               let actualCollateralToLiquidate = 0n;
         if (maxCollateralToLiquidate > collateralAmount) {
             actualCollateralToLiquidate = collateralAmount;
             actualLiquidationAmount =
@@ -1431,17 +1391,13 @@ describe('Pool liquidation test', () => {
             actualCollateralToLiquidate = maxCollateralToLiquidate;
             actualLiquidationAmount = actualLiquidationAmount;
         }
-        console.log(`actualCollateralToLiquidate: ${actualCollateralToLiquidate}`);
-        console.log(`actualLiquidationAmount: ${actualLiquidationAmount}`);
-        const expectedCollateralAfter =
+                      const expectedCollateralAfter =
             borrowerHealthInfo.totalCollateralInBaseCurrency -
             (actualCollateralToLiquidate * collateralReserveData.reserveData.price) / collateralUint;
         const expectedDebtAfter =
             borrowerHealthInfo.totalDebtInBaseCurrency -
             (actualLiquidationAmount * debtReserveData.reserveData.price) / debtUint;
-        console.log(`expectedCollateralAfter: ${expectedCollateralAfter}`);
-        console.log(`expectedDebtAfter: ${expectedDebtAfter}`);
-
+              
         let bonusCollateral =
             actualCollateralToLiquidate -
             (actualCollateralToLiquidate * PERCENTAGE_FACTOR) /
@@ -1528,8 +1484,7 @@ describe('Pool liquidation test', () => {
         accountData = await borrowerAccount.getAccount();
 
         borrowerHealthInfo = await pool.getUserAccountHealthInfo(accountData);
-        console.dir(borrowerHealthInfo, { depth: null });
-
+       
         // check borrower positions
         expect(Number(expectedCollateralAfter)).toBeCloseTo(
             Number(borrowerHealthInfo.totalCollateralInBaseCurrency),

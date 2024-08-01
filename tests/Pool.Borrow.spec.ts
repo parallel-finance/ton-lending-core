@@ -1,4 +1,4 @@
-import { Blockchain, printTransactionFees, SandboxContract, TreasuryContract } from '@ton/sandbox';
+import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
 import { fromNano, toNano } from '@ton/core';
 import { Pool } from '../wrappers/Pool';
 import '@ton/test-utils';
@@ -131,7 +131,6 @@ describe('Pool', () => {
                 success: true,
             });
 
-            printTransactionFees(result.transactions);
             const totalTransactionFee = sumTransactionsFee(result.transactions);
             expect(totalTransactionFee).toBeLessThanOrEqual(0.106); // real: 0.10566304799999998
 

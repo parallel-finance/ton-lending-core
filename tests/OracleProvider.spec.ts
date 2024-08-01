@@ -1,13 +1,6 @@
-import {
-    Blockchain,
-    BlockchainSnapshot,
-    printTransactionFees,
-    SandboxContract,
-    Treasury,
-    TreasuryContract,
-} from '@ton/sandbox';
+import { Blockchain, BlockchainSnapshot, SandboxContract, TreasuryContract } from '@ton/sandbox';
 import '@ton/test-utils';
-import { Address, beginCell, Cell, Dictionary, fromNano, Slice, toNano } from '@ton/core';
+import { Address, Dictionary, toNano } from '@ton/core';
 import { ATokenDTokenContents, Pool, ReserveConfiguration, ReserveInterestRateStrategy } from '../wrappers/Pool';
 import { SampleJetton } from '../build/SampleJetton/tact_SampleJetton';
 import { buildOnchainMetadata } from '../scripts/utils';
@@ -288,7 +281,6 @@ describe('Oracle Provider test', () => {
         Object.entries(addresses).forEach(([key, value]) => {
             printAddress[key] = (value as Address).toString();
         });
-        console.table(printAddress);
     };
 
     const setMockOraclePrice = async (jetton: Address, price: bigint) => {
@@ -471,9 +463,7 @@ describe('Oracle Provider test', () => {
         prices.set(sampleJetton1.address, sampleJetton1Price);
         const result = await feedPrices(prices);
 
-        printTransactionFees(result.transactions);
         const sumFee = sumTransactionsFee(result.transactions);
-        console.log(`feed one price: ${sumFee}`);
         expect(sumFee).toBeLessThan(0.0165);
     });
 
@@ -486,9 +476,7 @@ describe('Oracle Provider test', () => {
 
         const result = await feedPrices(prices);
 
-        printTransactionFees(result.transactions);
         const sumFee = sumTransactionsFee(result.transactions);
-        console.log(`feed two prices: ${sumFee}`);
         expect(sumFee).toBeLessThan(0.023);
     });
 
@@ -538,10 +526,6 @@ describe('Oracle Provider test', () => {
         expect(Number(priceDataInOracle?.lastUpdateTime)).toBeCloseTo(Number(now), -1);
         const reservesData = await pool.getAllReserveDataAndConfiguration();
         expect(reservesData.keys()).not.toContain(mockReserve);
-
-        printTransactionFees(result.transactions);
-        const sumFee = sumTransactionsFee(result.transactions);
-        console.log(`feed one price which is not in pool: ${sumFee}`);
     });
 
     it('get expired price', async () => {
@@ -603,10 +587,8 @@ describe('Oracle Provider test', () => {
         const priceDataInOracle = (await oracleProvider.getOracleData()).prices.get(sampleJetton1.address);
         expect(priceDataInOracle?.price).toEqual(sampleJetton1Price);
         expect(Number(priceDataInOracle?.lastUpdateTime)).toBeCloseTo(Number(now), -1);
-        console.log(await pool.getAllReserveDataAndConfiguration());
         const reserveData = await pool.getReserveData(sampleJetton1.address);
         expect(reserveData.price).toEqual(sampleJetton1Price);
-        console.log(reserveData);
     });
 
     it('feed price exceed maxDeviationRate', async () => {
