@@ -40,14 +40,22 @@ struct ReserveData {
     lastUpdateTimestamp: Int as uint32;
     price: Int as uint64;
 }
-
 struct ReserveDataAndConfiguration {
     reserveData: ReserveData;
     reserveConfiguration: ReserveConfiguration;
     normalizedIncome: Int as uint128;
     normalizedDebt: Int as uint128;
 }
-
+struct TokenData {
+    supply: Int as coins;
+    borrow: Int as coins;
+    asCollateral: Bool;
+}
+struct UserAccountData {
+    positions: map<Int, Address>;
+    positionsLength: Int;
+    positionsDetail: map<Address, TokenData>;
+}
 struct ReserveCache {
     currentScaledDebt: Int;
     nextScaledDebt: Int;
@@ -99,4 +107,8 @@ struct Liquidation {
     liquidationReserve: Address;
     collateralReserve: Address;
     liquidationAmount: Int;
+}
+struct PriceData {
+    price: Int;
+    lastUpdateTime: Int as uint32;
 }
