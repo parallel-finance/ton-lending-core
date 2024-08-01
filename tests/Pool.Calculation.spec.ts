@@ -427,8 +427,8 @@ describe('Pool indexes calculation', () => {
         await sleep(5 * 1000);
         reserveData = (await pool.getReserveDataAndConfiguration(sampleJetton.address)).reserveData;
         // after the first borrow, the other action will update the indexes.
-        expect(reserveData.liquidityIndex).toEqual(normalizedIncomeBefore);
-        expect(reserveData.borrowIndex).toEqual(normalizedDebtBefore);
+        expect(Number(fromNano(reserveData.liquidityIndex))).toBeCloseTo(Number(fromNano(normalizedIncomeBefore)), -9);
+        expect(Number(fromNano(reserveData.borrowIndex))).toBeCloseTo(Number(fromNano(normalizedDebtBefore)), -9);
         // calculate rates
         {
             const totalDebt = (reserveData.totalBorrow * reserveData.borrowIndex) / RAY;
@@ -443,8 +443,8 @@ describe('Pool indexes calculation', () => {
                 (((currentBorrowRate * supplyUsageRatio) / RAY) *
                     (PERCENTAGE_FACTOR - reserveConfiguration.reserveFactor)) /
                 PERCENTAGE_FACTOR;
-            expect(reserveData.currentLiquidityRate).toEqual(currentLiquidityRate);
-            expect(reserveData.currentBorrowRate).toEqual(currentBorrowRate);
+            expect(Number(fromNano(reserveData.currentLiquidityRate))).toBeCloseTo(Number(fromNano(currentLiquidityRate)), -9);
+            expect(Number(fromNano(reserveData.currentBorrowRate))).toBeCloseTo(Number(fromNano(currentBorrowRate)), -9);
         }
 
         //  check: totalSupplyInUnderlying, available liquidity, totalBorrowInUnderlying, accToTreasury

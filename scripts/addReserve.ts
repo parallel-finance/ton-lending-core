@@ -187,7 +187,7 @@ const addUSDTReserve = async (provider: NetworkProvider, pool: OpenedContract<Po
     const aTokenJettonParams = {
         name: 'USDT aToken',
         description: 'USDT aToken',
-        decimals: '9',
+        decimals: '6',
         image: 'https://cache.tonapi.io/imgproxy/T3PB4s7oprNVaJkwqbGg54nexKE0zzKhcrPv8jcWYzU/rs:fill:200:200:1/g:no/aHR0cHM6Ly90ZXRoZXIudG8vaW1hZ2VzL2xvZ29DaXJjbGUucG5n.webp',
         symbol: 'aUSDT',
     };
@@ -195,7 +195,7 @@ const addUSDTReserve = async (provider: NetworkProvider, pool: OpenedContract<Po
     const dTokenJettonParams = {
         name: 'USDT dToken',
         description: 'USDT dToken',
-        decimals: '9',
+        decimals: '6',
         image: 'https://cache.tonapi.io/imgproxy/T3PB4s7oprNVaJkwqbGg54nexKE0zzKhcrPv8jcWYzU/rs:fill:200:200:1/g:no/aHR0cHM6Ly90ZXRoZXIudG8vaW1hZ2VzL2xvZ29DaXJjbGUucG5n.webp',
         symbol: 'dUSDT',
     };
@@ -238,6 +238,8 @@ const printCurrentReserveLength = async (provider: NetworkProvider, pool: Opened
 
 export async function run(provider: NetworkProvider) {
     const pool = provider.open(await Pool.fromInit());
+    // EQAQCgea8PVFW0jUIQvvGAZu9G-KsrO-Q3RO0R50Svg8tMXN
+    console.log(`Start adding reserves... (pool address: ${pool.address.toString()}`);
     await sleep(1000);
 
     const beforeReserveLength = await pool.getReservesLength();

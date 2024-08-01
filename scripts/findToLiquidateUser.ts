@@ -1,10 +1,11 @@
-import { address, Address, OpenedContract, TupleBuilder } from '@ton/core';
-import { Pool, ReserveData, storeTupleUserAccountData, UserAccountData, UserAccountHealthInfo } from '../wrappers/Pool';
+import { address, Address, OpenedContract } from '@ton/core';
+import { Pool, ReserveData, UserAccountData, UserAccountHealthInfo } from '../wrappers/Pool';
 import { NetworkProvider, sleep } from '@ton/blueprint';
 import axios from 'axios';
 import { UserAccount } from '../build/Pool/tact_UserAccount';
 import { RAY } from '../helpers/constant';
 
+// Warning: to run this script, you need to use the testnet(TonClient v4) rather than the custom network(TonClient)
 declare global {
     interface BigInt {
         toJSON(): string;

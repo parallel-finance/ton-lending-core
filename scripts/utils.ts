@@ -1,7 +1,9 @@
 import { Sha256 } from '@aws-crypto/sha256-js';
-import { beginCell, Cell } from '@ton/ton';
+import { beginCell, Cell, Address } from '@ton/ton';
 import { Dictionary } from '@ton/core';
 import * as crc32 from 'crc-32';
+import axios from 'axios';
+import { sleep } from '@ton/blueprint';
 
 const ONCHAIN_CONTENT_PREFIX = 0x00;
 const SNAKE_PREFIX = 0x00;
@@ -68,4 +70,28 @@ function calculateResponseOpcode_2(str: string): string {
     const a = BigInt(crc32.str(str));
     const b = BigInt(0x80000000);
     return ((a | b) < 0 ? (a | b) + BigInt('4294967296') : a | b).toString(16);
+}
+
+export const getAddressSeqno = async (address: Address): Promise<number> => {
+    const accountId = address.toRawString();
+    const testnetTonApiUrl = 'https://testnet.tonapi.io';
+    const query = `/v2/wallet/${accountId}/seqno`;
+    const testUrl = `${testnetTonApiUrl}${query}`;
+    const result = await axios.get(testUrl);
+    return result.data?.seqno;
+}
+
+export const waitNextSeqno = async (address: Address, beforeSeqno: number) => {
+    let currentSeqno = await getAddressSeqno(address);
+    let i = 0;
+    while (currentSeqno == beforeSeqno && i < 15) {
+        await sleep(1000);
+        currentSeqno = await getAddressSeqno(address);
+    }
+    console.log(`Current seqno: ${currentSeqno}`)
+    if (currentSeqno !== beforeSeqno + 1) {
+        console.log(`Action fail!`);
+    } else {
+        console.log(`Action success!`);
+    }
 }
