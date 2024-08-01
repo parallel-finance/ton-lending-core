@@ -230,8 +230,7 @@ describe('Pool indexes calculation', () => {
         Object.entries(addresses).forEach(([key, value]) => {
             printAddress[key] = (value as Address).toString();
         });
-        console.table(printAddress);
-    };
+           };
 
     const supply = async (user: Treasury, amount: bigint) => {
         // transfer jetton to pool

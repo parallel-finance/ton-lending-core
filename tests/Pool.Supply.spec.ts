@@ -1,4 +1,4 @@
-import { Blockchain, printTransactionFees, SandboxContract, TreasuryContract } from '@ton/sandbox';
+import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
 import { beginCell, Cell, toNano } from '@ton/core';
 import { Pool, UpdatePositionBounce } from '../wrappers/Pool';
 import '@ton/test-utils';
@@ -81,8 +81,6 @@ describe('Pool Supply', () => {
             },
         );
 
-        // open this line to see the details
-        // printTransactionFees(result.transactions);
         const totalTransactionFee = sumTransactionsFee(result.transactions);
         expect(totalTransactionFee).toBeLessThanOrEqual(0.12);
 
@@ -211,7 +209,7 @@ describe('Pool Supply', () => {
             const { liquidationThreshold } = reserveData.reserveConfiguration;
 
             const maxATokenTransferAmount =
-                amount - (borrowAmount * price * PERCENTAGE_FACTOR) / liquidationThreshold / price;
+                amount - (borrowAmount * price * (PERCENTAGE_FACTOR + 1n)) / liquidationThreshold / price;
 
             result = await aTokenWallet.send(
                 deployer.getSender(),
