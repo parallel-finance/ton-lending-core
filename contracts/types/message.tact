@@ -71,6 +71,11 @@ message(0x66660011) WithdrawTon {
 message(0x66660012) RepayTon {
     amount: Int as coins;
 }
+message(0x66660013) LiquidateTon {
+    borrower: Address;
+    collateralReserve: Address;
+    liquidationAmount: Int as coins;
+}
 // Notice: Only for Test
 message SetMockOraclePrice {
     asset: Address;

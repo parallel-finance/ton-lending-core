@@ -17,6 +17,7 @@ export type JettonParams = {
     symbol: string;
 };
 
+// === EQAEJ7U1iaC1TzcFel5lc2-JaEm8I0k5Krui3fzz3_GeAIhQ
 export const reserveAddress = address('UQAEJ7U1iaC1TzcFel5lc2-JaEm8I0k5Krui3fzz3_GeANWV');
 
 export const reserveConfiguration: ReserveConfiguration = {

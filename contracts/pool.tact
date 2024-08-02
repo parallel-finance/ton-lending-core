@@ -328,11 +328,31 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
                 // actualCollateralToLiquidate = actualCollateralToLiquidate - liquidationFee;
             }
 
-            // Transfer collateral Token to the liquidator.
             let poolWalletAddress: Address = collateralReserveConfiguration.poolWalletAddress;
-            self.sendTokenTransferByPool(poolWalletAddress, liquidator, actualCollateralToLiquidate - liquidationFee);
-            // Transfer collateral Token to the reserve treasury.
-            self.sendTokenTransferByPool(poolWalletAddress, collateralReserveConfiguration.treasury, liquidationFee);
+            if (poolWalletAddress == myAddress()) {
+                // The ton received should only be withdrawAmount
+                send(SendParameters{
+                    to: liquidator,
+                    value: actualCollateralToLiquidate - liquidationFee,
+                    bounce: false,
+                    mode: 0,
+                    body: emptyCell(),
+                });
+                send(SendParameters{
+                    to: collateralReserveConfiguration.treasury,
+                    value: liquidationFee,
+                    bounce: false,
+                    mode: 0,
+                    body: emptyCell(),
+                });
+            } else {
+                // Transfer collateral Token to the liquidator.
+                self.sendTokenTransferByPool(poolWalletAddress, liquidator, actualCollateralToLiquidate - liquidationFee);
+                // Transfer collateral Token to the reserve treasury.
+                self.sendTokenTransferByPool(poolWalletAddress, collateralReserveConfiguration.treasury, liquidationFee);
+            }
+
+            
             
             // update user debt token position and burn dToken
             let scaledLiquidationAmount: Int = actualLiquidationAmount.rayDiv(reserveCache.nextBorrowIndex);
@@ -535,6 +555,54 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator {
                 tokenAddress: reserveAddress,
                 amount: repayAmount,
                 payload: emptySlice()
+            }.toCell()
+        });
+        self.queryId += 1;
+    }
+
+    receive(msg: LiquidateTon) {
+        let debtReserve: Address = myAddress();
+        let optionalDebtReserveData: ReserveData? = self.reserveData(debtReserve);
+        require(optionalDebtReserveData != null, "Ton not supported");
+        let reserveData: ReserveData = optionalDebtReserveData!!;
+
+        let collateralReserve: ReserveData? = self.reservesData.get(msg.collateralReserve);
+        require(collateralReserve != null, "Collateral reserve not found");
+
+        let ctx: Context = context();
+        let fwdFee: Int = ctx.readForwardFee() * 8;
+        let storageFee: Int = self.MIN_TONS_FOR_STORAGE;
+        let computationAndActionFee: Int = self.TOKEN_TRANSFER_GAS_CONSUMPTION * 2
+            + self.TOKEN_BURN_GAS_CONSUMPTION * 2 
+            + self.LIQUIDATION_GAS_CONSUMPTION;
+        let totalFee: Int = fwdFee + storageFee + computationAndActionFee;
+        require(ctx.value > totalFee, "Insufficient fee");
+
+        let liquidationAmount: Int = msg.liquidationAmount;
+        let liquidationMsg: Liquidation = Liquidation{
+            liquidator: sender(),
+            borrower: msg.borrower,
+            liquidationReserve: debtReserve,
+            collateralReserve: msg.collateralReserve,
+            liquidationAmount: msg.liquidationAmount
+        };
+
+        let userAccountAddress: Address = self.userAccountAddress(msg.borrower);
+        let payload: Slice = beginCell().storeRef(liquidationMsg.toCell()).asSlice();
+        let remainingValue: Int = self.remainingValue(ctx.value, self.LIQUIDATION_GAS_CONSUMPTION + ctx.readForwardFee());
+
+        send(SendParameters{
+            to: userAccountAddress,
+            value: remainingValue,
+            bounce: true,
+            mode: SendPayGasSeparately,
+            body: GetUserAccountData{
+                queryId: self.queryId,
+                user: msg.borrower,
+                action: ACTION_LIQUIDATION,
+                tokenAddress: debtReserve,
+                amount: liquidationAmount,
+                payload: payload
             }.toCell()
         });
         self.queryId += 1;
