@@ -185,4 +185,36 @@ trait PoolView with Ownable, Resumable {
     get fun oracleProvider(): Address? {
         return self.oracleProvider;
     }
+
+    get fun MIN_TONS_FOR_STORAGE(): Int {
+        return self.MIN_TONS_FOR_STORAGE();
+    }
+
+    get fun TOKEN_TRANSFER_GAS_CONSUMPTION(): Int {
+        return self.TOKEN_TRANSFER_GAS_CONSUMPTION();
+    }
+    
+    get fun TOKEN_MINT_GAS_CONSUMPTION(): Int {
+        return self.TOKEN_MINT_GAS_CONSUMPTION();
+    }
+
+    get fun TOKEN_BURN_GAS_CONSUMPTION(): Int {
+        return self.TOKEN_BURN_GAS_CONSUMPTION();
+    }
+
+    get fun SUPPLY_REPAY_GAS_CONSUMPTION(): Int {
+        return self.SUPPLY_REPAY_GAS_CONSUMPTION();
+    }
+
+    get fun BORROW_GAS_CONSUMPTION(): Int {
+        return self.BORROW_GAS_CONSUMPTION();
+    }
+
+    get fun WITHDRAW_GAS_CONSUMPTION(): Int {
+        return self.WITHDRAW_GAS_CONSUMPTION();
+    }
+    
+    get fun LIQUIDATION_GAS_CONSUMPTION(): Int {
+        return self.LIQUIDATION_GAS_CONSUMPTION();
+    }
 }
