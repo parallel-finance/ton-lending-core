@@ -17,3 +17,13 @@ export const RERUN_ACTION_TOKEN_BURN = 103n;
 export const EXPIRATION_PERIOD = 300n;
 // reject when price +30% or -30%, based on 10000;
 export const MAX_DEVIATION_RATE = 3000n;
+
+// ACL ROLEs
+
+export const ACL = {
+    DEFAULT_ADMIN_ROLE: 0n,
+    POOL_ADMIN_ROLE: 1n,
+    ASSET_LISTING_ADMIN_ROLE: 2n,
+    RISK_ADMIN_ROLE: 3n,
+    EMERGENCY_ADMIN_ROLE: 4n,
+};

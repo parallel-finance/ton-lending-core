@@ -5,6 +5,7 @@ import '@ton/test-utils';
 import { buildOnchainMetadata } from '../scripts/utils';
 import { RAY } from '../helpers/constant';
 import { AToken } from '../build/Pool/tact_AToken';
+import { deployPool } from './utils';
 
 describe('Pool', () => {
     let blockchain: Blockchain;
@@ -52,7 +53,7 @@ describe('Pool', () => {
         supplyCap: 1000000n,
         borrowCap: 1000000n,
         treasury: reserveAddress,
-        decimals: 9n
+        decimals: 9n,
     };
 
     const reserveInterestRateStrategy: ReserveInterestRateStrategy = {
@@ -71,23 +72,7 @@ describe('Pool', () => {
 
         deployer = await blockchain.treasury('deployer');
 
-        const deployResult = await pool.send(
-            deployer.getSender(),
-            {
-                value: toNano('0.05'),
-            },
-            {
-                $$type: 'Deploy',
-                queryId: 0n,
-            },
-        );
-
-        expect(deployResult.transactions).toHaveTransaction({
-            from: deployer.address,
-            to: pool.address,
-            deploy: true,
-            success: true,
-        });
+        await deployPool(pool, deployer);
 
         reserveConfiguration.aTokenAddress = await pool.getCalculateATokenAddress(
             contents.aTokenContent,

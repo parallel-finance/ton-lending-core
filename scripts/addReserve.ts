@@ -3,6 +3,8 @@ import { NetworkProvider, sleep } from '@ton/blueprint';
 import { ATokenDTokenContents, Pool, ReserveConfiguration, ReserveInterestRateStrategy } from '../wrappers/Pool';
 import { SampleJetton } from '../wrappers/SampleJetton';
 import { buildOnchainMetadata, JettonMetaData } from './utils';
+import { ACL } from '../helpers/constant';
+import { send } from 'process';
 
 const RAY = 10n ** 27n;
 
@@ -19,7 +21,16 @@ const addJettonReserve = async (
     const jetton = provider.open(SampleJetton.fromAddress(reserveAddress));
     const poolWalletAddress = await jetton.getGetWalletAddress(pool.address);
 
-    await addReserve(provider, pool, poolWalletAddress, reserveAddress, aTokenJettonParams, dTokenJettonParams, targetReserveLength, decimals);
+    await addReserve(
+        provider,
+        pool,
+        poolWalletAddress,
+        reserveAddress,
+        aTokenJettonParams,
+        dTokenJettonParams,
+        targetReserveLength,
+        decimals,
+    );
 };
 
 const addReserve = async (
@@ -248,6 +259,10 @@ export async function run(provider: NetworkProvider) {
         return;
     }
     console.log(`Before reserve length: ${beforeReserveLength}`);
+
+    if (!(await pool.getHasRole(ACL.ASSET_LISTING_ADMIN_ROLE, provider.sender().address!!))) {
+        console.error(`${provider.sender().address!!} don't have the ASSET_LISTING_ADMIN_ROLE role`);
+    }
 
     await addMasReserve(provider, pool);
     await addNotCoinReserve(provider, pool);

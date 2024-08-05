@@ -11,6 +11,7 @@ import { PERCENTAGE_FACTOR, RAY } from '../helpers/constant';
 import { TestMathUtils } from '../wrappers/TestMathUtils';
 import { AToken } from '../build/Pool/tact_AToken';
 import { DToken } from '../build/Pool/tact_DToken';
+import { deployPool } from './utils';
 
 describe('Pool indexes calculation', () => {
     let blockchain: Blockchain;
@@ -48,24 +49,8 @@ describe('Pool indexes calculation', () => {
 
         pool = blockchain.openContract(await Pool.fromInit());
         // deploy pool
-        const deployResult = await pool.send(
-            deployer.getSender(),
-            {
-                value: toNano('0.05'),
-            },
-            {
-                $$type: 'Deploy',
-                queryId: 0n,
-            },
-        );
+        await deployPool(pool, deployer);
         addresses.pool = pool.address;
-
-        expect(deployResult.transactions).toHaveTransaction({
-            from: deployer.address,
-            to: pool.address,
-            deploy: true,
-            success: true,
-        });
 
         const jettonParams = {
             name: 'SampleJetton',
@@ -230,7 +215,7 @@ describe('Pool indexes calculation', () => {
         Object.entries(addresses).forEach(([key, value]) => {
             printAddress[key] = (value as Address).toString();
         });
-           };
+    };
 
     const supply = async (user: Treasury, amount: bigint) => {
         // transfer jetton to pool
@@ -442,8 +427,14 @@ describe('Pool indexes calculation', () => {
                 (((currentBorrowRate * supplyUsageRatio) / RAY) *
                     (PERCENTAGE_FACTOR - reserveConfiguration.reserveFactor)) /
                 PERCENTAGE_FACTOR;
-            expect(Number(fromNano(reserveData.currentLiquidityRate))).toBeCloseTo(Number(fromNano(currentLiquidityRate)), -9);
-            expect(Number(fromNano(reserveData.currentBorrowRate))).toBeCloseTo(Number(fromNano(currentBorrowRate)), -9);
+            expect(Number(fromNano(reserveData.currentLiquidityRate))).toBeCloseTo(
+                Number(fromNano(currentLiquidityRate)),
+                -9,
+            );
+            expect(Number(fromNano(reserveData.currentBorrowRate))).toBeCloseTo(
+                Number(fromNano(currentBorrowRate)),
+                -9,
+            );
         }
 
         //  check: totalSupplyInUnderlying, available liquidity, totalBorrowInUnderlying, accToTreasury
