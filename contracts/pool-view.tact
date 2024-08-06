@@ -141,6 +141,10 @@ trait PoolView with Ownable, Resumable {
         return self.reservesConfiguration.get(reserveAddress)!!;
     }
 
+    get fun reserveInterestRateStrategy(reserveAddress: Address): ReserveInterestRateStrategy {
+        return self.reservesInterestRateStrategy.get(reserveAddress)!!;
+    }
+
     get fun calculateATokenAddress(content: Cell, reserveAddress: Address): Address {
         let sinit: StateInit = self.getAssetATokenInit(content, reserveAddress);
         let aTokenAddress: Address = contractAddress(sinit);

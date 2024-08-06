@@ -113,6 +113,7 @@ trait PoolConfigurator with Ownable, Resumable, PoolACL, PoolView {
         configuration.liquidationThreshold = msg.liquidationThreshold;
         configuration.liquidationBonus = msg.liquidationBonus;
         self.reservesConfiguration.set(msg.reserve, configuration);
+        self.reply("ConfigureReserveAsCollateral successfully".asComment());
     }
 
     // requireEmergencyOrPoolAdmin or requirePoolAdmin
@@ -129,6 +130,7 @@ trait PoolConfigurator with Ownable, Resumable, PoolACL, PoolView {
 
         configuration.isActive = msg.active;
         self.reservesConfiguration.set(msg.reserve, configuration);
+        self.reply("SetReserveActive successfully".asComment());
     }
 
     // requireRiskOrPoolAdmin
@@ -141,6 +143,7 @@ trait PoolConfigurator with Ownable, Resumable, PoolACL, PoolView {
 
         configuration.isFrozen = msg.freeze;
         self.reservesConfiguration.set(msg.reserve, configuration);
+        self.reply("SetReserveFreeze successfully".asComment());
     }
 
     // requireRiskOrPoolAdmin
@@ -153,6 +156,7 @@ trait PoolConfigurator with Ownable, Resumable, PoolACL, PoolView {
 
         configuration.borrowingEnabled = msg.enabled;
         self.reservesConfiguration.set(msg.reserve, configuration);
+        self.reply("SetReserveBorrowing successfully".asComment());
     }
 
     // requireRiskOrPoolAdmin
@@ -167,6 +171,7 @@ trait PoolConfigurator with Ownable, Resumable, PoolACL, PoolView {
 
         configuration.reserveFactor = msg.reserveFactor;
         self.reservesConfiguration.set(msg.reserve, configuration);
+        self.reply("SetReserveFactor successfully".asComment());
     }
 
     // requireRiskOrPoolAdmin
@@ -179,6 +184,7 @@ trait PoolConfigurator with Ownable, Resumable, PoolACL, PoolView {
 
         configuration.supplyCap = msg.supplyCap;
         self.reservesConfiguration.set(msg.reserve, configuration);
+        self.reply("SetSupplyCap successfully".asComment());
     }
 
     // requireRiskOrPoolAdmin
@@ -191,6 +197,7 @@ trait PoolConfigurator with Ownable, Resumable, PoolACL, PoolView {
 
         configuration.borrowCap = msg.borrowCap;
         self.reservesConfiguration.set(msg.reserve, configuration);
+        self.reply("SetBorrowCap successfully".asComment());
     }
 
     // requireRiskOrPoolAdmin
@@ -203,6 +210,7 @@ trait PoolConfigurator with Ownable, Resumable, PoolACL, PoolView {
 
         configuration.liquidationProtocolFee = msg.fee;
         self.reservesConfiguration.set(msg.reserve, configuration);
+        self.reply("SetLiquidationProtocolFee successfully".asComment());
     }
 
     // requireRiskOrPoolAdmin
@@ -211,6 +219,7 @@ trait PoolConfigurator with Ownable, Resumable, PoolACL, PoolView {
         let strategy: ReserveInterestRateStrategy? = self.reservesInterestRateStrategy.get(msg.reserve);
         require(strategy != null, "reserve not found");
         self.reservesInterestRateStrategy.set(msg.reserve, msg.strategy);
+        self.reply("SetReserveInterestRateStrategy successfully".asComment());
     }
 
     // requireEmergencyAdmin / requirePoolAdmin
@@ -223,9 +232,10 @@ trait PoolConfigurator with Ownable, Resumable, PoolACL, PoolView {
         }
         let reservesConfiguration: map<Address, ReserveConfiguration> = self.reservesConfiguration;
         foreach (reserve , configuration in reservesConfiguration) {
-            configuration.isActive = msg.paused;
+            configuration.isActive = !msg.paused;
             self.reservesConfiguration.set(reserve, configuration);
         }
+        self.reply("PausePool successfully".asComment());
     }
 
     // requireRiskOrPoolAdmin
@@ -268,6 +278,7 @@ trait PoolConfigurator with Ownable, Resumable, PoolACL, PoolView {
     receive(msg: UpdateOracleProvider){
         self.requirePoolAdmin();
         self.oracleProvider = msg.oracle;
+        self.reply("UpdateOracleProvider successfully".asComment());
     }
 
     // Notice: Only for Test
@@ -275,6 +286,7 @@ trait PoolConfigurator with Ownable, Resumable, PoolACL, PoolView {
         let reserveData: ReserveData = self.reservesData.get(msg.asset)!!;
         reserveData.price = msg.price;
         self.reservesData.set(msg.asset, reserveData);
+        self.reply("SetMockOraclePrice successfully".asComment());
     }
 
     fun addReserve(
