@@ -50,8 +50,16 @@ message SetReserveInterestRateStrategy {
     reserve: Address;
     strategy: ReserveInterestRateStrategy;
 }
-message PauseOrUnpausePool {
+message PausePool {
     paused: Bool;
+}
+message UpdateXTokenContent {
+    token: Address;
+    content: Cell;
+}
+message StopXToken {
+    token: Address;
+    stopped: Bool;
 }
 trait PoolConfigurator with Ownable, Resumable, PoolACL, PoolView {
     owner: Address;
@@ -207,9 +215,9 @@ trait PoolConfigurator with Ownable, Resumable, PoolACL, PoolView {
 
     // requireEmergencyAdmin / requirePoolAdmin
     // set all reserve active or inactive
-    receive(msg: PauseOrUnpausePool){
+    receive(msg: PausePool){
         if (msg.paused == true) {
-            self.requireEmergencyAdmin();
+            self.requireEmergencyOrPoolAdmin();
         } else {
             self.requirePoolAdmin();
         }
@@ -220,11 +228,39 @@ trait PoolConfigurator with Ownable, Resumable, PoolACL, PoolView {
         }
     }
 
-    // Notice: Only for Test
-    receive(msg: SetMockOraclePrice){
-        let reserveData: ReserveData = self.reservesData.get(msg.asset)!!;
-        reserveData.price = msg.price;
-        self.reservesData.set(msg.asset, reserveData);
+    // requireRiskOrPoolAdmin
+    // update dtoken/atoken content
+    receive(msg: UpdateXTokenContent) {
+        self.requireRiskOrPoolAdmin();
+        send(SendParameters{
+            to: msg.token,
+            value: 0,
+            bounce: true,
+            mode: SendRemainingValue,
+            body: TokenUpdateContent{
+                content: msg.content
+            }.toCell()
+        });
+    }
+
+    // requireEmergencyOrPoolAdmin / requirePoolAdmin
+    // stop or resume dtoken/atoken
+    receive(msg: StopXToken) {
+        let message: Cell = emptyCell();
+        if (msg.stopped == true) {
+            self.requireEmergencyOrPoolAdmin();
+            message = "Stop".asComment();
+        } else {
+            self.requirePoolAdmin();
+            message = "Resume".asComment();
+        }
+        send(SendParameters{
+            to: msg.token,
+            value: 0,
+            bounce: true,
+            mode: SendRemainingValue,
+            body: message
+        });
     }
 
     // requirePoolAdmin
@@ -232,6 +268,13 @@ trait PoolConfigurator with Ownable, Resumable, PoolACL, PoolView {
     receive(msg: UpdateOracleProvider){
         self.requirePoolAdmin();
         self.oracleProvider = msg.oracle;
+    }
+
+    // Notice: Only for Test
+    receive(msg: SetMockOraclePrice){
+        let reserveData: ReserveData = self.reservesData.get(msg.asset)!!;
+        reserveData.price = msg.price;
+        self.reservesData.set(msg.asset, reserveData);
     }
 
     fun addReserve(
