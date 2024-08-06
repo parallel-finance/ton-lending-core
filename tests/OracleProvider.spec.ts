@@ -9,6 +9,7 @@ import { EXPIRATION_PERIOD, MAX_DEVIATION_RATE, PERCENTAGE_FACTOR } from '../hel
 import { randomAddress } from '@ton/test-utils';
 import { sumTransactionsFee } from '../jest.setup';
 import { sleep } from '@ton/blueprint';
+import { deployPool } from './utils';
 
 describe('Oracle Provider test', () => {
     let blockchain: Blockchain;
@@ -48,24 +49,8 @@ describe('Oracle Provider test', () => {
 
         pool = blockchain.openContract(await Pool.fromInit());
         // deploy pool
-        const deployResult = await pool.send(
-            deployer.getSender(),
-            {
-                value: toNano('0.05'),
-            },
-            {
-                $$type: 'Deploy',
-                queryId: 0n,
-            },
-        );
+        await deployPool(pool, deployer);
         addresses.pool = pool.address;
-
-        expect(deployResult.transactions).toHaveTransaction({
-            from: deployer.address,
-            to: pool.address,
-            deploy: true,
-            success: true,
-        });
 
         let max_supply = toNano(1000000n); // 🔴 Set the specific total supply in nano
         let content1 = buildOnchainMetadata({

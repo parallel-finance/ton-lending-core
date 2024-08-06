@@ -12,7 +12,7 @@ import { DTokenDefaultWallet } from '../build/Pool/tact_DTokenDefaultWallet';
 import { ATokenDefaultWallet } from '../build/Pool/tact_ATokenDefaultWallet';
 import { AToken } from '../build/Pool/tact_AToken';
 import { DToken } from '../build/Pool/tact_DToken';
-import { addReserve } from './utils';
+import { addReserve, deployPool } from './utils';
 import { flattenTransaction } from '@ton/test-utils';
 
 describe('Pool liquidation test', () => {
@@ -56,24 +56,8 @@ describe('Pool liquidation test', () => {
 
         pool = blockchain.openContract(await Pool.fromInit());
         // deploy pool
-        const deployResult = await pool.send(
-            deployer.getSender(),
-            {
-                value: toNano('0.05'),
-            },
-            {
-                $$type: 'Deploy',
-                queryId: 0n,
-            },
-        );
+        await deployPool(pool, deployer);
         addresses.pool = pool.address;
-
-        expect(deployResult.transactions).toHaveTransaction({
-            from: deployer.address,
-            to: pool.address,
-            deploy: true,
-            success: true,
-        });
 
         let max_supply = toNano(1000000n); // 🔴 Set the specific total supply in nano
         let content1 = buildOnchainMetadata({

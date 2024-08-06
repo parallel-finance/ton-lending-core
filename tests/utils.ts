@@ -7,6 +7,8 @@ import { TreasuryContract } from '@ton/sandbox/dist/treasury/Treasury';
 import { SandboxContract } from '@ton/sandbox/dist/blockchain/Blockchain';
 import { ATokenDTokenContents } from '../build/UserAccount/tact_UserAccount';
 import { JettonDefaultWallet } from '../build/SampleJetton/tact_JettonDefaultWallet';
+import { UserAccount } from '../build/Pool/tact_UserAccount';
+import { ACL } from '../helpers/constant';
 
 export type JettonParams = {
     name: string;
@@ -47,6 +49,27 @@ export const reserveInterestRateStrategy: ReserveInterestRateStrategy = {
     slope2: BigInt(0.6 * 10 ** 27),
 };
 
+export const grantAllAdminRole = async (
+    pool: SandboxContract<Pool>,
+    defaultAdmin: SandboxContract<TreasuryContract>,
+    user: Address,
+) => {
+    Object.values(ACL).forEach(async (role) => {
+        await pool.send(
+            defaultAdmin.getSender(),
+            {
+                value: toNano('0.1'),
+            },
+            {
+                $$type: 'GrantRole',
+                role,
+                admin: user,
+            },
+        );
+        expect(await pool.getHasRole(role, user)).toEqual(true);
+    });
+};
+
 export const deployPool = async (pool: SandboxContract<Pool>, deployer: SandboxContract<TreasuryContract>) => {
     const deployResult = await pool.send(
         deployer.getSender(),
@@ -65,6 +88,19 @@ export const deployPool = async (pool: SandboxContract<Pool>, deployer: SandboxC
         deploy: true,
         success: true,
     });
+
+    const defaultAdminRoleData = await pool.getRoleData(ACL.DEFAULT_ADMIN_ROLE);
+    expect(defaultAdminRoleData?.members.keys().length).toEqual(1);
+    expect(defaultAdminRoleData?.members.keys()[0]).toEqualAddress(deployer.address);
+
+    [ACL.POOL_ADMIN_ROLE, ACL.ASSET_LISTING_ADMIN_ROLE, ACL.EMERGENCY_ADMIN_ROLE, ACL.RISK_ADMIN_ROLE].forEach(
+        async (role) => {
+            const roleData = await pool.getRoleData(role);
+            expect(roleData?.members.keys().length).toEqual(0);
+        },
+    );
+
+    await grantAllAdminRole(pool, deployer, deployer.address);
 };
 
 // able to deploy several different jettons

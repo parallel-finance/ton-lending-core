@@ -11,6 +11,7 @@ import { PERCENTAGE_FACTOR, RAY } from '../helpers/constant';
 import { TestMathUtils } from '../wrappers/TestMathUtils';
 import { AToken } from '../build/Pool/tact_AToken';
 import { DToken } from '../build/Pool/tact_DToken';
+import { deployPool } from './utils';
 
 describe('Pool indexes calculation', () => {
     let blockchain: Blockchain;
@@ -48,24 +49,8 @@ describe('Pool indexes calculation', () => {
 
         pool = blockchain.openContract(await Pool.fromInit());
         // deploy pool
-        const deployResult = await pool.send(
-            deployer.getSender(),
-            {
-                value: toNano('0.05'),
-            },
-            {
-                $$type: 'Deploy',
-                queryId: 0n,
-            },
-        );
+        await deployPool(pool, deployer);
         addresses.pool = pool.address;
-
-        expect(deployResult.transactions).toHaveTransaction({
-            from: deployer.address,
-            to: pool.address,
-            deploy: true,
-            success: true,
-        });
 
         const jettonParams = {
             name: 'SampleJetton',
