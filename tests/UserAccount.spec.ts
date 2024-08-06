@@ -17,19 +17,19 @@ describe('UserAccoount', () => {
         const deployResult = await userAccount.send(
             deployer.getSender(),
             {
-                value: toNano('0.05')
+                value: toNano('0.05'),
             },
             {
                 $$type: 'Deploy',
-                queryId: 0n
-            }
+                queryId: 0n,
+            },
         );
 
         expect(deployResult.transactions).toHaveTransaction({
             from: deployer.address,
             to: userAccount.address,
             deploy: true,
-            success: true
+            success: true,
         });
     });
 
@@ -38,7 +38,7 @@ describe('UserAccoount', () => {
             const result = await userAccount.send(
                 deployer.getSender(),
                 {
-                    value: toNano('0.05')
+                    value: toNano('0.05'),
                 },
                 {
                     $$type: 'UpdatePosition',
@@ -46,13 +46,13 @@ describe('UserAccoount', () => {
                     address: reserveAddress,
                     supply: toNano('100'),
                     borrow: 0n,
-                }
+                },
             );
 
             expect(result.transactions).toHaveTransaction({
                 from: deployer.address,
                 to: userAccount.address,
-                success: true
+                success: true,
             });
 
             const accountData = await userAccount.getAccount();
@@ -66,7 +66,7 @@ describe('UserAccoount', () => {
             await userAccount.send(
                 deployer.getSender(),
                 {
-                    value: toNano('0.05')
+                    value: toNano('0.05'),
                 },
                 {
                     $$type: 'UpdatePosition',
@@ -74,13 +74,13 @@ describe('UserAccoount', () => {
                     address: reserveAddress,
                     supply: toNano('100'),
                     borrow: 0n,
-                }
+                },
             );
 
             const result = await userAccount.send(
                 deployer.getSender(),
                 {
-                    value: toNano('0.05')
+                    value: toNano('0.05'),
                 },
                 {
                     $$type: 'UpdatePosition',
@@ -88,13 +88,13 @@ describe('UserAccoount', () => {
                     address: reserveAddress,
                     supply: -toNano('50'),
                     borrow: toNano(20n),
-                }
+                },
             );
 
             expect(result.transactions).toHaveTransaction({
                 from: deployer.address,
                 to: userAccount.address,
-                success: true
+                success: true,
             });
 
             const accountData = await userAccount.getAccount();
@@ -113,7 +113,7 @@ describe('UserAccoount', () => {
                 positionsLength: 0n,
                 positions: {},
                 positionsDetail: {},
-            })
+            });
         });
-    })
+    });
 });

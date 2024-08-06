@@ -1,4 +1,4 @@
-import { Address, address, beginCell, Cell, OpenedContract, Sender, toNano } from '@ton/core';
+import { Address, address, beginCell, Cell, Sender, toNano } from '@ton/core';
 import { Pool, ReserveConfiguration, ReserveInterestRateStrategy } from '../wrappers/Pool';
 import { buildOnchainMetadata } from '../scripts/utils';
 import { SampleJetton } from '../build/SampleJetton/tact_SampleJetton';
