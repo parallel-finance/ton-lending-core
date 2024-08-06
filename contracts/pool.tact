@@ -57,8 +57,6 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
         self._acl_initialize(self.owner());
     }
 
-
-
     receive(msg: TokenNotification) {
         self.processTokenNotification(msg);
     }

@@ -7,8 +7,9 @@ struct ReserveConfiguration {
     ltv: Int as uint16;
     liquidationThreshold: Int as uint16;
     liquidationBonus: Int as uint16;
-    reserveFactor: Int as uint16;
     liquidationProtocolFee: Int as uint16;
+    reserveFactor: Int as uint16;
+
     // supply and borrow configuration
     isActive: Bool;
     isFrozen: Bool; // disable supply and borrow

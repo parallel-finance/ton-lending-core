@@ -76,6 +76,30 @@ trait PoolACL {
         require(self.hasRole(self.EMERGENCY_ADMIN_ROLE, sender()), "Not EMERGENCY_ADMIN_ROLE");
     }
 
+    fun requireRiskOrPoolAdmin() {
+        require(
+            self.hasRole(self.RISK_ADMIN_ROLE, sender()) ||
+            self.hasRole(self.POOL_ADMIN_ROLE, sender()), 
+            "Not POOL_ADMIN_ROLE or RISK_ADMIN_ROLE"
+        );
+    }
+
+    fun requireAssetListingOrPoolAdmin() {
+        require(
+            self.hasRole(self.ASSET_LISTING_ADMIN_ROLE, sender()) ||
+            self.hasRole(self.POOL_ADMIN_ROLE, sender()), 
+            "Not POOL_ADMIN_ROLE or ASSET_LISTING_ADMIN_ROLE"
+        );
+    }
+
+    fun requireEmergencyOrPoolAdmin() {
+        require(
+            self.hasRole(self.EMERGENCY_ADMIN_ROLE, sender()) ||
+            self.hasRole(self.POOL_ADMIN_ROLE, sender()), 
+            "Not POOL_ADMIN_ROLE or EMERGENCY_ADMIN_ROLE"
+        );
+    }
+
     fun grantRole(role: Int, admin: Address) {
         self.requireDefaultAdmin();
         let roleData: RoleData = self.admins.get(role)!!;
