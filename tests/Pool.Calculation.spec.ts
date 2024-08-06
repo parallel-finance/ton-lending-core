@@ -230,7 +230,7 @@ describe('Pool indexes calculation', () => {
         Object.entries(addresses).forEach(([key, value]) => {
             printAddress[key] = (value as Address).toString();
         });
-           };
+    };
 
     const supply = async (user: Treasury, amount: bigint) => {
         // transfer jetton to pool
@@ -442,8 +442,14 @@ describe('Pool indexes calculation', () => {
                 (((currentBorrowRate * supplyUsageRatio) / RAY) *
                     (PERCENTAGE_FACTOR - reserveConfiguration.reserveFactor)) /
                 PERCENTAGE_FACTOR;
-            expect(Number(fromNano(reserveData.currentLiquidityRate))).toBeCloseTo(Number(fromNano(currentLiquidityRate)), -9);
-            expect(Number(fromNano(reserveData.currentBorrowRate))).toBeCloseTo(Number(fromNano(currentBorrowRate)), -9);
+            expect(Number(fromNano(reserveData.currentLiquidityRate))).toBeCloseTo(
+                Number(fromNano(currentLiquidityRate)),
+                -9,
+            );
+            expect(Number(fromNano(reserveData.currentBorrowRate))).toBeCloseTo(
+                Number(fromNano(currentBorrowRate)),
+                -9,
+            );
         }
 
         //  check: totalSupplyInUnderlying, available liquidity, totalBorrowInUnderlying, accToTreasury

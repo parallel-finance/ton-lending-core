@@ -87,22 +87,22 @@ describe('TestWadRayMath and PercentageMath', () => {
         const a = BigInt(132131312312) * WAD;
         const b = 3000n;
         const rst = await math.getPercentMul(a, b);
-        const expected = a * b / 10000n;
+        const expected = (a * b) / 10000n;
         expect(rst).toEqual(expected);
     });
-    
+
     it('percentDiv', async () => {
         const a = BigInt(132131312312) * WAD;
         const b = 3000n;
         const rst = await math.getPercentDiv(a, b);
-        const expected = a * 10000n / b;
+        const expected = (a * 10000n) / b;
         expect(rst).toEqual(expected);
     });
 
     it('extends mutates', async () => {
-        const ts = await math.getTestTs()
-        expect(ts.a).toEqual(2n)
-        const ts2 = await math.getGetTs()
-        expect(ts2.a).toEqual(0n)
-    })
+        const ts = await math.getTestTs();
+        expect(ts.a).toEqual(2n);
+        const ts2 = await math.getGetTs();
+        expect(ts2.a).toEqual(0n);
+    });
 });

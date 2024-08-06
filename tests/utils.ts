@@ -1,4 +1,4 @@
-import { Address, address, beginCell, Cell, OpenedContract, Sender, toNano } from '@ton/core';
+import { Address, address, beginCell, Cell, Sender, toNano } from '@ton/core';
 import { Pool, ReserveConfiguration, ReserveInterestRateStrategy } from '../wrappers/Pool';
 import { buildOnchainMetadata } from '../scripts/utils';
 import { SampleJetton } from '../build/SampleJetton/tact_SampleJetton';
@@ -7,7 +7,6 @@ import { TreasuryContract } from '@ton/sandbox/dist/treasury/Treasury';
 import { SandboxContract } from '@ton/sandbox/dist/blockchain/Blockchain';
 import { ATokenDTokenContents } from '../build/UserAccount/tact_UserAccount';
 import { JettonDefaultWallet } from '../build/SampleJetton/tact_JettonDefaultWallet';
-import { UserAccount } from '../build/Pool/tact_UserAccount';
 
 export type JettonParams = {
     name: string;
@@ -36,7 +35,7 @@ export const reserveConfiguration: ReserveConfiguration = {
     supplyCap: 1000000n,
     borrowCap: 1000000n,
     treasury: reserveAddress,
-    decimals: 9n
+    decimals: 9n,
 };
 
 export const reserveInterestRateStrategy: ReserveInterestRateStrategy = {

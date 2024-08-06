@@ -1,12 +1,11 @@
 import { Blockchain, BlockchainSnapshot, SandboxContract, Treasury, TreasuryContract } from '@ton/sandbox';
-import { Address, beginCell, Cell, fromNano, Slice, toNano } from '@ton/core';
+import { Address, beginCell, Cell, fromNano, toNano } from '@ton/core';
 import { ATokenDTokenContents, Pool, ReserveConfiguration, ReserveInterestRateStrategy } from '../wrappers/Pool';
 import '@ton/test-utils';
 import { SampleJetton } from '../build/SampleJetton/tact_SampleJetton';
 import { buildOnchainMetadata } from '../scripts/utils';
 import { JettonDefaultWallet } from '../build/SampleJetton/tact_JettonDefaultWallet';
 import { UserAccount } from '../build/Pool/tact_UserAccount';
-import { sleep } from '@ton/blueprint';
 import { PERCENTAGE_FACTOR, RAY } from '../helpers/constant';
 import { TestMathUtils } from '../wrappers/TestMathUtils';
 import { DTokenDefaultWallet } from '../build/Pool/tact_DTokenDefaultWallet';
