@@ -26,7 +26,7 @@ trait PoolConfigurator with Ownable, Resumable, PoolACL, PoolView {
     reservesData: map<Address, ReserveData>;
     // baseTokenAddress -> reserveConfiguration
     reservesConfiguration: map<Address, ReserveConfiguration>;
-    reserveInterestRateStrategy: map<Address, ReserveInterestRateStrategy>;
+    reservesInterestRateStrategy: map<Address, ReserveInterestRateStrategy>;
     // oracle provider address
     oracleProvider: Address?;
     // ACL admins
@@ -111,7 +111,7 @@ trait PoolConfigurator with Ownable, Resumable, PoolACL, PoolView {
         self.reserves.set(lastReserveIndex, null);
         self.reservesData.set(reserveAddress, null);
         self.reservesConfiguration.set(reserveAddress, null);
-        self.reserveInterestRateStrategy.set(reserveAddress, null);
+        self.reservesInterestRateStrategy.set(reserveAddress, null);
         self.reservesLength -= 1;
     }
 

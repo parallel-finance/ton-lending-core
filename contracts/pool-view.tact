@@ -24,7 +24,7 @@ trait PoolView with Ownable, Resumable {
     reservesData: map<Address, ReserveData>;
     // baseTokenAddress -> reserveConfiguration
     reservesConfiguration: map<Address, ReserveConfiguration>;
-    reserveInterestRateStrategy: map<Address, ReserveInterestRateStrategy>;
+    reservesInterestRateStrategy: map<Address, ReserveInterestRateStrategy>;
 
     // oracle provider address
     oracleProvider: Address?;

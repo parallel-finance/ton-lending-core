@@ -41,7 +41,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
     reservesData: map<Address, ReserveData>;
     // baseTokenAddress -> reserveConfiguration
     reservesConfiguration: map<Address, ReserveConfiguration>;
-    reserveInterestRateStrategy: map<Address, ReserveInterestRateStrategy>;
+    reservesInterestRateStrategy: map<Address, ReserveInterestRateStrategy>;
     
     // oracle provider address
     oracleProvider: Address?;
@@ -171,7 +171,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
         // _updateIndexes and _accrueToTreasury
         reserveCache = reserveData.updateState(reserveCache);
 
-        let rateStrategy: ReserveInterestRateStrategy = self.reserveInterestRateStrategy.get(reserveAddress)!!;
+        let rateStrategy: ReserveInterestRateStrategy = self.reservesInterestRateStrategy.get(reserveAddress)!!;
 
         if(msg.action == ACTION_BORROW) {
             let borrowAmount: Int = msg.amount;
@@ -431,7 +431,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
         );
 
         // updateInterestRates
-        let rateStrategy: ReserveInterestRateStrategy = self.reserveInterestRateStrategy.get(reserveAddress)!!;
+        let rateStrategy: ReserveInterestRateStrategy = self.reservesInterestRateStrategy.get(reserveAddress)!!;
         reserveData.updateInterestRates(reserveCache, rateStrategy, supplyAmount, 0);
         // update liquidity and set reserveData to storage back;
         let scaledSupplyAmount: Int = supplyAmount.rayDiv(reserveCache.nextLiquidityIndex);
@@ -885,7 +885,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
             );
 
             // updateInterestRates
-            let rateStrategy: ReserveInterestRateStrategy = self.reserveInterestRateStrategy.get(matchedReserve!!)!!;
+            let rateStrategy: ReserveInterestRateStrategy = self.reservesInterestRateStrategy.get(matchedReserve!!)!!;
             reserveData.updateInterestRates(reserveCache, rateStrategy, supplyAmount, 0);
             // update liquidity and set reserveData to storage back;
             let scaledSupplyAmount: Int = supplyAmount.rayDiv(reserveCache.nextLiquidityIndex);
