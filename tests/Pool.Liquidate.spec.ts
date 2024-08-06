@@ -315,16 +315,25 @@ describe('Pool liquidation test', () => {
         expect(reserveData.price).toEqual(price);
     };
 
-    const updateReserveConfiguration = async (jetton: Address, config: ReserveConfiguration) => {
+    const configureReserveAsCollateral = async (
+        jetton: Address,
+        config: {
+            ltv: bigint;
+            liquidationThreshold: bigint;
+            liquidationBonus: bigint;
+        },
+    ) => {
         const rst = await pool.send(
             deployer.getSender(),
             {
                 value: toNano('0.2'),
             },
             {
-                $$type: 'UpdateReserveConfiguration',
+                $$type: 'ConfigureReserveAsCollateral',
                 reserve: jetton,
-                reserveConfiguration: config,
+                ltv: config.ltv,
+                liquidationThreshold: config.liquidationThreshold,
+                liquidationBonus: config.liquidationBonus,
             },
         );
         expect(rst.transactions).toHaveTransaction({
@@ -333,9 +342,10 @@ describe('Pool liquidation test', () => {
             success: true,
         });
         const configuration = await pool.getReserveConfiguration(jetton);
-        const { poolWalletAddress, aTokenAddress, dTokenAddress, treasury, ...otherReserveConfiguration } =
-            configuration;
-        expect(config).toMatchObject(otherReserveConfiguration);
+
+        expect(configuration.ltv).toEqual(config.ltv);
+        expect(configuration.liquidationThreshold).toEqual(config.liquidationThreshold);
+        expect(configuration.liquidationBonus).toEqual(config.liquidationBonus);
     };
 
     const supply = async (user: Treasury, jetton: SandboxContract<SampleJetton>, amount: bigint) => {
@@ -1031,8 +1041,9 @@ describe('Pool liquidation test', () => {
         );
 
         // update borrow asset LS to shortfall borrower
-        await updateReserveConfiguration(collateralReserve.address, {
-            ...reserveConfiguration1,
+        await configureReserveAsCollateral(collateralReserve.address, {
+            ltv: 5000n,
+            liquidationBonus: reserveConfiguration1.liquidationBonus,
             liquidationThreshold: 5900n,
         });
 
@@ -1288,8 +1299,9 @@ describe('Pool liquidation test', () => {
         );
 
         // update borrow asset LS to shortfall borrower
-        await updateReserveConfiguration(collateralReserve.address, {
-            ...reserveConfiguration1,
+        await configureReserveAsCollateral(collateralReserve.address, {
+            ltv: 4000n,
+            liquidationBonus: reserveConfiguration1.liquidationBonus,
             liquidationThreshold: 5000n,
         });
 

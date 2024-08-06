@@ -12,7 +12,7 @@ import "./libraries/logic/reserve-logic";
 import "./constants";
 import "./pool-acl";
 import "./pool-view";
-message SetReserveLTVAndLiquidationConfig {
+message ConfigureReserveAsCollateral {
     reserve: Address;
     ltv: Int as uint16;
     liquidationThreshold: Int as uint16;
@@ -91,7 +91,7 @@ trait PoolConfigurator with Ownable, Resumable, PoolACL, PoolView {
     }
 
     // requireRiskOrPoolAdmin
-    receive(msg: SetReserveLTVAndLiquidationConfig){
+    receive(msg: ConfigureReserveAsCollateral){
         self.requireRiskOrPoolAdmin();
 
         let _configuration: ReserveConfiguration? = self.reservesConfiguration.get(msg.reserve);
@@ -220,11 +220,6 @@ trait PoolConfigurator with Ownable, Resumable, PoolACL, PoolView {
         }
     }
 
-    receive(msg: UpdateReserveConfiguration){
-        // TODO ACL check
-        self.reservesConfiguration.set(msg.reserve, msg.reserveConfiguration);
-    }
-
     // Notice: Only for Test
     receive(msg: SetMockOraclePrice){
         let reserveData: ReserveData = self.reservesData.get(msg.asset)!!;
@@ -232,10 +227,10 @@ trait PoolConfigurator with Ownable, Resumable, PoolACL, PoolView {
         self.reservesData.set(msg.asset, reserveData);
     }
 
+    // requirePoolAdmin
     // update oracle provider address
     receive(msg: UpdateOracleProvider){
-        // self.requireOwner();
-        // TODO: add ACL check
+        self.requirePoolAdmin();
         self.oracleProvider = msg.oracle;
     }
 
