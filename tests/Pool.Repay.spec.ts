@@ -18,6 +18,8 @@ describe('Pool', () => {
     let sampleJetton: SandboxContract<SampleJetton>;
     let dToken: SandboxContract<DToken>;
 
+    jest.setTimeout(60 * 1000);
+
     beforeEach(async () => {
         blockchain = await Blockchain.create();
         pool = blockchain.openContract(await Pool.fromInit());

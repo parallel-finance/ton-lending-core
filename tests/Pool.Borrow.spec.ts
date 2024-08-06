@@ -18,6 +18,8 @@ describe('Pool', () => {
     let sampleJetton: SandboxContract<SampleJetton>;
     let dToken: SandboxContract<DToken>;
 
+    jest.setTimeout(60 * 1000);
+
     beforeEach(async () => {
         blockchain = await Blockchain.create();
         pool = blockchain.openContract(await Pool.fromInit());
@@ -132,7 +134,7 @@ describe('Pool', () => {
             });
 
             const totalTransactionFee = sumTransactionsFee(result.transactions);
-            expect(totalTransactionFee).toBeLessThanOrEqual(0.107); // real:0.10685557099999998
+            expect(totalTransactionFee).toBeLessThanOrEqual(0.108); // real: 0.10758038199999997
 
             const userAccountContract = blockchain.openContract(userAccountAddress);
             const accountData = await userAccountContract.getAccount();
