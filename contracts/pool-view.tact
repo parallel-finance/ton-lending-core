@@ -67,12 +67,22 @@ trait PoolView with Ownable, Resumable {
                 totalDebt += borrowValue;
             }
         }
+
+        let avgLtv: Int = totalCollateral != 0 ? totalCollateralMulLtv / totalCollateral : 0;
+        let availableBorrows: Int = totalCollateral.percentMul(avgLtv);
+        if (availableBorrows < totalDebt) {
+            availableBorrows = 0;
+        } else {
+            availableBorrows = availableBorrows - totalDebt;
+        }
+
         return UserAccountHealthInfo{
-            avgLtv: totalCollateral != 0 ? totalCollateralMulLtv / totalCollateral : 0,
+            avgLtv: avgLtv,
             avgLiquidationThreshold: totalCollateral != 0 ? totalCollateralMulLT / totalCollateral : 0,
             totalSupplyInBaseCurrency: totalSupply,
             totalCollateralInBaseCurrency: totalCollateral,
             totalDebtInBaseCurrency: totalDebt,
+            availableBorrowsInBaseCurrency: availableBorrows,
             healthFactorInRay: totalDebt != 0 ? (totalCollateralMulLT / PERCENTAGE_FACTOR).rayDiv(totalDebt) : UINT256_MAX // base in RAY
         };
     }
