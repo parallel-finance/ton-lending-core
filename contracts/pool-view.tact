@@ -24,7 +24,7 @@ trait PoolView with Ownable, Resumable {
     reservesData: map<Address, ReserveData>;
     // baseTokenAddress -> reserveConfiguration
     reservesConfiguration: map<Address, ReserveConfiguration>;
-    reserveInterestRateStrategy: map<Address, ReserveInterestRateStrategy>;
+    reservesInterestRateStrategy: map<Address, ReserveInterestRateStrategy>;
 
     // oracle provider address
     oracleProvider: Address?;
@@ -139,6 +139,10 @@ trait PoolView with Ownable, Resumable {
 
     get fun reserveConfiguration(reserveAddress: Address): ReserveConfiguration {
         return self.reservesConfiguration.get(reserveAddress)!!;
+    }
+
+    get fun reserveInterestRateStrategy(reserveAddress: Address): ReserveInterestRateStrategy {
+        return self.reservesInterestRateStrategy.get(reserveAddress)!!;
     }
 
     get fun calculateATokenAddress(content: Cell, reserveAddress: Address): Address {
