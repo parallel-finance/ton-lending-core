@@ -2,19 +2,23 @@ import { Blockchain, BlockchainSnapshot, printTransactionFees, SandboxContract, 
 import '@ton/test-utils';
 import { Address, Cell, toNano } from '@ton/core';
 import { ATokenDTokenContents, Pool, ReserveConfiguration, ReserveInterestRateStrategy } from '../wrappers/Pool';
-import { ACL } from '../helpers/constant';
+import { ACL, UINT256_MAX } from '../helpers/constant';
 import { addReserve, deployJetton, deployPool, mintJetton, supplyJetton } from './utils';
 import { SampleJetton } from '../wrappers/SampleJetton';
 import { buildOnchainMetadata } from '../scripts/utils';
 import { JettonDefaultWallet } from '../build/SampleJetton/tact_JettonDefaultWallet';
 import { AToken } from '../build/Pool/tact_AToken';
 import { DToken } from '../build/Pool/tact_DToken';
+import { UserAccount } from '../build/Pool/tact_UserAccount';
+import { sleep } from '@ton/blueprint';
+import { ATokenDefaultWallet } from '../build/Pool/tact_ATokenDefaultWallet';
 
 describe('Pool Configurator test', () => {
     let blockchain: Blockchain;
     let snapshot: BlockchainSnapshot;
     let deployer: SandboxContract<TreasuryContract>;
     let secondUser: SandboxContract<TreasuryContract>;
+    let treasury: SandboxContract<TreasuryContract>;
     let pool: SandboxContract<Pool>;
     let sampleJetton1: SandboxContract<SampleJetton>;
     let addresses: any = {};
@@ -37,16 +41,18 @@ describe('Pool Configurator test', () => {
 
         blockchain = await Blockchain.create();
         deployer = await blockchain.treasury('deployer');
+        secondUser = await blockchain.treasury('secondUser');
+        treasury = await blockchain.treasury('treasury');
         addresses.deployer = deployer.address;
-        secondUser = (await blockchain.createWallets(2))[1];
         addresses.secondUser = secondUser.address;
+        addresses.treasury = treasury.address;
 
         pool = blockchain.openContract(await Pool.fromInit());
         // deploy pool
         await deployPool(pool, deployer);
         addresses.pool = pool.address;
 
-        let max_supply = toNano(1000000n); // 🔴 Set the specific total supply in nano
+        let max_supply = toNano(100000000n); // 🔴 Set the specific total supply in nano
         let content1 = buildOnchainMetadata({
             name: 'SampleJetton 1',
             description: 'Sample Jetton 1',
@@ -127,8 +133,8 @@ describe('Pool Configurator test', () => {
             isActive: true,
             isFrozen: false,
             borrowingEnabled: true,
-            supplyCap: 1000000n,
-            borrowCap: 1000000n,
+            supplyCap: 100000000n,
+            borrowCap: 100000000n,
         };
         reserveConfiguration1 = {
             $$type: 'ReserveConfiguration',
@@ -136,7 +142,7 @@ describe('Pool Configurator test', () => {
             poolWalletAddress: poolWalletAddress1,
             aTokenAddress: aTokenAddress1,
             dTokenAddress: dTokenAddress1,
-            treasury: sampleJetton1.address,
+            treasury: treasury.address,
             decimals: 9n,
         };
 
@@ -155,8 +161,8 @@ describe('Pool Configurator test', () => {
             );
         };
 
-        await mintTestJetton(sampleJetton1, deployer.getSender().address, toNano(100000n));
-        await mintTestJetton(sampleJetton1, secondUser.address, toNano(100000n));
+        await mintTestJetton(sampleJetton1, deployer.getSender().address, toNano(5000000n));
+        await mintTestJetton(sampleJetton1, secondUser.address, toNano(5000000n));
     });
 
     beforeEach(async () => {
@@ -240,23 +246,6 @@ describe('Pool Configurator test', () => {
         const roleData = await pool.getRoleData(role);
         expect(roleData?.members.has(admin)).toEqual(true);
         expect(await pool.getHasRole(role, admin)).toEqual(true);
-    };
-
-    const revokeRole = async (role: bigint, admin: Address) => {
-        await pool.send(
-            deployer.getSender(),
-            {
-                value: toNano('0.1'),
-            },
-            {
-                $$type: 'RevokeRole',
-                role,
-                admin,
-            },
-        );
-        const roleData = await pool.getRoleData(role);
-        expect(roleData?.members.has(admin)).toEqual(false);
-        expect(await pool.getHasRole(role, admin)).toEqual(false);
     };
 
     describe('AddReserve and ConfigureReserveAsCollateral', () => {
@@ -1043,5 +1032,161 @@ describe('Pool Configurator test', () => {
             },
         );
         expect(await pool.getOracleProvider()).toEqualAddress(pool.address);
+    });
+
+    it('MintToTreasury', async () => {
+        await addReserve1(deployer, reserveConfiguration1);
+        expect(await pool.getReservesLength()).toEqual(1n);
+        await setMockOraclePrice(sampleJetton1.address, toNano('1'));
+
+        const userJettonWallet = blockchain.openContract(
+            JettonDefaultWallet.fromAddress(await sampleJetton1.getGetWalletAddress(deployer.address)),
+        );
+        const secondUserJettonWallet = blockchain.openContract(
+            JettonDefaultWallet.fromAddress(await sampleJetton1.getGetWalletAddress(secondUser.address)),
+        );
+        await supplyJetton(userJettonWallet, deployer, pool.address, toNano(1000000));
+        expect((await pool.getReserveData(sampleJetton1.address)).totalSupply).not.toEqual(0n);
+        let reserveDataAndConfiguration = await pool.getReserveDataAndConfiguration(sampleJetton1.address);
+
+        await pool.send(
+            deployer.getSender(),
+            {
+                value: toNano('0.4'),
+            },
+            {
+                $$type: 'BorrowToken',
+                tokenAddress: sampleJetton1.address,
+                amount: toNano(100000),
+            },
+        );
+        reserveDataAndConfiguration = await pool.getReserveDataAndConfiguration(sampleJetton1.address);
+
+        expect(reserveDataAndConfiguration.reserveData.totalBorrow).not.toEqual(0n);
+        await sleep(5000);
+        await supplyJetton(secondUserJettonWallet, secondUser, pool.address, toNano(1000000));
+        reserveDataAndConfiguration = await pool.getReserveDataAndConfiguration(sampleJetton1.address);
+
+        await pool.send(
+            secondUser.getSender(),
+            {
+                value: toNano('0.4'),
+            },
+            {
+                $$type: 'BorrowToken',
+                tokenAddress: sampleJetton1.address,
+                amount: toNano(50000n),
+            },
+        );
+        reserveDataAndConfiguration = await pool.getReserveDataAndConfiguration(sampleJetton1.address);
+
+        let result = await pool.send(
+            deployer.getSender(),
+            {
+                value: toNano('0.2'),
+            },
+            {
+                $$type: 'MintToTreasury',
+                reserve: sampleJetton1.address,
+            },
+        );
+        let treasuryUserAccount = blockchain.openContract(
+            UserAccount.fromAddress(await pool.getUserAccountAddress(reserveConfiguration1.treasury)),
+        );
+        const reserveDataAndConfigurationAfter = await pool.getReserveDataAndConfiguration(sampleJetton1.address);
+        const aToken = blockchain.openContract(
+            AToken.fromAddress(reserveDataAndConfigurationAfter.reserveConfiguration.aTokenAddress),
+        );
+        const treasuryATokenWallet = blockchain.openContract(
+            ATokenDefaultWallet.fromAddress(await aToken.getGetWalletAddress(treasury.address)),
+        );
+
+        expect(result.transactions).toHaveTransaction({
+            from: deployer.address,
+            to: pool.address,
+            success: true,
+        });
+        expect(result.transactions).toHaveTransaction({
+            from: pool.address,
+            to: treasuryUserAccount.address,
+            success: true,
+        });
+        expect(result.transactions).toHaveTransaction({
+            from: treasuryUserAccount.address,
+            to: pool.address,
+            success: true,
+        });
+        expect(result.transactions).toHaveTransaction({
+            from: pool.address,
+            to: aToken.address,
+            success: true,
+        });
+        expect(result.transactions).toHaveTransaction({
+            from: aToken.address,
+            to: treasuryATokenWallet.address,
+            success: true,
+        });
+        expect(reserveDataAndConfigurationAfter.reserveData.accruedToTreasury).toEqual(0n);
+        expect(reserveDataAndConfigurationAfter.reserveData.totalSupply).toEqual(
+            reserveDataAndConfiguration.reserveData.accruedToTreasury +
+                reserveDataAndConfiguration.reserveData.totalSupply,
+        );
+        expect((await treasuryUserAccount.getAccount()).positionsDetail.get(sampleJetton1.address)?.supply).toEqual(
+            reserveDataAndConfiguration.reserveData.accruedToTreasury,
+        );
+        expect((await treasuryATokenWallet.getGetWalletData()).balance).toEqual(
+            reserveDataAndConfiguration.reserveData.accruedToTreasury,
+        );
+
+        result = await pool.send(
+            treasury.getSender(),
+            {
+                value: toNano('0.25'),
+            },
+            {
+                $$type: 'WithdrawToken',
+                tokenAddress: sampleJetton1.address,
+                amount: UINT256_MAX,
+            },
+        );
+        expect(result.transactions).toHaveTransaction({
+            from: treasury.address,
+            to: pool.address,
+            success: true,
+        });
+        expect(result.transactions).toHaveTransaction({
+            from: pool.address,
+            to: treasuryUserAccount.address,
+            success: true,
+        });
+        expect(result.transactions).toHaveTransaction({
+            from: treasuryUserAccount.address,
+            to: pool.address,
+            success: true,
+        });
+        expect(result.transactions).toHaveTransaction({
+            from: pool.address,
+            to: treasuryUserAccount.address,
+            success: true,
+        });
+        expect(result.transactions).toHaveTransaction({
+            from: treasuryUserAccount.address,
+            to: pool.address,
+            success: true,
+        });
+        expect(result.transactions).toHaveTransaction({
+            from: pool.address,
+            to: treasuryATokenWallet.address,
+            success: true,
+        });
+        expect(result.transactions).toHaveTransaction({
+            from: treasuryATokenWallet.address,
+            to: aToken.address,
+            success: true,
+        });
+        expect(
+            Number((await treasuryUserAccount.getAccount()).positionsDetail.get(sampleJetton1.address)?.supply),
+        ).toBeCloseTo(0, -1);
+        expect(Number((await treasuryATokenWallet.getGetWalletData()).balance)).toBeCloseTo(0, -1);
     });
 });
