@@ -1014,7 +1014,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
         });
     }
 
-    fun findReserveByPoolWalletAddress(poolWalletAddress: Address): Address? {
+    override fun findReserveByPoolWalletAddress(poolWalletAddress: Address): Address? {
         let i: Int = 0;
         let matchedReserve: Address? = null;
         while (i < self.reservesLength && matchedReserve == null) {

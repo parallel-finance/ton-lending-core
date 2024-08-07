@@ -1189,4 +1189,93 @@ describe('Pool Configurator test', () => {
         ).toBeCloseTo(0, -1);
         expect(Number((await treasuryATokenWallet.getGetWalletData()).balance)).toBeCloseTo(0, -1);
     });
+
+    it('Rescue token that Pool configured', async () => {
+        await addReserve1(deployer, reserveConfiguration1);
+        expect(await pool.getReservesLength()).toEqual(1n);
+        await setMockOraclePrice(sampleJetton1.address, toNano('1'));
+
+        const userJettonWallet = blockchain.openContract(
+            JettonDefaultWallet.fromAddress(await sampleJetton1.getGetWalletAddress(deployer.address)),
+        );
+        await supplyJetton(userJettonWallet, deployer, pool.address, toNano(1000000));
+
+        let result = await pool.send(
+            deployer.getSender(),
+            {
+                value: toNano('0.2'),
+            },
+            {
+                $$type: 'RescueToken',
+                wallet: addresses.poolWalletAddress1,
+                amount: toNano(100),
+                to: secondUser.address,
+            },
+        );
+
+        expect(result.transactions).toHaveTransaction({
+            from: deployer.address,
+            to: pool.address,
+            success: false,
+            exitCode: 30492,
+        });
+    });
+
+    it('Rescue token that Pool is not configured', async () => {
+        // deploy test jetton
+        const jettonParams = {
+            name: 'SampleJetton for Rescue token',
+            description: 'Sample Jetton for testing purposes',
+            decimals: '9',
+            image: 'https://ipfs.io/ipfs/bafybeicn7i3soqdgr7dwnrwytgq4zxy7a5jpkizrvhm5mv6bgjd32wm3q4/welcome-to-IPFS.jpg',
+            symbol: 'SAM',
+        };
+        const sampleJetton2 = await deployJetton(blockchain, deployer, jettonParams);
+        await mintJetton(sampleJetton2, deployer.getSender(), deployer.address, toNano(100000n));
+
+        const poolWalletAddress = await sampleJetton2.getGetWalletAddress(pool.address);
+        const userJettonWallet = blockchain.openContract(
+            JettonDefaultWallet.fromAddress(await sampleJetton2.getGetWalletAddress(deployer.address)),
+        );
+        const secondUserJettonWallet = blockchain.openContract(
+            JettonDefaultWallet.fromAddress(await sampleJetton2.getGetWalletAddress(secondUser.address)),
+        );
+        const poolJettonWallet = blockchain.openContract(JettonDefaultWallet.fromAddress(poolWalletAddress));
+
+        const amount = toNano(100);
+
+        await userJettonWallet.send(
+            deployer.getSender(),
+            {
+                value: toNano('0.1'),
+            },
+            {
+                $$type: 'TokenTransfer',
+                queryId: 0n,
+                destination: pool.address,
+                amount,
+                response_destination: deployer.address,
+                custom_payload: null,
+                forward_payload: Cell.EMPTY,
+                forward_ton_amount: 0n,
+            },
+        );
+        expect((await poolJettonWallet.getGetWalletData()).balance).toEqual(amount);
+        const rescueAmount = toNano(100);
+        await pool.send(
+            deployer.getSender(),
+            {
+                value: toNano('0.2'),
+            },
+            {
+                $$type: 'RescueToken',
+                wallet: poolWalletAddress,
+                amount: rescueAmount,
+                to: secondUser.address,
+            },
+        );
+
+        expect((await poolJettonWallet.getGetWalletData()).balance).toEqual(amount - rescueAmount);
+        expect((await secondUserJettonWallet.getGetWalletData()).balance).toEqual(rescueAmount);
+    });
 });
