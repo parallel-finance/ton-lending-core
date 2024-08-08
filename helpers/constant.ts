@@ -18,6 +18,8 @@ export const EXPIRATION_PERIOD = 300n;
 // reject when price +30% or -30%, based on 10000;
 export const MAX_DEVIATION_RATE = 3000n;
 
+export const UINT256_MAX = 2n ** 256n - 1n;
+
 // ACL ROLEs
 
 export const ACL = {

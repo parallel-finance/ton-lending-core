@@ -170,7 +170,7 @@ describe('Pool', () => {
             );
 
             const totalTransactionFee = sumTransactionsFee(result.transactions);
-            expect(totalTransactionFee).toBeLessThanOrEqual(0.11);
+            expect(totalTransactionFee).toBeLessThanOrEqual(0.117); // real 0.11610242399999998
         });
 
         it('should repay max ton successfully', async () => {

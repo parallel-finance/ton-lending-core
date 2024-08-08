@@ -602,6 +602,10 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
         self.syncPrices(msg);
     }
 
+    receive(msg: MintToTreasury) {
+        self.mintToTreasury(msg.reserve);
+    }
+
     fun syncPrices(msg: SyncPrices) {
         foreach (reserve, price in msg.prices) {
             let reserveData: ReserveData? = self.reservesData.get(reserve);
@@ -1010,7 +1014,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
         });
     }
 
-    fun findReserveByPoolWalletAddress(poolWalletAddress: Address): Address? {
+    override fun findReserveByPoolWalletAddress(poolWalletAddress: Address): Address? {
         let i: Int = 0;
         let matchedReserve: Address? = null;
         while (i < self.reservesLength && matchedReserve == null) {
@@ -1027,5 +1031,29 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
     fun requireFromUserAccount(user: Address) {
         let userAccount: Address = self.userAccountAddress(user);
         require(userAccount == sender(), "Not from the user account");
+    }
+
+    fun mintToTreasury(reserve: Address) {
+        let ctx: Context = context();
+        let fwdFee: Int = ctx.readForwardFee() * 5;
+        let storageFee: Int = self.MIN_TONS_FOR_STORAGE;
+        let computationAndActionFee: Int = self.TOKEN_MINT_GAS_CONSUMPTION + self.SUPPLY_REPAY_GAS_CONSUMPTION;
+        let totalFee: Int = fwdFee + storageFee + computationAndActionFee;
+        require(ctx.value > totalFee, "Insufficient fee");
+
+        let reserveData: ReserveData = self.reservesData.get(reserve)!!;
+        let reserveConfiguration: ReserveConfiguration = self.reservesConfiguration.get(reserve)!!;
+        
+        // scaled amount
+        let accruedToTreasury: Int = reserveData.accruedToTreasury;
+        reserveData.accruedToTreasury = 0;
+        reserveData.totalSupply += accruedToTreasury;
+
+        self.reservesData.set(reserve, reserveData);
+        
+        let selfConsumption: Int = self.SUPPLY_REPAY_GAS_CONSUMPTION + ctx.readForwardFee();
+        let remainingValue: Int = self.remainingValue(ctx.value, selfConsumption);
+
+        self.updateUserAccountPosition(reserveConfiguration.treasury, reserve, accruedToTreasury, 0, remainingValue);
     }
 }

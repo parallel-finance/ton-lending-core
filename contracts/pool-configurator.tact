@@ -61,6 +61,11 @@ message StopXToken {
     token: Address;
     stopped: Bool;
 }
+message RescueToken {
+    wallet: Address;
+    amount: Int;
+    to: Address;
+}
 trait PoolConfigurator with Ownable, Resumable, PoolACL, PoolView {
     owner: Address;
     stopped: Bool;
@@ -281,6 +286,30 @@ trait PoolConfigurator with Ownable, Resumable, PoolACL, PoolView {
         self.reply("UpdateOracleProvider successfully".asComment());
     }
 
+    // requirePoolAdmin
+    // rescue token from Pool
+    receive(msg: RescueToken){
+        self.requirePoolAdmin();
+        let reserve: Address? = self.findReserveByPoolWalletAddress(msg.wallet);
+        require(reserve == null, "Invalid wallet of reserve");
+        let tokenTransferMsg: TokenTransfer = TokenTransfer{
+            queryId: 0,
+            amount: msg.amount,
+            destination: msg.to,
+            response_destination: sender(),
+            custom_payload: null,
+            forward_ton_amount: 0,
+            forward_payload: emptySlice()
+        };
+        send(SendParameters{
+            to: msg.wallet,
+            value: 0,
+            bounce: true,
+            mode: SendRemainingValue,
+            body: tokenTransferMsg.toCell()
+        });
+    }
+
     // Notice: Only for Test
     receive(msg: SetMockOraclePrice){
         let reserveData: ReserveData = self.reservesData.get(msg.asset)!!;
@@ -407,4 +436,6 @@ trait PoolConfigurator with Ownable, Resumable, PoolACL, PoolView {
         );
         return dTokenAddress;
     }
+
+    abstract fun findReserveByPoolWalletAddress(poolWalletAddress: Address): Address?;
 }

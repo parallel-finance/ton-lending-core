@@ -99,6 +99,8 @@ struct UserAccountHealthInfo {
     totalCollateralInBaseCurrency: Int as uint128;
     // base in oracle price decimal: 10**9
     totalDebtInBaseCurrency: Int as uint128;
+    // base in oracle price decimal: 10**9
+    availableBorrowsInBaseCurrency: Int as uint128;
     // base in RAY
     healthFactorInRay: Int as uint256;
 }

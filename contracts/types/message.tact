@@ -22,7 +22,7 @@ message(0x66660004) GetUserAccountData {
     // 0: borrow, 1: withdraw, 2: transfer aToken, 3: liquidation
     action: Int as uint8;
     tokenAddress: Address;
-    amount: Int as coins;
+    amount: Int;
     payload: Slice as remaining;
 }
 // gas cost:
@@ -33,14 +33,14 @@ message(0x66660005) UserAccountDataResponse {
     // 0: borrow, 1: withdraw, 2: transfer aToken, 3: liquidation
     action: Int as uint8;
     tokenAddress: Address;
-    amount: Int as coins;
+    amount: Int;
     accountData: UserAccountData;
     payload: Slice as remaining;
 }
 //
 message(0x66660006) WithdrawToken {
     tokenAddress: Address;
-    amount: Int as coins;
+    amount: Int;
 }
 // gas cost: 0.006
 message(0x66660007) UpdatePosition {
@@ -66,7 +66,7 @@ message(0x66660010) BorrowTon {
     amount: Int as coins;
 }
 message(0x66660011) WithdrawTon {
-    amount: Int as coins;
+    amount: Int;
 }
 message(0x66660012) RepayTon {
     amount: Int as coins;
@@ -75,6 +75,9 @@ message(0x66660013) LiquidateTon {
     borrower: Address;
     collateralReserve: Address;
     liquidationAmount: Int as coins;
+}
+message(0x66660014) MintToTreasury {
+    reserve: Address;
 }
 // Notice: Only for Test
 message SetMockOraclePrice {
