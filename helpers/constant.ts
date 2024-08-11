@@ -1,3 +1,5 @@
+import { pTON } from '@ston-fi/sdk';
+
 export const RAY = BigInt('1000000000000000000000000000');
 export const WAD = BigInt('1000000000000000000');
 export const PERCENTAGE_FACTOR = BigInt('10000');
@@ -28,4 +30,16 @@ export const ACL = {
     ASSET_LISTING_ADMIN_ROLE: 2n,
     RISK_ADMIN_ROLE: 3n,
     EMERGENCY_ADMIN_ROLE: 4n,
+};
+
+export const MAINNET_ADDRESS = {
+    USDT: 'EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs',
+    pTON: new pTON.v1().address,
+    STONFI_V1_ROUTER: 'EQB3ncyBUTjZUA5EnFKR5_EnOMI9V1tTEAAPaiU71gc4TiUt',
+};
+
+export const TESTNET_ADDRESS = {
+    USDT: '',
+    pTON: "EQDTrtiFWwyA2rx1Yasw0TuyK_UqtLxkRcqIXfWbJqOnQEgo",
+    STONFI_V1_ROUTER: 'kQD7GHQoIk00-z7dzjagREolRpwprM_ogDEiOF1v8jOo-mkn',
 };

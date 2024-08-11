@@ -8,6 +8,7 @@
     "build:all": "blueprint build --all",
     "test": "jest --verbose",
     "run:testnet": "blueprint run --testnet --mnemonic",
+    "run:mainnet": "blueprint run --mainnet --mnemonic",
     "prepare": "husky"
   },
   "devDependencies": {
@@ -28,8 +29,9 @@
   },
   "dependencies": {
     "@aws-crypto/sha256-js": "^5.2.0",
-    "axios": "^1.7.2",
     "@orbs-network/ton-access": "^2.3.3",
+    "@ston-fi/sdk": "^1.0.2",
+    "axios": "^1.7.2",
     "crc-32": "^1.2.2"
   }
 }
