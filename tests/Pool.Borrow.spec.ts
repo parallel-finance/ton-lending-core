@@ -1,10 +1,10 @@
 import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
-import { fromNano, toNano } from '@ton/core';
+import { Address, Dictionary, fromNano, toNano } from '@ton/core';
 import { Pool } from '../wrappers/Pool';
 import '@ton/test-utils';
 import { SampleJetton } from '../build/SampleJetton/tact_SampleJetton';
 import { JettonDefaultWallet } from '../build/SampleJetton/tact_JettonDefaultWallet';
-import { UserAccount } from '../build/Pool/tact_UserAccount';
+import { UserAccount, UserAccountData } from '../build/Pool/tact_UserAccount';
 import { DTokenDefaultWallet } from '../build/Pool/tact_DTokenDefaultWallet';
 import { PERCENTAGE_FACTOR, RAY } from '../helpers/constant';
 import { sumTransactionsFee } from '../jest.setup';
@@ -242,6 +242,11 @@ describe('Pool', () => {
                 (100 * Number(reserveConfiguration.liquidationThreshold)) / (Number(PERCENTAGE_FACTOR) * 60),
                 5,
             );
+
+            const userAccountsData: Dictionary<Address, UserAccountData> = Dictionary.empty(Dictionary.Keys.Address());
+            userAccountsData.set(deployer.address, accountData)
+            // userAccountsData.set(pool.address, accountData)
+            // console.log(await pool.getBatchUserAccountHealthInfo(userAccountsData))
         });
 
         it('should borrow failed', async () => {
