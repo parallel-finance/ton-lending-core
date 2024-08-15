@@ -87,6 +87,14 @@ trait PoolView with Ownable, Resumable {
         };
     }
 
+    get fun batchUserAccountHealthInfo(accountDatas: map<Address, UserAccountData>): map<Address, UserAccountHealthInfo> {
+        let healthInfos: map<Address, UserAccountHealthInfo> = emptyMap();
+        foreach (userAddress, userAccountData in accountDatas) {
+            healthInfos.set(userAddress, self.userAccountHealthInfo(userAccountData));
+        }
+        return healthInfos;
+    }
+
     get fun getUserAccountInit(userAddress: Address): StateInit {
         return initOf UserAccount(myAddress(), userAddress);
     }
