@@ -567,5 +567,54 @@ describe('Pool Supply', () => {
                 success: false,
             });
         });
+
+        it('set user reserve as collateral', async () => {
+            const amount = toNano(100n);
+            await supplyJetton(amount);
+            const userAccountContract = blockchain.openContract(
+                await UserAccount.fromInit(pool.address, deployer.address),
+            );
+
+            let result = await userAccountContract.send(
+                deployer.getSender(),
+                {
+                    value: toNano('0.05'),
+                },
+                {
+                    $$type: 'SetUserReserveAsCollateral',
+                    reserve: sampleJetton.address,
+                    asCollateral: true,
+                },
+            );
+            // SetUserReserveAsCollateral
+            expect(result.transactions).toHaveTransaction({
+                from: deployer.address,
+                to: userAccountContract.address,
+                success: true,
+            });
+
+            let accountData = await userAccountContract.getAccount();
+            expect(accountData.positionsDetail.get(sampleJetton.address)?.asCollateral).toEqual(true);
+
+            result = await userAccountContract.send(
+                deployer.getSender(),
+                {
+                    value: toNano('0.05'),
+                },
+                {
+                    $$type: 'SetUserReserveAsCollateral',
+                    reserve: sampleJetton.address,
+                    asCollateral: false,
+                },
+            );
+            // SetUserReserveAsCollateral
+            expect(result.transactions).toHaveTransaction({
+                from: deployer.address,
+                to: userAccountContract.address,
+                success: true,
+            });
+            accountData = await userAccountContract.getAccount();
+            expect(accountData.positionsDetail.get(sampleJetton.address)?.asCollateral).toEqual(false);
+        });
     });
 });

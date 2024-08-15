@@ -1,4 +1,11 @@
-import { Blockchain, BlockchainSnapshot, SandboxContract, Treasury, TreasuryContract } from '@ton/sandbox';
+import {
+    Blockchain,
+    BlockchainSnapshot,
+    printTransactionFees,
+    SandboxContract,
+    Treasury,
+    TreasuryContract,
+} from '@ton/sandbox';
 import { Address, beginCell, Cell, fromNano, toNano } from '@ton/core';
 import { ATokenDTokenContents, Pool, ReserveConfiguration, ReserveInterestRateStrategy } from '../wrappers/Pool';
 import '@ton/test-utils';
@@ -2029,5 +2036,79 @@ describe('Pool liquidation test', () => {
         expect(
             Number(liquidatorCollateralWalletBalanceBefore + actualCollateralToLiquidate - liquidationProtocolFee),
         ).toBeCloseTo(Number(liquidatorCollateralWalletBalanceAfter), -5);
+    });
+
+    it('supply jetton1, jetton2, borrow jetton2, set user jetton1 not as collateral', async () => {
+        // provide liquidity
+        await supply(secondUser.getSender(), sampleJetton1, 10000n * 10n ** reserveConfiguration1.decimals);
+        await supply(secondUser.getSender(), sampleJetton2, 10000n * 10n ** reserveConfiguration2.decimals);
+
+        const borrower = deployer;
+        const sampleJetton1Uint = 10n ** reserveConfiguration1.decimals;
+        const sampleJetton2Uint = 10n ** reserveConfiguration2.decimals;
+        await supply(deployer.getSender(), sampleJetton1, 10000n * sampleJetton1Uint);
+        await supply(deployer.getSender(), sampleJetton2, 10000n * sampleJetton2Uint);
+        await borrow(deployer.getSender(), sampleJetton2, 5000n * sampleJetton2Uint);
+        const borrowerAccount = blockchain.openContract(await UserAccount.fromInit(pool.address, borrower.address));
+
+        let result = await borrowerAccount.send(
+            borrower.getSender(),
+            {
+                value: toNano('0.05'),
+            },
+            {
+                $$type: 'SetUserReserveAsCollateral',
+                reserve: sampleJetton1.address,
+                asCollateral: false,
+            },
+        );
+        expect(result.transactions).toHaveTransaction({
+            from: borrower.address,
+            to: borrowerAccount.address,
+            success: true,
+        });
+        expect(result.transactions).toHaveTransaction({
+            from: borrowerAccount.address,
+            to: pool.address,
+            success: true,
+        });
+        expect(result.transactions).toHaveTransaction({
+            from: pool.address,
+            to: borrowerAccount.address,
+            success: true,
+        });
+        expect(result.transactions).toHaveTransaction({
+            from: borrowerAccount.address,
+            to: deployer.address,
+            success: true,
+        });
+        let accountData = await borrowerAccount.getAccount();
+        expect(accountData.positionsDetail.get(sampleJetton1.address)?.asCollateral).toEqual(false);
+
+        result = await borrowerAccount.send(
+            borrower.getSender(),
+            {
+                value: toNano('0.05'),
+            },
+            {
+                $$type: 'SetUserReserveAsCollateral',
+                reserve: sampleJetton2.address,
+                asCollateral: false,
+            },
+        );
+        expect(result.transactions).toHaveTransaction({
+            from: borrower.address,
+            to: borrowerAccount.address,
+            success: true,
+        });
+        expect(result.transactions).toHaveTransaction({
+            from: borrowerAccount.address,
+            to: pool.address,
+            success: false,
+        });
+
+        accountData = await borrowerAccount.getAccount();
+        expect(accountData.positionsDetail.get(sampleJetton2.address)?.asCollateral).toEqual(true);
+        // printTransactionFees(result.transactions);
     });
 });

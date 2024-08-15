@@ -119,3 +119,10 @@ message SyncPrices {
 message UpdateOracleProvider {
     oracle: Address;
 }
+message SetUserReserveAsCollateral {
+    reserve: Address;
+    asCollateral: Bool;
+}
+message SetUserReserveNotAsCollateralFromPool {
+    reserve: Address;
+}

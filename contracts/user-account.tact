@@ -1,5 +1,6 @@
 import "@stdlib/deploy";
 import "./types/message";
+import "./constants";
 
 contract UserAccount with Deployable {
     const MIN_TONS_FOR_STORAGE: Int = ton("0.01");
@@ -17,30 +18,57 @@ contract UserAccount with Deployable {
         self.master = master;
     }
 
-    fun requireMaster() {
-        require(context().sender == self.master, "Invalid sender");
+    receive(msg: SetUserReserveAsCollateral) {
+        self.requireOwner();
+        
+        let _tokenData: TokenData? = self.positionsDetail.get(msg.reserve);
+        require(_tokenData != null && _tokenData!!.supply > 0, "No supply position for this reserve");
+        let tokenData: TokenData = _tokenData!!;
+        if (tokenData.asCollateral == msg.asCollateral) {
+            self.cashback("SetUserReserveAsCollateral skip");
+            return;
+        }
+        
+        if (msg.asCollateral == true) {
+            tokenData.asCollateral = true;
+            self.positionsDetail.set(msg.reserve, tokenData);
+            self.cashback("SetUserReserveAsCollateral successfully");
+        } else {
+            let positionDetail: map<Address, TokenData> = self.positionsDetail;
+            tokenData.asCollateral = false;
+            positionDetail.set(msg.reserve, tokenData);
+            
+            let ctx: Context = context();
+            let msgValue: Int = self.msgValue(ctx.value) - ctx.readForwardFee();
+            send(SendParameters{
+                to: self.master,
+                value: msgValue,
+                mode: SendPayGasSeparately,
+                bounce: false,
+                body: UserAccountDataResponse{
+                    queryId: 0,
+                    user: self.owner,
+                    tokenAddress: msg.reserve,
+                    action: ACTION_SET_USER_RESERVE_NOT_AS_COLLATERAL,
+                    amount: 0,
+                    accountData: UserAccountData{
+                        positions: self.positions,
+                        positionsLength: self.positionsLength,
+                        positionsDetail: positionDetail
+                    },
+                    payload: emptySlice()
+                }.toCell()
+            });
+        }
     }
 
-    fun processUpdatePosition(position: UpdatePosition) {
-        let existingTokenData: TokenData? = self.positionsDetail.get(position.address);
-        if (existingTokenData == null) {
-            self.positions.set(self.positionsLength, position.address);
-            self.positionsDetail.set(position.address, TokenData{
-                supply: position.supply,
-                borrow: position.borrow,
-                asCollateral: true
-            });
-            self.positionsLength += 1;
-        } else {
-            let currentTokenData: TokenData = self.positionsDetail.get(position.address)!!;
-            let newBorrow: Int = currentTokenData.borrow + position.borrow;
-            let updatedTokenData: TokenData = TokenData{
-                supply: currentTokenData.supply + position.supply,
-                borrow: newBorrow > 0 ? newBorrow : 0,
-                asCollateral: currentTokenData.asCollateral
-            };
-            self.positionsDetail.set(position.address, updatedTokenData);
-        }
+    receive(msg: SetUserReserveNotAsCollateralFromPool) {
+        self.requireMaster();
+        
+        let tokenData: TokenData = self.positionsDetail.get(msg.reserve)!!;
+        tokenData.asCollateral = false;
+        self.positionsDetail.set(msg.reserve, tokenData);
+        self.cashback("SetUserReserveNotAsCollateral successfully");
     }
 
     receive(msg: UpdatePosition) {
@@ -94,6 +122,40 @@ contract UserAccount with Deployable {
         let storageFee: Int = self.MIN_TONS_FOR_STORAGE - min(tonBalanceBeforeMsg, self.MIN_TONS_FOR_STORAGE);
         msgValue = msgValue - (storageFee + self.GAS_CONSUMPTION);
         return msgValue;
+    }
+
+    fun requireMaster() {
+        require(context().sender == self.master, "Invalid sender, not master");
+    }
+
+    fun requireOwner() {
+        require(context().sender == self.owner, "Invalid sender, not owner");
+    }
+
+    fun processUpdatePosition(position: UpdatePosition) {
+        let existingTokenData: TokenData? = self.positionsDetail.get(position.address);
+        if (existingTokenData == null) {
+            self.positions.set(self.positionsLength, position.address);
+            self.positionsDetail.set(position.address, TokenData{
+                supply: position.supply,
+                borrow: position.borrow,
+                asCollateral: true
+            });
+            self.positionsLength += 1;
+        } else {
+            let currentTokenData: TokenData = self.positionsDetail.get(position.address)!!;
+            let newBorrow: Int = currentTokenData.borrow + position.borrow;
+            let updatedTokenData: TokenData = TokenData{
+                supply: currentTokenData.supply + position.supply,
+                borrow: newBorrow > 0 ? newBorrow : 0,
+                asCollateral: currentTokenData.asCollateral
+            };
+            self.positionsDetail.set(position.address, updatedTokenData);
+        }
+    }
+
+    fun cashback(comment: String) {
+        self.forward(self.owner, comment.asComment(), false, null);
     }
 
     get fun account(): UserAccountData {

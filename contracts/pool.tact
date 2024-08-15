@@ -386,6 +386,18 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
                 }.toCell()
             });
         }
+
+        if (msg.action == ACTION_SET_USER_RESERVE_NOT_AS_COLLATERAL) {
+            send(SendParameters{
+                to: sender(),
+                value: 0,
+                bounce: false,
+                mode: SendRemainingValue,
+                body: SetUserReserveNotAsCollateralFromPool{
+                    reserve: msg.tokenAddress,
+                }.toCell()
+            });
+        }
     }
 
     receive(msg: TokenExcesses) {
@@ -749,6 +761,10 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
             let transferValueMulLT: Int = transferValue.percentMul(reserveConfiguration.liquidationThreshold);
             let totalCollateralMulLT: Int = healthInfo.totalCollateralInBaseCurrency.percentMul(healthInfo.avgLiquidationThreshold);
             require(totalCollateralMulLT - transferValueMulLT >= healthInfo.totalDebtInBaseCurrency, "the left collateral can't cover debt");
+        }
+        if (msg.action == ACTION_SET_USER_RESERVE_NOT_AS_COLLATERAL) {
+            require(healthInfo.healthFactorInRay >= RAY, "HF < 1");
+            require(reserveConfiguration.isActive, "Token inactive");
         }
 
         return healthInfo;
