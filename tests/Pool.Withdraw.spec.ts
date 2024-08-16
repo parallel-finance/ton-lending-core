@@ -1,6 +1,6 @@
-import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
-import { fromNano, toNano } from '@ton/core';
-import { Pool } from '../wrappers/Pool';
+import { Blockchain, printTransactionFees, SandboxContract, TreasuryContract } from '@ton/sandbox';
+import { beginCell, fromNano, toNano } from '@ton/core';
+import { Pool, storeWithdrawToken } from '../wrappers/Pool';
 import '@ton/test-utils';
 import { SampleJetton } from '../build/SampleJetton/tact_SampleJetton';
 import { JettonDefaultWallet } from '../build/SampleJetton/tact_JettonDefaultWallet';
@@ -12,6 +12,7 @@ import { sumTransactionsFee } from '../jest.setup';
 import { addReserve, deployJetton, deployPool, mintJetton, reserveConfiguration, supplyJetton } from './utils';
 import { AToken } from '../build/Pool/tact_AToken';
 import { DToken } from '../build/Pool/tact_DToken';
+import { senderArgsToMessageRelaxed } from '../scripts/utils';
 
 describe('Pool Withdraw', () => {
     let blockchain: Blockchain;
@@ -490,5 +491,159 @@ describe('Pool Withdraw', () => {
             to: pool.address,
             success: false,
         });
+    });
+
+    it('Reentrancy borrow should be failed', async () => {
+        const userAccountAddress = await UserAccount.fromInit(pool.address, deployer.address);
+        const withdrawAmount = supplyAmount;
+        const deployerJettonBalanceBefore = (await deployerJettonDefaultWallet.getGetWalletData()).balance;
+        const withdrawMessage = senderArgsToMessageRelaxed({
+            to: pool.address,
+            value: toNano('0.5'),
+            body: beginCell()
+                .store(
+                    storeWithdrawToken({
+                        $$type: 'WithdrawToken',
+                        tokenAddress: sampleJetton.address,
+                        amount: withdrawAmount,
+                    }),
+                )
+                .endCell(),
+        });
+        const result = await deployer.sendMessages([withdrawMessage, withdrawMessage]);
+
+        // WithdrawToken
+        expect(result.transactions).toHaveTransaction({
+            from: deployer.address,
+            to: pool.address,
+            success: true,
+        });
+
+        // GetUserAccountData
+        expect(result.transactions).toHaveTransaction({
+            from: pool.address,
+            to: userAccountAddress.address,
+            success: true,
+        });
+
+        // UserAccountDataResponse
+        expect(result.transactions).toHaveTransaction({
+            from: userAccountAddress.address,
+            to: pool.address,
+            success: true,
+        });
+
+        // sendTokenTransferByPool TokenTransfer
+        expect(result.transactions).toHaveTransaction({
+            from: pool.address,
+            to: poolWallet.address,
+            success: true,
+        });
+
+        // UpdatePosition
+        expect(result.transactions).toHaveTransaction({
+            from: pool.address,
+            to: userAccountAddress.address,
+            success: true,
+        });
+
+        // UserPositionUpdated
+        expect(result.transactions).toHaveTransaction({
+            from: userAccountAddress.address,
+            to: pool.address,
+            success: true,
+        });
+
+        // Burn aToken
+        expect(result.transactions).toHaveTransaction({
+            from: pool.address,
+            to: deployerATokenDefaultWallet.address,
+            success: true,
+        });
+
+        // aToken-wallet to aToken-master TokenBurnNotification
+        expect(result.transactions).toHaveTransaction({
+            from: deployerATokenDefaultWallet.address,
+            to: aToken.address,
+            success: true,
+        });
+
+        // the second withdraw transaction will be failed
+        expect(result.transactions).toHaveTransaction({
+            from: deployer.address,
+            to: pool.address,
+            success: false,
+            exitCode: 53463,
+        });
+
+        // printTransactionFees(result.transactions)
+        expect(await pool.getUserLock(deployer.address)).toEqual(false);
+        const userAccountContract = blockchain.openContract(userAccountAddress);
+        const accountData = await userAccountContract.getAccount();
+        expect(accountData.positionsLength).toEqual(1n);
+        expect(accountData.positions?.get(0n)!!.equals(sampleJetton.address)).toBeTruthy();
+        expect(accountData.positionsDetail?.get(sampleJetton.address)!!.supply).toEqual(supplyAmount - withdrawAmount);
+        expect(accountData.positionsDetail?.get(sampleJetton.address)!!.borrow).toEqual(toNano(0n));
+
+        const walletData = await deployerATokenDefaultWallet.getGetWalletData();
+        expect(walletData.balance).toEqual(supplyAmount - withdrawAmount);
+        expect((await deployerJettonDefaultWallet.getGetWalletData()).balance).toEqual(
+            deployerJettonBalanceBefore + withdrawAmount,
+        );
+
+        const totalTransactionFee = sumTransactionsFee(result.transactions);
+        expect(totalTransactionFee).toBeLessThanOrEqual(0.113); // real: 0.11201533600000001
+    });
+
+    it('should release lock successfully when failed to validationForAction', async () => {
+        const userAccount = await UserAccount.fromInit(pool.address, deployer.address);
+        const withdrawMessage = senderArgsToMessageRelaxed({
+            to: pool.address,
+            value: toNano('0.5'),
+            body: beginCell()
+                .store(
+                    storeWithdrawToken({
+                        $$type: 'WithdrawToken',
+                        tokenAddress: sampleJetton.address,
+                        amount: supplyAmount + 1n,
+                    }),
+                )
+                .endCell(),
+        });
+        const result = await deployer.sendMessages([withdrawMessage]);
+
+        // WithdrawToken
+        expect(result.transactions).toHaveTransaction({
+            from: deployer.address,
+            to: pool.address,
+            success: true,
+        });
+
+        // GetUserAccountData
+        expect(result.transactions).toHaveTransaction({
+            from: pool.address,
+            to: userAccount.address,
+            success: true,
+        });
+
+        // UserAccountDataResponse
+        // invalid available liquidity
+        expect(result.transactions).toHaveTransaction({
+            from: userAccount.address,
+            to: pool.address,
+            success: false,
+            exitCode: 32741,
+        });
+        // cashback
+        expect(result.transactions).toHaveTransaction({
+            from: userAccount.address,
+            to: deployer.address,
+            success: true,
+            op: 0,
+        });
+
+        // printTransactionFees(result.transactions);
+        // should release lock successfully.
+        expect(await pool.getUserLock(deployer.address)).toEqual(false);
     });
 });

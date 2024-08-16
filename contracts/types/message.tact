@@ -48,6 +48,7 @@ message(0x66660007) UpdatePosition {
     address: Address;
     supply: Int as int128;
     borrow: Int as int128;
+    releaseUserLock: Bool;
 }
 // gas cost:
 //      supply: 0.011
@@ -58,6 +59,7 @@ message(0x66660008) UserPositionUpdated {
     asset: Address;
     supply: Int as int128;
     borrow: Int as int128;
+    releaseUserLock: Bool;
 }
 message(0x66660009) SupplyTon {
     amount: Int as coins;

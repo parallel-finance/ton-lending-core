@@ -57,7 +57,8 @@ contract UserAccount with Deployable {
                 user: self.owner,
                 asset: msg.address,
                 supply: msg.supply,
-                borrow: msg.borrow
+                borrow: msg.borrow,
+                releaseUserLock: msg.releaseUserLock
             }.toCell()
         });
     }
