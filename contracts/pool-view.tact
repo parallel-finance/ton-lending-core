@@ -32,6 +32,9 @@ trait PoolView with Ownable, Resumable {
     // bounce messages
     updatePositionMsg: map<Int, UpdatePositionBounce>;
 
+    // user reentrancy lock
+    userLock: map<Address, Bool>;
+
     // ===== Get functions =====
 
     get fun userAccountHealthInfo(userAccountData: UserAccountData): UserAccountHealthInfo {
@@ -200,6 +203,10 @@ trait PoolView with Ownable, Resumable {
 
     get fun oracleProvider(): Address? {
         return self.oracleProvider;
+    }
+
+    get fun userLock(user: Address): Bool {
+        return self.userLock.get(user) == true;
     }
 
     get fun MIN_TONS_FOR_STORAGE(): Int {

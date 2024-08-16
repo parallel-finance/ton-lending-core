@@ -4,6 +4,7 @@ import "./types/message";
 contract UserAccount with Deployable {
     const MIN_TONS_FOR_STORAGE: Int = ton("0.01");
     const GAS_CONSUMPTION: Int = ton("0.01");
+    const RELEASE_LOCK_GAS_CONSUMPTION: Int = ton("0.01"); // 0.0065012
 
     owner: Address;
     master: Address;
@@ -69,7 +70,7 @@ contract UserAccount with Deployable {
             to: context().sender,
             value: msgValue,
             mode: SendPayGasSeparately,
-            bounce: false,
+            bounce: true,
             body: UserAccountDataResponse{
                 queryId: msg.queryId,
                 user: msg.user,
@@ -86,12 +87,30 @@ contract UserAccount with Deployable {
         });
     }
 
+    // bounce for `pool.validateForAction` check failed
+    bounced(src: bounced<UserAccountDataResponse>){
+        let ctx: Context = context();
+        let msgValue: Int = ctx.value - self.RELEASE_LOCK_GAS_CONSUMPTION;
+        send(SendParameters{
+            to: self.master,
+            value: self.RELEASE_LOCK_GAS_CONSUMPTION,
+            bounce: false,
+            mode: SendPayGasSeparately,
+            body: ReleaseUserLock{ user: self.owner }.toCell()
+        });
+        self.cashback("cashback for bounce");
+    }
+
     fun msgValue(value: Int): Int {
         let msgValue: Int = value;
         let tonBalanceBeforeMsg: Int = myBalance() - msgValue;
         let storageFee: Int = self.MIN_TONS_FOR_STORAGE - min(tonBalanceBeforeMsg, self.MIN_TONS_FOR_STORAGE);
         msgValue = msgValue - (storageFee + self.GAS_CONSUMPTION);
         return msgValue;
+    }
+
+    fun cashback(comment: String) {
+        self.forward(self.owner, comment.asComment(), false, null);
     }
 
     get fun account(): UserAccountData {

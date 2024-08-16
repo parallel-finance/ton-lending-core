@@ -119,3 +119,6 @@ message SyncPrices {
 message UpdateOracleProvider {
     oracle: Address;
 }
+message ReleaseUserLock {
+    user: Address;
+}
