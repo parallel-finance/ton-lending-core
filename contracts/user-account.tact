@@ -27,8 +27,7 @@ contract UserAccount with Deployable {
             self.positions.set(self.positionsLength, position.address);
             self.positionsDetail.set(position.address, TokenData{
                 supply: position.supply,
-                borrow: position.borrow,
-                asCollateral: true
+                borrow: position.borrow
             });
             self.positionsLength += 1;
         } else {
@@ -36,8 +35,7 @@ contract UserAccount with Deployable {
             let newBorrow: Int = currentTokenData.borrow + position.borrow;
             let updatedTokenData: TokenData = TokenData{
                 supply: currentTokenData.supply + position.supply,
-                borrow: newBorrow > 0 ? newBorrow : 0,
-                asCollateral: currentTokenData.asCollateral
+                borrow: newBorrow > 0 ? newBorrow : 0
             };
             self.positionsDetail.set(position.address, updatedTokenData);
         }

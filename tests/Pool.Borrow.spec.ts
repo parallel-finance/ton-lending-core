@@ -226,7 +226,7 @@ describe('Pool', () => {
             let userHealthInfo = await pool.getUserAccountHealthInfo(accountData);
             expect(userHealthInfo.avgLtv).toEqual(reserveConfiguration.ltv);
             expect(userHealthInfo.avgLiquidationThreshold).toEqual(reserveConfiguration.liquidationThreshold);
-            expect(Number(fromNano(userHealthInfo.totalCollateralInBaseCurrency))).toBeCloseTo(
+            expect(Number(fromNano(userHealthInfo.totalSupplyInBaseCurrency))).toBeCloseTo(
                 Number(fromNano(100n * toNano(1))),
                 6,
             );
@@ -342,7 +342,6 @@ describe('Pool', () => {
             expect(accountData.positions?.get(1n)!!.equals(pool.address)).toBeTruthy();
             expect(Number(fromNano(accountData.positionsDetail?.get(pool.address)!!.supply))).toBeCloseTo(100, 3);
             expect(Number(fromNano(accountData.positionsDetail?.get(pool.address)!!.borrow))).toBeCloseTo(50, 3);
-            expect(accountData.positionsDetail?.get(pool.address)!!.asCollateral).toBeTruthy();
         });
     });
 

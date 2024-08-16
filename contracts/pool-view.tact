@@ -37,12 +37,10 @@ trait PoolView with Ownable, Resumable {
     get fun userAccountHealthInfo(userAccountData: UserAccountData): UserAccountHealthInfo {
         // sum(reserve supply amount * reserve price)
         let totalSupply: Int = 0;
-        // sum(reserve Collateral amount * reserve price)
-        let totalCollateral: Int = 0;
-        // sum(reserve Collateral amount * reserve price * reserve ltv)
-        let totalCollateralMulLtv: Int = 0;
-        // sum(reserve Collateral amount * reserve price * reserve LiquidationThreshold)
-        let totalCollateralMulLT: Int = 0;
+        // sum(reserve supply amount * reserve price * reserve ltv)
+        let totalSupplyMulLtv: Int = 0;
+        // sum(reserve supply amount * reserve price * reserve LiquidationThreshold)
+        let totalSupplyMulLT: Int = 0;
         // sum(reserve borrow amount * reserve price)
         let totalDebt: Int = 0;
 
@@ -55,11 +53,8 @@ trait PoolView with Ownable, Resumable {
                 let normalizedIncome: Int = reserveData.getNormalizedIncome();
                 let supplyValue: Int = tokenData.supply.rayMul(normalizedIncome) * reserveData.price / reserveUint;
                 totalSupply += supplyValue;
-                if (tokenData.asCollateral) {
-                    totalCollateral += supplyValue;
-                    totalCollateralMulLtv += supplyValue * reserveConfiguration.ltv;
-                    totalCollateralMulLT += supplyValue  * reserveConfiguration.liquidationThreshold;
-                }
+                totalSupplyMulLtv += supplyValue * reserveConfiguration.ltv;
+                totalSupplyMulLT += supplyValue  * reserveConfiguration.liquidationThreshold;
             }
             if (tokenData.borrow > 0) {
                 let normalizedDebt: Int = reserveData.getNormalizedDebt();
@@ -68,8 +63,8 @@ trait PoolView with Ownable, Resumable {
             }
         }
 
-        let avgLtv: Int = totalCollateral != 0 ? totalCollateralMulLtv / totalCollateral : 0;
-        let availableBorrows: Int = totalCollateral.percentMul(avgLtv);
+        let avgLtv: Int = totalSupply != 0 ? totalSupplyMulLtv / totalSupply : 0;
+        let availableBorrows: Int = totalSupply.percentMul(avgLtv);
         if (availableBorrows < totalDebt) {
             availableBorrows = 0;
         } else {
@@ -78,12 +73,11 @@ trait PoolView with Ownable, Resumable {
 
         return UserAccountHealthInfo{
             avgLtv: avgLtv,
-            avgLiquidationThreshold: totalCollateral != 0 ? totalCollateralMulLT / totalCollateral : 0,
+            avgLiquidationThreshold: totalSupply != 0 ? totalSupplyMulLT / totalSupply : 0,
             totalSupplyInBaseCurrency: totalSupply,
-            totalCollateralInBaseCurrency: totalCollateral,
             totalDebtInBaseCurrency: totalDebt,
             availableBorrowsInBaseCurrency: availableBorrows,
-            healthFactorInRay: totalDebt != 0 ? (totalCollateralMulLT / PERCENTAGE_FACTOR).rayDiv(totalDebt) : UINT256_MAX // base in RAY
+            healthFactorInRay: totalDebt != 0 ? (totalSupplyMulLT / PERCENTAGE_FACTOR).rayDiv(totalDebt) : UINT256_MAX // base in RAY
         };
     }
 

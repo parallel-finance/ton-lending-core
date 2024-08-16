@@ -50,7 +50,6 @@ struct ReserveDataAndConfiguration {
 struct TokenData {
     supply: Int as coins;
     borrow: Int as coins;
-    asCollateral: Bool;
 }
 struct UserAccountData {
     positions: map<Int, Address>;
@@ -95,8 +94,6 @@ struct UserAccountHealthInfo {
     avgLiquidationThreshold: Int as uint16;
     // base in oracle price decimal: 10**9
     totalSupplyInBaseCurrency: Int as uint128;
-    // base in oracle price decimal: 10**9
-    totalCollateralInBaseCurrency: Int as uint128;
     // base in oracle price decimal: 10**9
     totalDebtInBaseCurrency: Int as uint128;
     // base in oracle price decimal: 10**9

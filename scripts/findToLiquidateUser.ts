@@ -132,8 +132,8 @@ export async function run(provider: NetworkProvider) {
 
     for (let i = 0; i < uniqueHolders.length; i++) {
         const userHealthInfo = await getUserHealthInfo(provider, pool, uniqueHolders[i]);
-        const {totalCollateralInBaseCurrency, healthFactorInRay} = userHealthInfo;
-        if (totalCollateralInBaseCurrency > 0 && healthFactorInRay < RAY) {
+        const {totalSupplyInBaseCurrency, healthFactorInRay} = userHealthInfo;
+        if (totalSupplyInBaseCurrency > 0 && healthFactorInRay < RAY) {
             console.log(`User ${uniqueHolders[i].toString()} is liquidatable`);
             liquidatableUsers.push(uniqueHolders[i]);
         } else {

@@ -684,7 +684,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
             let borrowAmountValue: Int = amount * reserveData.price / reserveUint;
             require(healthInfo.avgLtv != 0, "zero user avgLtv");
             let collateralNeeded: Int = borrowAmountValue.percentDiv(healthInfo.avgLtv);
-            require(healthInfo.totalDebtInBaseCurrency + collateralNeeded <= healthInfo.totalCollateralInBaseCurrency, "collateral can't cover new borrow");
+            require(healthInfo.totalDebtInBaseCurrency + collateralNeeded <= healthInfo.totalSupplyInBaseCurrency, "collateral can't cover new borrow");
         }
         if (msg.action == ACTION_WITHDRAW) {
             // 1. check reserve isActive
@@ -711,8 +711,8 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
             let reserveUint: Int = pow(10, reserveConfiguration.decimals);
             let withdrawValue: Int = withdrawAmount * reserveData.price / reserveUint;
             let withdrawValueMulLT: Int = withdrawValue.percentMul(reserveConfiguration.liquidationThreshold);
-            let totalCollateralMulLT: Int = healthInfo.totalCollateralInBaseCurrency.percentMul(healthInfo.avgLiquidationThreshold);
-            require(totalCollateralMulLT - withdrawValueMulLT >= healthInfo.totalDebtInBaseCurrency, "the left collateral can't cover debt");
+            let totalSupplyMulLT: Int = healthInfo.totalSupplyInBaseCurrency.percentMul(healthInfo.avgLiquidationThreshold);
+            require(totalSupplyMulLT - withdrawValueMulLT >= healthInfo.totalDebtInBaseCurrency, "the left collateral can't cover debt");
         }
         if (msg.action == ACTION_REPAY) {
             // 1. check reserve isActive
@@ -726,11 +726,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
             let collateralReserve: Address = liquidation.collateralReserve;
             let collateralReserveConfiguration: ReserveConfiguration = self.reservesConfiguration.get(collateralReserve)!!;
             let userCollateralPosition: TokenData = userAccountData.positionsDetail.get(collateralReserve)!!;
-            require(
-                userCollateralPosition.asCollateral && 
-                collateralReserveConfiguration.liquidationThreshold != 0, 
-                "collateral can't be liquidated"
-            );
+            require(collateralReserveConfiguration.liquidationThreshold != 0, "collateral can't be liquidated");
             require(collateralReserveConfiguration.isActive && reserveConfiguration.isActive, "reserve isn not active");
         }
         if (msg.action == ACTION_TRANSFER_ATOKEN) {
@@ -747,8 +743,8 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
             let reserveUint: Int = pow(10, reserveConfiguration.decimals);
             let transferValue: Int = transferAmount.rayMul(normalizedIncome) * reserveData.price / reserveUint;
             let transferValueMulLT: Int = transferValue.percentMul(reserveConfiguration.liquidationThreshold);
-            let totalCollateralMulLT: Int = healthInfo.totalCollateralInBaseCurrency.percentMul(healthInfo.avgLiquidationThreshold);
-            require(totalCollateralMulLT - transferValueMulLT >= healthInfo.totalDebtInBaseCurrency, "the left collateral can't cover debt");
+            let totalSupplyMulLT: Int = healthInfo.totalSupplyInBaseCurrency.percentMul(healthInfo.avgLiquidationThreshold);
+            require(totalSupplyMulLT - transferValueMulLT >= healthInfo.totalDebtInBaseCurrency, "the left collateral can't cover debt");
         }
 
         return healthInfo;

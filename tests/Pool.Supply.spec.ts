@@ -110,7 +110,6 @@ describe('Pool Supply', () => {
         expect(accountData.positionsLength).toEqual(1n);
         expect(accountData.positions?.get(0n)!!.equals(sampleJetton.address)).toBeTruthy();
         expect(accountData.positionsDetail?.get(sampleJetton.address)!!.supply).toEqual(amount);
-        expect(accountData.positionsDetail?.get(sampleJetton.address)!!.asCollateral).toBeTruthy();
     };
 
     describe('handle supply', () => {
@@ -157,7 +156,6 @@ describe('Pool Supply', () => {
             expect(accountData.positionsLength).toEqual(1n);
             expect(accountData.positions?.get(0n)!!.equals(pool.address)).toBeTruthy();
             expect(accountData.positionsDetail?.get(pool.address)!!.supply).toEqual(amount);
-            expect(accountData.positionsDetail?.get(pool.address)!!.asCollateral).toBeTruthy();
         });
 
         it('transfer AToken', async () => {
@@ -522,7 +520,6 @@ describe('Pool Supply', () => {
             expect(accountData.positionsLength).toEqual(1n);
             expect(accountData.positions?.get(0n)!!.equals(sampleJetton.address)).toBeTruthy();
             expect(accountData.positionsDetail?.get(sampleJetton.address)!!.supply).toEqual(amount);
-            expect(accountData.positionsDetail?.get(sampleJetton.address)!!.asCollateral).toBeTruthy();
         });
 
         it('Should fail if not enough gas', async () => {
