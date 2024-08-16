@@ -507,13 +507,11 @@ describe('Pool liquidation test', () => {
         let collateralReserveData = await pool.getReserveDataAndConfiguration(collateralReserve.address);
         let debtReserveData = await pool.getReserveDataAndConfiguration(debtReserve.address);
         expect(accountData.positionsLength).toEqual(2n);
-        expect(accountData.positionsDetail.get(collateralReserve.address)?.asCollateral).toEqual(true);
         expect(accountData.positionsDetail.get(collateralReserve.address)?.supply).toEqual(supplyAmount);
         expect(accountData.positionsDetail.get(collateralReserve.address)?.borrow).toEqual(0n);
-        expect(accountData.positionsDetail.get(debtReserve.address)?.asCollateral).toEqual(true);
         expect(accountData.positionsDetail.get(debtReserve.address)?.supply).toEqual(0n);
         expect(accountData.positionsDetail.get(debtReserve.address)?.borrow).toEqual(borrowAmount);
-        expect(Number(fromNano(borrowerHealthInfo.totalCollateralInBaseCurrency))).toBeCloseTo(
+        expect(Number(fromNano(borrowerHealthInfo.totalSupplyInBaseCurrency))).toBeCloseTo(
             Number(fromNano((supplyAmount * collateralReserveData.reserveData.price) / collateralUint)),
             5,
         );
@@ -541,13 +539,11 @@ describe('Pool liquidation test', () => {
         collateralReserveData = await pool.getReserveDataAndConfiguration(collateralReserve.address);
         debtReserveData = await pool.getReserveDataAndConfiguration(debtReserve.address);
         expect(accountData.positionsLength).toEqual(2n);
-        expect(accountData.positionsDetail.get(collateralReserve.address)?.asCollateral).toEqual(true);
         expect(accountData.positionsDetail.get(collateralReserve.address)?.supply).toEqual(supplyAmount);
         expect(accountData.positionsDetail.get(collateralReserve.address)?.borrow).toEqual(0n);
-        expect(accountData.positionsDetail.get(debtReserve.address)?.asCollateral).toEqual(true);
         expect(accountData.positionsDetail.get(debtReserve.address)?.supply).toEqual(0n);
         expect(accountData.positionsDetail.get(debtReserve.address)?.borrow).toEqual(borrowAmount);
-        expect(Number(fromNano(borrowerHealthInfo.totalCollateralInBaseCurrency))).toBeCloseTo(
+        expect(Number(fromNano(borrowerHealthInfo.totalSupplyInBaseCurrency))).toBeCloseTo(
             Number(fromNano((supplyAmount * collateralReserveData.reserveData.price) / collateralUint)),
             2,
         );
@@ -626,7 +622,7 @@ describe('Pool liquidation test', () => {
             actualLiquidationAmount = actualLiquidationAmount;
         }
         const expectedCollateralAfter =
-            borrowerHealthInfo.totalCollateralInBaseCurrency -
+            borrowerHealthInfo.totalSupplyInBaseCurrency -
             (actualCollateralToLiquidate * collateralReserveData.reserveData.price) / collateralUint;
         const expectedDebtAfter =
             borrowerHealthInfo.totalDebtInBaseCurrency -
@@ -721,7 +717,7 @@ describe('Pool liquidation test', () => {
 
         // check borrower positions
         expect(Number(expectedCollateralAfter)).toBeCloseTo(
-            Number(borrowerHealthInfo.totalCollateralInBaseCurrency),
+            Number(borrowerHealthInfo.totalSupplyInBaseCurrency),
             -5,
         );
         expect(Number(expectedDebtAfter)).toBeCloseTo(Number(borrowerHealthInfo.totalDebtInBaseCurrency), -5);
@@ -762,13 +758,11 @@ describe('Pool liquidation test', () => {
         let collateralReserveData = await pool.getReserveDataAndConfiguration(collateralReserve.address);
         let debtReserveData = await pool.getReserveDataAndConfiguration(debtReserve.address);
         expect(accountData.positionsLength).toEqual(2n);
-        expect(accountData.positionsDetail.get(collateralReserve.address)?.asCollateral).toEqual(true);
         expect(accountData.positionsDetail.get(collateralReserve.address)?.supply).toEqual(supplyAmount);
         expect(accountData.positionsDetail.get(collateralReserve.address)?.borrow).toEqual(0n);
-        expect(accountData.positionsDetail.get(debtReserve.address)?.asCollateral).toEqual(true);
         expect(accountData.positionsDetail.get(debtReserve.address)?.supply).toEqual(0n);
         expect(accountData.positionsDetail.get(debtReserve.address)?.borrow).toEqual(borrowAmount);
-        expect(Number(fromNano(borrowerHealthInfo.totalCollateralInBaseCurrency))).toBeCloseTo(
+        expect(Number(fromNano(borrowerHealthInfo.totalSupplyInBaseCurrency))).toBeCloseTo(
             Number(fromNano((supplyAmount * collateralReserveData.reserveData.price) / collateralUint)),
             5,
         );
@@ -796,13 +790,11 @@ describe('Pool liquidation test', () => {
         collateralReserveData = await pool.getReserveDataAndConfiguration(collateralReserve.address);
         debtReserveData = await pool.getReserveDataAndConfiguration(debtReserve.address);
         expect(accountData.positionsLength).toEqual(2n);
-        expect(accountData.positionsDetail.get(collateralReserve.address)?.asCollateral).toEqual(true);
         expect(accountData.positionsDetail.get(collateralReserve.address)?.supply).toEqual(supplyAmount);
         expect(accountData.positionsDetail.get(collateralReserve.address)?.borrow).toEqual(0n);
-        expect(accountData.positionsDetail.get(debtReserve.address)?.asCollateral).toEqual(true);
         expect(accountData.positionsDetail.get(debtReserve.address)?.supply).toEqual(0n);
         expect(accountData.positionsDetail.get(debtReserve.address)?.borrow).toEqual(borrowAmount);
-        expect(Number(fromNano(borrowerHealthInfo.totalCollateralInBaseCurrency))).toBeCloseTo(
+        expect(Number(fromNano(borrowerHealthInfo.totalSupplyInBaseCurrency))).toBeCloseTo(
             Number(fromNano((supplyAmount * collateralReserveData.reserveData.price) / collateralUint)),
             2,
         );
@@ -881,7 +873,7 @@ describe('Pool liquidation test', () => {
             actualLiquidationAmount = actualLiquidationAmount;
         }
         const expectedCollateralAfter =
-            borrowerHealthInfo.totalCollateralInBaseCurrency -
+            borrowerHealthInfo.totalSupplyInBaseCurrency -
             (actualCollateralToLiquidate * collateralReserveData.reserveData.price) / collateralUint;
         const expectedDebtAfter =
             borrowerHealthInfo.totalDebtInBaseCurrency -
@@ -976,7 +968,7 @@ describe('Pool liquidation test', () => {
 
         // check borrower positions
         expect(Number(expectedCollateralAfter)).toBeCloseTo(
-            Number(borrowerHealthInfo.totalCollateralInBaseCurrency),
+            Number(borrowerHealthInfo.totalSupplyInBaseCurrency),
             -5,
         );
         expect(Number(expectedDebtAfter)).toBeCloseTo(Number(borrowerHealthInfo.totalDebtInBaseCurrency), -5);
@@ -1017,10 +1009,10 @@ describe('Pool liquidation test', () => {
         let collateralReserveData = await pool.getReserveDataAndConfiguration(collateralReserve.address);
         let debtReserveData = await pool.getReserveDataAndConfiguration(debtReserve.address);
         expect(accountData.positionsLength).toEqual(1n);
-        expect(accountData.positionsDetail.get(collateralReserve.address)?.asCollateral).toEqual(true);
+        
         expect(accountData.positionsDetail.get(collateralReserve.address)?.supply).toEqual(supplyAmount);
         expect(accountData.positionsDetail.get(debtReserve.address)?.borrow).toEqual(borrowAmount);
-        expect(Number(fromNano(borrowerHealthInfo.totalCollateralInBaseCurrency))).toBeCloseTo(
+        expect(Number(fromNano(borrowerHealthInfo.totalSupplyInBaseCurrency))).toBeCloseTo(
             Number(fromNano((supplyAmount * collateralReserveData.reserveData.price) / collateralUint)),
             5,
         );
@@ -1052,10 +1044,10 @@ describe('Pool liquidation test', () => {
         collateralReserveData = await pool.getReserveDataAndConfiguration(collateralReserve.address);
         debtReserveData = await pool.getReserveDataAndConfiguration(debtReserve.address);
         expect(accountData.positionsLength).toEqual(1n);
-        expect(accountData.positionsDetail.get(collateralReserve.address)?.asCollateral).toEqual(true);
+        
         expect(accountData.positionsDetail.get(collateralReserve.address)?.supply).toEqual(supplyAmount);
         expect(accountData.positionsDetail.get(debtReserve.address)?.borrow).toEqual(borrowAmount);
-        expect(Number(fromNano(borrowerHealthInfo.totalCollateralInBaseCurrency))).toBeCloseTo(
+        expect(Number(fromNano(borrowerHealthInfo.totalSupplyInBaseCurrency))).toBeCloseTo(
             Number(fromNano((supplyAmount * collateralReserveData.reserveData.price) / collateralUint)),
             2,
         );
@@ -1134,7 +1126,7 @@ describe('Pool liquidation test', () => {
             actualLiquidationAmount = actualLiquidationAmount;
         }
         const expectedCollateralAfter =
-            borrowerHealthInfo.totalCollateralInBaseCurrency -
+            borrowerHealthInfo.totalSupplyInBaseCurrency -
             (actualCollateralToLiquidate * collateralReserveData.reserveData.price) / collateralUint;
         const expectedDebtAfter =
             borrowerHealthInfo.totalDebtInBaseCurrency -
@@ -1229,7 +1221,7 @@ describe('Pool liquidation test', () => {
 
         // check borrower positions
         expect(Number(expectedCollateralAfter)).toBeCloseTo(
-            Number(borrowerHealthInfo.totalCollateralInBaseCurrency),
+            Number(borrowerHealthInfo.totalSupplyInBaseCurrency),
             -5,
         );
         expect(Number(expectedDebtAfter)).toBeCloseTo(Number(borrowerHealthInfo.totalDebtInBaseCurrency), -5);
@@ -1275,10 +1267,10 @@ describe('Pool liquidation test', () => {
         let collateralReserveData = await pool.getReserveDataAndConfiguration(collateralReserve.address);
         let debtReserveData = await pool.getReserveDataAndConfiguration(debtReserve.address);
         expect(accountData.positionsLength).toEqual(1n);
-        expect(accountData.positionsDetail.get(collateralReserve.address)?.asCollateral).toEqual(true);
+        
         expect(accountData.positionsDetail.get(collateralReserve.address)?.supply).toEqual(supplyAmount);
         expect(accountData.positionsDetail.get(debtReserve.address)?.borrow).toEqual(borrowAmount);
-        expect(Number(fromNano(borrowerHealthInfo.totalCollateralInBaseCurrency))).toBeCloseTo(
+        expect(Number(fromNano(borrowerHealthInfo.totalSupplyInBaseCurrency))).toBeCloseTo(
             Number(fromNano((supplyAmount * collateralReserveData.reserveData.price) / collateralUint)),
             5,
         );
@@ -1310,10 +1302,10 @@ describe('Pool liquidation test', () => {
         collateralReserveData = await pool.getReserveDataAndConfiguration(collateralReserve.address);
         debtReserveData = await pool.getReserveDataAndConfiguration(debtReserve.address);
         expect(accountData.positionsLength).toEqual(1n);
-        expect(accountData.positionsDetail.get(collateralReserve.address)?.asCollateral).toEqual(true);
+        
         expect(accountData.positionsDetail.get(collateralReserve.address)?.supply).toEqual(supplyAmount);
         expect(accountData.positionsDetail.get(debtReserve.address)?.borrow).toEqual(borrowAmount);
-        expect(Number(fromNano(borrowerHealthInfo.totalCollateralInBaseCurrency))).toBeCloseTo(
+        expect(Number(fromNano(borrowerHealthInfo.totalSupplyInBaseCurrency))).toBeCloseTo(
             Number(fromNano((supplyAmount * collateralReserveData.reserveData.price) / collateralUint)),
             2,
         );
@@ -1392,7 +1384,7 @@ describe('Pool liquidation test', () => {
             actualLiquidationAmount = actualLiquidationAmount;
         }
         const expectedCollateralAfter =
-            borrowerHealthInfo.totalCollateralInBaseCurrency -
+            borrowerHealthInfo.totalSupplyInBaseCurrency -
             (actualCollateralToLiquidate * collateralReserveData.reserveData.price) / collateralUint;
         const expectedDebtAfter =
             borrowerHealthInfo.totalDebtInBaseCurrency -
@@ -1487,7 +1479,7 @@ describe('Pool liquidation test', () => {
 
         // check borrower positions
         expect(Number(expectedCollateralAfter)).toBeCloseTo(
-            Number(borrowerHealthInfo.totalCollateralInBaseCurrency),
+            Number(borrowerHealthInfo.totalSupplyInBaseCurrency),
             -5,
         );
         expect(Number(expectedDebtAfter)).toBeCloseTo(Number(borrowerHealthInfo.totalDebtInBaseCurrency), -5);
@@ -1559,13 +1551,13 @@ describe('Pool liquidation test', () => {
         let collateralReserveData = await pool.getReserveDataAndConfiguration(collateralReserve.address);
         let debtReserveData = await pool.getReserveDataAndConfiguration(debtReserve.address);
         expect(accountData.positionsLength).toEqual(2n);
-        expect(accountData.positionsDetail.get(collateralReserve.address)?.asCollateral).toEqual(true);
+        
         expect(accountData.positionsDetail.get(collateralReserve.address)?.supply).toEqual(supplyAmount);
         expect(accountData.positionsDetail.get(collateralReserve.address)?.borrow).toEqual(0n);
-        expect(accountData.positionsDetail.get(debtReserve.address)?.asCollateral).toEqual(true);
+        
         expect(accountData.positionsDetail.get(debtReserve.address)?.supply).toEqual(0n);
         expect(accountData.positionsDetail.get(debtReserve.address)?.borrow).toEqual(borrowAmount);
-        expect(Number(fromNano(borrowerHealthInfo.totalCollateralInBaseCurrency))).toBeCloseTo(
+        expect(Number(fromNano(borrowerHealthInfo.totalSupplyInBaseCurrency))).toBeCloseTo(
             Number(fromNano((supplyAmount * collateralReserveData.reserveData.price) / collateralUint)),
             5,
         );
@@ -1593,13 +1585,13 @@ describe('Pool liquidation test', () => {
         collateralReserveData = await pool.getReserveDataAndConfiguration(collateralReserve.address);
         debtReserveData = await pool.getReserveDataAndConfiguration(debtReserve.address);
         expect(accountData.positionsLength).toEqual(2n);
-        expect(accountData.positionsDetail.get(collateralReserve.address)?.asCollateral).toEqual(true);
+        
         expect(accountData.positionsDetail.get(collateralReserve.address)?.supply).toEqual(supplyAmount);
         expect(accountData.positionsDetail.get(collateralReserve.address)?.borrow).toEqual(0n);
-        expect(accountData.positionsDetail.get(debtReserve.address)?.asCollateral).toEqual(true);
+        
         expect(accountData.positionsDetail.get(debtReserve.address)?.supply).toEqual(0n);
         expect(accountData.positionsDetail.get(debtReserve.address)?.borrow).toEqual(borrowAmount);
-        expect(Number(fromNano(borrowerHealthInfo.totalCollateralInBaseCurrency))).toBeCloseTo(
+        expect(Number(fromNano(borrowerHealthInfo.totalSupplyInBaseCurrency))).toBeCloseTo(
             Number(fromNano((supplyAmount * collateralReserveData.reserveData.price) / collateralUint)),
             2,
         );
@@ -1667,7 +1659,7 @@ describe('Pool liquidation test', () => {
             actualLiquidationAmount = actualLiquidationAmount;
         }
         const expectedCollateralAfter =
-            borrowerHealthInfo.totalCollateralInBaseCurrency -
+            borrowerHealthInfo.totalSupplyInBaseCurrency -
             (actualCollateralToLiquidate * collateralReserveData.reserveData.price) / collateralUint;
         const expectedDebtAfter =
             borrowerHealthInfo.totalDebtInBaseCurrency -
@@ -1748,7 +1740,7 @@ describe('Pool liquidation test', () => {
 
         // check borrower positions
         expect(Number(expectedCollateralAfter)).toBeCloseTo(
-            Number(borrowerHealthInfo.totalCollateralInBaseCurrency),
+            Number(borrowerHealthInfo.totalSupplyInBaseCurrency),
             -5,
         );
         expect(Number(expectedDebtAfter)).toBeCloseTo(Number(borrowerHealthInfo.totalDebtInBaseCurrency), -5);
@@ -1820,13 +1812,13 @@ describe('Pool liquidation test', () => {
         let collateralReserveData = await pool.getReserveDataAndConfiguration(collateralReserve.address);
         let debtReserveData = await pool.getReserveDataAndConfiguration(debtReserve.address);
         expect(accountData.positionsLength).toEqual(2n);
-        expect(accountData.positionsDetail.get(collateralReserve.address)?.asCollateral).toEqual(true);
+        
         expect(accountData.positionsDetail.get(collateralReserve.address)?.supply).toEqual(supplyAmount);
         expect(accountData.positionsDetail.get(collateralReserve.address)?.borrow).toEqual(0n);
-        expect(accountData.positionsDetail.get(debtReserve.address)?.asCollateral).toEqual(true);
+        
         expect(accountData.positionsDetail.get(debtReserve.address)?.supply).toEqual(0n);
         expect(accountData.positionsDetail.get(debtReserve.address)?.borrow).toEqual(borrowAmount);
-        expect(Number(fromNano(borrowerHealthInfo.totalCollateralInBaseCurrency))).toBeCloseTo(
+        expect(Number(fromNano(borrowerHealthInfo.totalSupplyInBaseCurrency))).toBeCloseTo(
             Number(fromNano((supplyAmount * collateralReserveData.reserveData.price) / collateralUint)),
             5,
         );
@@ -1854,13 +1846,13 @@ describe('Pool liquidation test', () => {
         collateralReserveData = await pool.getReserveDataAndConfiguration(collateralReserve.address);
         debtReserveData = await pool.getReserveDataAndConfiguration(debtReserve.address);
         expect(accountData.positionsLength).toEqual(2n);
-        expect(accountData.positionsDetail.get(collateralReserve.address)?.asCollateral).toEqual(true);
+        
         expect(accountData.positionsDetail.get(collateralReserve.address)?.supply).toEqual(supplyAmount);
         expect(accountData.positionsDetail.get(collateralReserve.address)?.borrow).toEqual(0n);
-        expect(accountData.positionsDetail.get(debtReserve.address)?.asCollateral).toEqual(true);
+        
         expect(accountData.positionsDetail.get(debtReserve.address)?.supply).toEqual(0n);
         expect(accountData.positionsDetail.get(debtReserve.address)?.borrow).toEqual(borrowAmount);
-        expect(Number(fromNano(borrowerHealthInfo.totalCollateralInBaseCurrency))).toBeCloseTo(
+        expect(Number(fromNano(borrowerHealthInfo.totalSupplyInBaseCurrency))).toBeCloseTo(
             Number(fromNano((supplyAmount * collateralReserveData.reserveData.price) / collateralUint)),
             2,
         );
@@ -1928,7 +1920,7 @@ describe('Pool liquidation test', () => {
             actualLiquidationAmount = actualLiquidationAmount;
         }
         const expectedCollateralAfter =
-            borrowerHealthInfo.totalCollateralInBaseCurrency -
+            borrowerHealthInfo.totalSupplyInBaseCurrency -
             (actualCollateralToLiquidate * collateralReserveData.reserveData.price) / collateralUint;
         const expectedDebtAfter =
             borrowerHealthInfo.totalDebtInBaseCurrency -
@@ -2013,7 +2005,7 @@ describe('Pool liquidation test', () => {
 
         // check borrower positions
         expect(Number(expectedCollateralAfter)).toBeCloseTo(
-            Number(borrowerHealthInfo.totalCollateralInBaseCurrency),
+            Number(borrowerHealthInfo.totalSupplyInBaseCurrency),
             -5,
         );
         expect(Number(expectedDebtAfter)).toBeCloseTo(Number(borrowerHealthInfo.totalDebtInBaseCurrency), -5);

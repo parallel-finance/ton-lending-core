@@ -33,7 +33,7 @@ const getLargestDebtAndCollateralReserveData = async (
     for (let i = 0n; i < positionsLength; i++) {
         const position = positions.get(i)!!;
         const positionDetail = positionsDetail.get(position)!!;
-        const { supply, borrow, asCollateral } = positionDetail;
+        const { supply, borrow } = positionDetail;
         const price = allReservesDataAndConfiguration.get(position)!!.reserveData.price;
         const normalizedDebt = allReservesDataAndConfiguration.get(position)!!.normalizedDebt;
         const borrowValue = borrow * price;
@@ -43,7 +43,7 @@ const getLargestDebtAndCollateralReserveData = async (
             largestDebtAmount = (borrow * normalizedDebt) / RAY;
         }
         const supplyValue = supply * price;
-        if (asCollateral && supplyValue > largestCollateralValue) {
+        if (supplyValue > largestCollateralValue) {
             largestCollateralValue = supplyValue;
             largestCollateralReserveAddress = position;
         }
