@@ -249,7 +249,15 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
 
             let selfConsumption: Int = self.WITHDRAW_GAS_CONSUMPTION + self.TOKEN_TRANSFER_GAS_CONSUMPTION + ctx.readForwardFee() * 2;
             let remainingValue: Int = self.remainingValue(ctx.value, selfConsumption);
-            self.updateUserAccountPosition(msg.user, msg.tokenAddress, -scaledWithdrawAmount, 0, remainingValue, true, false);
+            self.updateUserAccountPosition(
+                msg.user, 
+                msg.tokenAddress, 
+                -scaledWithdrawAmount, 
+                0, 
+                remainingValue, 
+                true, 
+                false
+            );
 
             // Transfer withdrawAmount Token(tokenAddress) to the user.
             let poolWalletAddress: Address = reserveConfiguration.poolWalletAddress;
@@ -286,7 +294,15 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
 
             let selfConsumption: Int = self.SUPPLY_REPAY_GAS_CONSUMPTION + ctx.readForwardFee();
             let remainingValue: Int = self.remainingValue(ctx.value, selfConsumption);
-            self.updateUserAccountPosition(msg.user, reserveAddress, 0, -scaledRepayAmount, remainingValue, false, false);
+            self.updateUserAccountPosition(
+                msg.user, 
+                reserveAddress, 
+                0, 
+                -scaledRepayAmount, 
+                remainingValue, 
+                false, 
+                false
+            );
         }
 
         if (msg.action == ACTION_LIQUIDATION) {
@@ -381,7 +397,15 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
 
             let selfConsumption: Int = self.LIQUIDATION_GAS_CONSUMPTION + self.TOKEN_TRANSFER_GAS_CONSUMPTION * 2 + ctx.readForwardFee() * 4;
             let remainingValue: Int = self.remainingValue(ctx.value, selfConsumption);
-            self.updateUserAccountPosition(msg.user, reserveAddress, 0, -scaledLiquidationAmount, remainingValue / 2, false, false);
+            self.updateUserAccountPosition(
+                msg.user, 
+                reserveAddress, 
+                0, 
+                -scaledLiquidationAmount, 
+                remainingValue / 2, 
+                false, 
+                false
+            );
 
             // update user collateral token position and burn aToken
             collateralReserveData = self.reservesData.get(collateralReserve)!!;
@@ -395,11 +419,19 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
             collateralReserveData.totalSupply -= scaledCollateralAmount;
             self.reservesData.set(collateralReserve, collateralReserveData);
 
-            self.updateUserAccountPosition(msg.user, collateralReserve, -scaledCollateralAmount, 0, remainingValue / 2, true, false);
+            self.updateUserAccountPosition(
+                msg.user, 
+                collateralReserve, 
+                -scaledCollateralAmount, 
+                0, 
+                remainingValue / 2, 
+                true, 
+                false
+            );
         }
 
         if (msg.action == ACTION_TRANSFER_ATOKEN) {
-            let scaledTransferAmount = msg.amount;
+            let scaledTransferAmount: Int = msg.amount;
             // updateInterestRates
             reserveData.updateInterestRates(reserveCache, rateStrategy, 0, 0);
             // set reserveData to storage back
@@ -488,7 +520,15 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
         self.reservesData.set(reserveAddress, reserveData);
 
         let remainingValue: Int = self.remainingValue(ctx.value, self.SUPPLY_REPAY_GAS_CONSUMPTION + ctx.readForwardFee());
-        self.updateUserAccountPosition(ctx.sender, reserveAddress, scaledSupplyAmount, 0, remainingValue, false, false);
+        self.updateUserAccountPosition(
+            ctx.sender, 
+            reserveAddress, 
+            scaledSupplyAmount, 
+            0, 
+            remainingValue, 
+            false, 
+            false
+        );
     }
 
     receive(msg: BorrowTon) {
@@ -914,6 +954,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
         let fwdFee: Int = ctx.readForwardFee() * 7;
         let storageFee: Int = self.MIN_TONS_FOR_STORAGE;
         // calculation logic is similar with withdraw
+        // aToken transfer gas is more expensive than standard token transfer
         let computationAndActionFee: Int = self.ATOKEN_TRANSFER_GAS_CONSUMPTION + self.WITHDRAW_GAS_CONSUMPTION;
         let totalFee: Int = fwdFee + storageFee + computationAndActionFee;
         require(ctx.value > totalFee, "Insufficient fee");
@@ -983,7 +1024,15 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
 
             let selfConsumption: Int = self.SUPPLY_REPAY_GAS_CONSUMPTION + ctx.readForwardFee();
             let remainingValue: Int = self.remainingValue(ctx.value, selfConsumption);
-            self.updateUserAccountPosition(msg.from, matchedReserve!!, scaledSupplyAmount, 0, remainingValue, false, false);
+            self.updateUserAccountPosition(
+                msg.from, 
+                matchedReserve!!, 
+                scaledSupplyAmount, 
+                0, 
+                remainingValue, 
+                false, 
+                false
+            );
         }
 
         // use crc32 code of 'Repay': utils.calculateRequestOpcode_1('Repay')
@@ -1062,8 +1111,8 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
         supply: Int,
         borrow: Int, 
         msgValue: Int, 
-        releaseUserLock: Bool,
-        onlyUpdateAccount: Bool
+        releaseUserLock: Bool, // release user lock after updated userAccount
+        onlyUpdateAccount: Bool // only update Account and not mint/burn aToken/dToken
     ) {
         let queryId: Int = self.queryId;
         let userAccountInit: StateInit = self.getUserAccountInit(ownerAddress);
@@ -1155,7 +1204,15 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
         let selfConsumption: Int = self.SUPPLY_REPAY_GAS_CONSUMPTION + ctx.readForwardFee();
         let remainingValue: Int = self.remainingValue(ctx.value, selfConsumption);
 
-        self.updateUserAccountPosition(reserveConfiguration.treasury, reserve, accruedToTreasury, 0, remainingValue, false, false);
+        self.updateUserAccountPosition(
+            reserveConfiguration.treasury, 
+            reserve, 
+            accruedToTreasury, 
+            0, 
+            remainingValue, 
+            false, 
+            false
+        );
     }
 
     fun requireUserNotLocked(user: Address) {
