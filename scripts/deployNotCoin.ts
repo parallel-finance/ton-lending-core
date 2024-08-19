@@ -29,7 +29,7 @@ export async function run(provider: NetworkProvider) {
         }
     );
 
-    // EQBqFJkn_DoBFcNPQ0ble53CD92X_XsDgPr1_WAajYceJMHi
+    // EQAidZnvEzP9y5Gh_O94l3VzVCEvDN5M7j51ANP-XW4HTcb7
     await provider.waitForDeploy(sampleJetton.address);
     console.log(`Deployed at ${sampleJetton.address.toString()}`);
 }

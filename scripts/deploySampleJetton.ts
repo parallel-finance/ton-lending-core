@@ -28,11 +28,7 @@ export async function run(provider: NetworkProvider) {
         }
     );
 
-    // SAM: EQDXzHrAAvH0oBVW3LEZd8dF6uGipG16r3GasIx0gKAAU_Qo
-    // MAS: EQBe9prUeNqHJHRw4YWDZhXI91kiGaGTTHuCWIaY975Uw2AU
-    // USDT: EQColXOG7C2X8x0ZFT-3Ot5sYknz-JbLnJzI1eVNldQlX2Bu
-    // NOT: EQD8-IT-fOEuBqY5bG_NY3lcZTKnnKv-7_UuILidV2eCa4W-
-    // pTON: EQBvOgGXLdZOysRTnw2UDc_KRwcD5HLVH139DZ3AnK04LcxH
+    // MAS: EQA3artTJWoOgxwbttoYSXFs4_ETzGMC54HyK8cdkanCSaBd
     await provider.waitForDeploy(sampleJetton.address);
     console.log(`Deployed at ${sampleJetton.address.toString()}`);
 }
