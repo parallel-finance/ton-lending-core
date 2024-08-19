@@ -3,11 +3,12 @@ import { Pool } from '../wrappers/Pool';
 import { NetworkProvider } from '@ton/blueprint';
 import { SampleJetton } from '../build/SampleJetton/tact_SampleJetton';
 import { JettonDefaultWallet } from '../build/SampleJetton/tact_JettonDefaultWallet';
+import { TESTNET_ADDRESS } from '../helpers/constant';
 
 export async function run(provider: NetworkProvider) {
-    const pool = provider.open(await Pool.fromInit());
+    const pool = provider.open(Pool.fromAddress(address(TESTNET_ADDRESS.pool)));
     // MAS
-    const reserveAddress = address('EQBe9prUeNqHJHRw4YWDZhXI91kiGaGTTHuCWIaY975Uw2AU');
+    const reserveAddress = address(TESTNET_ADDRESS.MAS);
     const sampleJetton = provider.open(SampleJetton.fromAddress(reserveAddress));
     const providerJettonWalletAddress = await sampleJetton.getGetWalletAddress(provider.sender().address!!);
     const providerJettonWallet = provider.open(JettonDefaultWallet.fromAddress(providerJettonWalletAddress));

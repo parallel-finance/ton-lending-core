@@ -3,7 +3,7 @@ import { NetworkProvider, sleep } from '@ton/blueprint';
 import { ATokenDTokenContents, Pool, ReserveConfiguration, ReserveInterestRateStrategy } from '../wrappers/Pool';
 import { SampleJetton } from '../wrappers/SampleJetton';
 import { buildOnchainMetadata, JettonMetaData } from './utils';
-import { ACL } from '../helpers/constant';
+import { ACL, TESTNET_ADDRESS } from '../helpers/constant';
 import { send } from 'process';
 
 const RAY = 10n ** 27n;
@@ -130,14 +130,7 @@ const addMasReserve = async (provider: NetworkProvider, pool: OpenedContract<Poo
         image: 'https://ipfs.io/ipfs/bafybeicn7i3soqdgr7dwnrwytgq4zxy7a5jpkizrvhm5mv6bgjd32wm3q4/welcome-to-IPFS.jpg',
         symbol: 'dMAS',
     };
-    await addJettonReserve(
-        provider,
-        pool,
-        address('EQBe9prUeNqHJHRw4YWDZhXI91kiGaGTTHuCWIaY975Uw2AU'),
-        aTokenJettonParams,
-        dTokenJettonParams,
-        1n,
-    );
+    await addJettonReserve(provider, pool, address(TESTNET_ADDRESS.MAS), aTokenJettonParams, dTokenJettonParams, 1n);
 };
 
 const addNotCoinReserve = async (provider: NetworkProvider, pool: OpenedContract<Pool>) => {
@@ -157,14 +150,7 @@ const addNotCoinReserve = async (provider: NetworkProvider, pool: OpenedContract
         symbol: 'dNOT',
     };
 
-    await addJettonReserve(
-        provider,
-        pool,
-        address('EQD8-IT-fOEuBqY5bG_NY3lcZTKnnKv-7_UuILidV2eCa4W-'),
-        aTokenJettonParams,
-        dTokenJettonParams,
-        2n,
-    );
+    await addJettonReserve(provider, pool, address(TESTNET_ADDRESS.NOT), aTokenJettonParams, dTokenJettonParams, 2n);
 };
 
 const addProxyTonReserve = async (provider: NetworkProvider, pool: OpenedContract<Pool>) => {
@@ -184,14 +170,7 @@ const addProxyTonReserve = async (provider: NetworkProvider, pool: OpenedContrac
         symbol: 'dpTON',
     };
 
-    await addJettonReserve(
-        provider,
-        pool,
-        address('EQBvOgGXLdZOysRTnw2UDc_KRwcD5HLVH139DZ3AnK04LcxH'),
-        aTokenJettonParams,
-        dTokenJettonParams,
-        3n,
-    );
+    await addJettonReserve(provider, pool, address(TESTNET_ADDRESS.pTON), aTokenJettonParams, dTokenJettonParams, 3n);
 };
 
 const addUSDTReserve = async (provider: NetworkProvider, pool: OpenedContract<Pool>) => {
@@ -214,7 +193,7 @@ const addUSDTReserve = async (provider: NetworkProvider, pool: OpenedContract<Po
     await addJettonReserve(
         provider,
         pool,
-        address('EQColXOG7C2X8x0ZFT-3Ot5sYknz-JbLnJzI1eVNldQlX2Bu'),
+        address(TESTNET_ADDRESS.USDT),
         aTokenJettonParams,
         dTokenJettonParams,
         4n,
@@ -248,7 +227,7 @@ const printCurrentReserveLength = async (provider: NetworkProvider, pool: Opened
 };
 
 export async function run(provider: NetworkProvider) {
-    const pool = provider.open(await Pool.fromInit());
+    const pool = provider.open(Pool.fromAddress(address(TESTNET_ADDRESS.pool)));
     // EQAQCgea8PVFW0jUIQvvGAZu9G-KsrO-Q3RO0R50Svg8tMXN
     console.log(`Start adding reserves... (pool address: ${pool.address.toString()}`);
     await sleep(1000);

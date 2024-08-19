@@ -6,10 +6,6 @@ export async function run(provider: NetworkProvider, args: string[]) {
     const userAddress = Address.parse(provider.sender().address?.toString() || '');
     const ui= provider.ui();
 
-    // MAS: EQBe9prUeNqHJHRw4YWDZhXI91kiGaGTTHuCWIaY975Uw2AU
-    // USDT: EQColXOG7C2X8x0ZFT-3Ot5sYknz-JbLnJzI1eVNldQlX2Bu
-    // NOT: EQD8-IT-fOEuBqY5bG_NY3lcZTKnnKv-7_UuILidV2eCa4W-
-    // pTON: EQBvOgGXLdZOysRTnw2UDc_KRwcD5HLVH139DZ3AnK04LcxH
     const address = Address.parse(args.length > 0 ? args[0] : await ui.input('SampleJetton address'));
 
     if (!(await provider.isContractDeployed(address))) {

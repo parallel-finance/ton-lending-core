@@ -39,7 +39,13 @@ export const MAINNET_ADDRESS = {
 };
 
 export const TESTNET_ADDRESS = {
-    USDT: '',
-    pTON: "EQDTrtiFWwyA2rx1Yasw0TuyK_UqtLxkRcqIXfWbJqOnQEgo",
+    USDT: 'EQBBo3or9J_bQ9G9BLM5oLpp2Xk6eB00djrP7tXDmByYISCw',
+    MAS: 'EQA3artTJWoOgxwbttoYSXFs4_ETzGMC54HyK8cdkanCSaBd',
+    NOT: 'EQAidZnvEzP9y5Gh_O94l3VzVCEvDN5M7j51ANP-XW4HTcb7',
+    pTON: 'EQBAnuhcK0cHhCsLa8B_-J2_yM_62MakfI2a8iNqpK1rEtf3', // based on sampleJetton
+    
+    pool: "EQDlTidB1AZqnPwrtgYoai88pgr_rA1ATzB0pKke2cuQR2rI",
+    
+    STONFI_pTON: "EQDTrtiFWwyA2rx1Yasw0TuyK_UqtLxkRcqIXfWbJqOnQEgo",
     STONFI_V1_ROUTER: 'kQD7GHQoIk00-z7dzjagREolRpwprM_ogDEiOF1v8jOo-mkn',
 };
