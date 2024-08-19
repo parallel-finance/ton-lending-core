@@ -1,6 +1,6 @@
 import { Sha256 } from '@aws-crypto/sha256-js';
 import { beginCell, Cell, Address } from '@ton/ton';
-import { Dictionary } from '@ton/core';
+import { Dictionary, internal, MessageRelaxed, SenderArguments } from '@ton/core';
 import * as crc32 from 'crc-32';
 import axios from 'axios';
 import { sleep } from '@ton/blueprint';
@@ -79,7 +79,7 @@ export const getAddressSeqno = async (address: Address): Promise<number> => {
     const testUrl = `${testnetTonApiUrl}${query}`;
     const result = await axios.get(testUrl);
     return result.data?.seqno;
-}
+};
 
 export const waitNextSeqno = async (address: Address, beforeSeqno: number) => {
     let currentSeqno = await getAddressSeqno(address);
@@ -88,10 +88,20 @@ export const waitNextSeqno = async (address: Address, beforeSeqno: number) => {
         await sleep(1000);
         currentSeqno = await getAddressSeqno(address);
     }
-    console.log(`Current seqno: ${currentSeqno}`)
+    console.log(`Current seqno: ${currentSeqno}`);
     if (currentSeqno !== beforeSeqno + 1) {
         console.log(`Action fail!`);
     } else {
         console.log(`Action success!`);
     }
-}
+};
+
+export const senderArgsToMessageRelaxed = (args: SenderArguments): MessageRelaxed => {
+    return internal({
+        to: args.to,
+        value: args.value,
+        init: args.init,
+        body: args.body,
+        bounce: args.bounce,
+    });
+};

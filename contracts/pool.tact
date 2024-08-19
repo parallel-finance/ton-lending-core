@@ -51,6 +51,9 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
     // bounce messages
     updatePositionMsg: map<Int, UpdatePositionBounce>;
 
+    // user reentrancy lock
+    userLock: map<Address, Bool>;
+
     init() {
         self.owner = sender();
         self.stopped = false;
@@ -71,6 +74,10 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
         self.requireFromUserAccount(msg.user);
         // delete stored updatePositionMsg
         self.updatePositionMsg.del(msg.queryId);
+        // release user reentrancy lock
+        if (msg.releaseUserLock) {
+            self.releaseUserLock(msg.user);
+        }
 
         // for supply
         if (msg.supply > 0) {
@@ -103,8 +110,12 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
         let totalFee: Int = fwdFee + storageFee + computationAndActionFee;
         require(ctx.value > totalFee, "Insufficient fee");
 
+        let user: Address = sender();
+        self.requireUserNotLocked(user);
+        self.lockUser(user);
+
         // send message to get user account data
-        let userAccountAddress: Address = self.userAccountAddress(sender());
+        let userAccountAddress: Address = self.userAccountAddress(user);
         // GetUserAccountData don't need to handle bounce
         send(SendParameters{
             to: userAccountAddress,
@@ -113,7 +124,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
             mode: SendRemainingValue,
             body: GetUserAccountData{
                 queryId: self.queryId,
-                user: context().sender,
+                user: user,
                 action: ACTION_BORROW,
                 tokenAddress: reserveAddress,
                 amount: msg.amount,
@@ -136,8 +147,12 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
         let totalFee: Int = fwdFee + storageFee + computationAndActionFee;
         require(ctx.value > totalFee, "Insufficient fee");
 
+        let user: Address = sender();
+        self.requireUserNotLocked(user);
+        self.lockUser(user);
+
         // send message to get user account data
-        let userAccountAddress: Address = self.userAccountAddress(sender());
+        let userAccountAddress: Address = self.userAccountAddress(user);
         // GetUserAccountData don't need handle bounce
         send(SendParameters{
             to: userAccountAddress,
@@ -146,7 +161,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
             mode: SendRemainingValue,
             body: GetUserAccountData{
                 queryId: self.queryId,
-                user: sender(),
+                user: user,
                 action: ACTION_WITHDRAW,
                 tokenAddress: msg.tokenAddress,
                 amount: msg.amount,
@@ -155,6 +170,14 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
         });
         self.queryId += 1;
     }
+
+    // bounced(src: bounced<GetUserAccountData>){
+    //     self.releaseUserLock(src.user);
+    // }
+
+    // bounced(src: bounced<UpdatePosition>){
+    //     self.releaseUserLock(src.user);
+    // }
 
     receive(msg: UserAccountDataResponse) {
         self.requireFromUserAccount(msg.user);
@@ -186,7 +209,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
 
             let selfConsumption: Int = self.BORROW_GAS_CONSUMPTION + self.TOKEN_TRANSFER_GAS_CONSUMPTION + ctx.readForwardFee() * 2;
             let remainingValue: Int = self.remainingValue(ctx.value, selfConsumption);
-            self.updateUserAccountPosition(msg.user, msg.tokenAddress, 0, scaledBorrowAmount, remainingValue);
+            self.updateUserAccountPosition(msg.user, msg.tokenAddress, 0, scaledBorrowAmount, remainingValue, true);
             // Transfer borrowAmount Token(tokenAddress) to the user.
             let poolWalletAddress: Address = reserveConfiguration.poolWalletAddress;
             if (poolWalletAddress == myAddress()) {
@@ -222,7 +245,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
 
             let selfConsumption: Int = self.WITHDRAW_GAS_CONSUMPTION + self.TOKEN_TRANSFER_GAS_CONSUMPTION + ctx.readForwardFee() * 2;
             let remainingValue: Int = self.remainingValue(ctx.value, selfConsumption);
-            self.updateUserAccountPosition(msg.user, msg.tokenAddress, -scaledWithdrawAmount, 0, remainingValue);
+            self.updateUserAccountPosition(msg.user, msg.tokenAddress, -scaledWithdrawAmount, 0, remainingValue, true);
 
             // Transfer withdrawAmount Token(tokenAddress) to the user.
             let poolWalletAddress: Address = reserveConfiguration.poolWalletAddress;
@@ -259,7 +282,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
 
             let selfConsumption: Int = self.SUPPLY_REPAY_GAS_CONSUMPTION + ctx.readForwardFee();
             let remainingValue: Int = self.remainingValue(ctx.value, selfConsumption);
-            self.updateUserAccountPosition(msg.user, reserveAddress, 0, -scaledRepayAmount, remainingValue);
+            self.updateUserAccountPosition(msg.user, reserveAddress, 0, -scaledRepayAmount, remainingValue, false);
         }
 
         if (msg.action == ACTION_LIQUIDATION) {
@@ -342,8 +365,6 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
                 self.sendTokenTransferByPool(poolWalletAddress, collateralReserveConfiguration.treasury, liquidationFee);
             }
 
-            
-            
             // update user debt token position and burn dToken
             let scaledLiquidationAmount: Int = actualLiquidationAmount.rayDiv(reserveCache.nextBorrowIndex);
             reserveData.totalBorrow -= scaledLiquidationAmount;
@@ -356,7 +377,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
 
             let selfConsumption: Int = self.LIQUIDATION_GAS_CONSUMPTION + self.TOKEN_TRANSFER_GAS_CONSUMPTION * 2 + ctx.readForwardFee() * 4;
             let remainingValue: Int = self.remainingValue(ctx.value, selfConsumption);
-            self.updateUserAccountPosition(msg.user, reserveAddress, 0, -scaledLiquidationAmount, remainingValue / 2);
+            self.updateUserAccountPosition(msg.user, reserveAddress, 0, -scaledLiquidationAmount, remainingValue / 2, false);
 
             // update user collateral token position and burn aToken
             collateralReserveData = self.reservesData.get(collateralReserve)!!;
@@ -370,7 +391,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
             collateralReserveData.totalSupply -= scaledCollateralAmount;
             self.reservesData.set(collateralReserve, collateralReserveData);
 
-            self.updateUserAccountPosition(msg.user, collateralReserve, -scaledCollateralAmount, 0, remainingValue / 2);
+            self.updateUserAccountPosition(msg.user, collateralReserve, -scaledCollateralAmount, 0, remainingValue / 2, true);
         }
 
         if (msg.action == ACTION_TRANSFER_ATOKEN) {
@@ -438,7 +459,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
         self.reservesData.set(reserveAddress, reserveData);
 
         let remainingValue: Int = self.remainingValue(ctx.value, self.SUPPLY_REPAY_GAS_CONSUMPTION + ctx.readForwardFee());
-        self.updateUserAccountPosition(ctx.sender, reserveAddress, scaledSupplyAmount, 0, remainingValue);
+        self.updateUserAccountPosition(ctx.sender, reserveAddress, scaledSupplyAmount, 0, remainingValue, false);
     }
 
     receive(msg: BorrowTon) {
@@ -453,9 +474,13 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
         let computationAndActionFee: Int = self.TOKEN_TRANSFER_GAS_CONSUMPTION + self.TOKEN_MINT_GAS_CONSUMPTION + self.BORROW_GAS_CONSUMPTION;
         let totalFee: Int = fwdFee + storageFee + computationAndActionFee;
         require(ctx.value > totalFee, "Insufficient fee");
+        
+        let user: Address = sender();
+        self.requireUserNotLocked(user);
+        self.lockUser(user);
 
         // send message to get user account data
-        let userAccountAddress: Address = self.userAccountAddress(sender());
+        let userAccountAddress: Address = self.userAccountAddress(user);
 
         let remainingValue: Int = self.remainingValue(ctx.value, self.BORROW_GAS_CONSUMPTION + ctx.readForwardFee());
         // GetUserAccountData don'tSendRemainingValue need to handle bounce
@@ -466,7 +491,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
             mode: SendPayGasSeparately,
             body: GetUserAccountData{
                 queryId: self.queryId,
-                user: sender(),
+                user: user,
                 action: ACTION_BORROW,
                 tokenAddress: reserveAddress,
                 amount: msg.amount,
@@ -489,8 +514,12 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
         let totalFee: Int = fwdFee + storageFee + computationAndActionFee;
         require(ctx.value > totalFee, "Insufficient fee");
 
+        let user: Address = sender();
+        self.requireUserNotLocked(user);
+        self.lockUser(user);
+
         // send message to get user account data
-        let userAccountAddress: Address = self.userAccountAddress(sender());
+        let userAccountAddress: Address = self.userAccountAddress(user);
 
         let remainingValue: Int = self.remainingValue(ctx.value, self.WITHDRAW_GAS_CONSUMPTION + ctx.readForwardFee());
         // GetUserAccountData don'tSendRemainingValue need to handle bounce
@@ -501,7 +530,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
             mode: SendPayGasSeparately,
             body: GetUserAccountData{
                 queryId: self.queryId,
-                user: sender(),
+                user: user,
                 action: ACTION_WITHDRAW,
                 tokenAddress: reserveAddress,
                 amount: msg.amount,
@@ -581,6 +610,10 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
         let payload: Slice = beginCell().storeRef(liquidationMsg.toCell()).asSlice();
         let remainingValue: Int = self.remainingValue(ctx.value, self.LIQUIDATION_GAS_CONSUMPTION + ctx.readForwardFee());
 
+        let user: Address = msg.borrower;
+        self.requireUserNotLocked(user);
+        self.lockUser(user);
+
         send(SendParameters{
             to: userAccountAddress,
             value: remainingValue,
@@ -588,7 +621,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
             mode: SendPayGasSeparately,
             body: GetUserAccountData{
                 queryId: self.queryId,
-                user: msg.borrower,
+                user: user,
                 action: ACTION_LIQUIDATION,
                 tokenAddress: debtReserve,
                 amount: liquidationAmount,
@@ -604,6 +637,17 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
 
     receive(msg: MintToTreasury) {
         self.mintToTreasury(msg.reserve);
+    }
+
+    receive(msg: ReleaseUserLock) {
+        let userAccount: Address = self.userAccountAddress(msg.user);
+        let sender = sender();
+        require(
+            sender == userAccount || 
+            self.hasRole(self.RISK_ADMIN_ROLE, sender), 
+            "No access to release user lock"
+        );
+        self.releaseUserLock(msg.user);
     }
 
     fun syncPrices(msg: SyncPrices) {
@@ -893,7 +937,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
 
             let selfConsumption: Int = self.SUPPLY_REPAY_GAS_CONSUMPTION + ctx.readForwardFee();
             let remainingValue: Int = self.remainingValue(ctx.value, selfConsumption);
-            self.updateUserAccountPosition(msg.from, matchedReserve!!, scaledSupplyAmount, 0, remainingValue);
+            self.updateUserAccountPosition(msg.from, matchedReserve!!, scaledSupplyAmount, 0, remainingValue, false);
         }
 
         // use crc32 code of 'Repay': utils.calculateRequestOpcode_1('Repay')
@@ -942,6 +986,11 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
                 liquidationAmount: liquidationAmount
             };
             let payload: Slice = beginCell().storeRef(liquidationMsg.toCell()).asSlice();
+            
+            let user: Address = borrower;
+            self.requireUserNotLocked(user);
+            self.lockUser(user);
+
             // TODO: This GetUserAccountData need to do bounce
             send(SendParameters{
                 to: userAccountAddress,
@@ -961,7 +1010,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
         }
     }
 
-    fun updateUserAccountPosition(ownerAddress: Address, reserveAddress: Address, supply: Int, borrow: Int, msgValue: Int) {
+    fun updateUserAccountPosition(ownerAddress: Address, reserveAddress: Address, supply: Int, borrow: Int, msgValue: Int, releaseUserLock: Bool) {
         let queryId: Int = self.queryId;
         let userAccountInit: StateInit = self.getUserAccountInit(ownerAddress);
         let userAccountAddress: Address = contractAddress(userAccountInit);
@@ -969,7 +1018,8 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
             queryId: queryId,
             address: reserveAddress,
             supply: supply,
-            borrow: borrow
+            borrow: borrow,
+            releaseUserLock: releaseUserLock
         };
         let updatePositionBounce: UpdatePositionBounce = UpdatePositionBounce{
             to: userAccountAddress,
@@ -1050,6 +1100,18 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
         let selfConsumption: Int = self.SUPPLY_REPAY_GAS_CONSUMPTION + ctx.readForwardFee();
         let remainingValue: Int = self.remainingValue(ctx.value, selfConsumption);
 
-        self.updateUserAccountPosition(reserveConfiguration.treasury, reserve, accruedToTreasury, 0, remainingValue);
+        self.updateUserAccountPosition(reserveConfiguration.treasury, reserve, accruedToTreasury, 0, remainingValue, false);
+    }
+
+    fun requireUserNotLocked(user: Address) {
+        require(self.userLock.get(user) != true, "User Reentrancy Locked");
+    }
+
+    fun lockUser(user: Address) {
+        self.userLock.set(user, true);
+    }
+
+    fun releaseUserLock(user: Address) {
+        self.userLock.del(user);
     }
 }

@@ -46,6 +46,7 @@ describe('UserAccoount', () => {
                     address: reserveAddress,
                     supply: toNano('100'),
                     borrow: 0n,
+                    releaseUserLock: false,
                 },
             );
 
@@ -74,6 +75,7 @@ describe('UserAccoount', () => {
                     address: reserveAddress,
                     supply: toNano('100'),
                     borrow: 0n,
+                    releaseUserLock: false,
                 },
             );
 
@@ -88,6 +90,7 @@ describe('UserAccoount', () => {
                     address: reserveAddress,
                     supply: -toNano('50'),
                     borrow: toNano(20n),
+                    releaseUserLock: false,
                 },
             );
 

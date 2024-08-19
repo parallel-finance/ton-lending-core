@@ -86,6 +86,8 @@ trait PoolConfigurator with Ownable, Resumable, PoolACL, PoolView {
     admins: map<Int, RoleData>;
     // bounce messages
     updatePositionMsg: map<Int, UpdatePositionBounce>;
+    // user reentrancy lock
+    userLock: map<Address, Bool>;
 
     // requireAssetListingOrPoolAdmin
     receive(msg: AddReserve){

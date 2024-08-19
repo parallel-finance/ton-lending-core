@@ -1,6 +1,6 @@
-import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
-import { Address, Dictionary, fromNano, toNano } from '@ton/core';
-import { Pool } from '../wrappers/Pool';
+import { Blockchain, printTransactionFees, SandboxContract, TreasuryContract } from '@ton/sandbox';
+import { Address, beginCell, Dictionary, fromNano, toNano } from '@ton/core';
+import { Pool, storeBorrowToken, storeBorrowTon } from '../wrappers/Pool';
 import '@ton/test-utils';
 import { SampleJetton } from '../build/SampleJetton/tact_SampleJetton';
 import { JettonDefaultWallet } from '../build/SampleJetton/tact_JettonDefaultWallet';
@@ -10,10 +10,12 @@ import { PERCENTAGE_FACTOR, RAY } from '../helpers/constant';
 import { sumTransactionsFee } from '../jest.setup';
 import { addReserve, deployJetton, deployPool, mintJetton, reserveConfiguration, supplyJetton } from './utils';
 import { DToken } from '../build/Pool/tact_DToken';
+import { senderArgsToMessageRelaxed } from '../scripts/utils';
 
 describe('Pool', () => {
     let blockchain: Blockchain;
     let deployer: SandboxContract<TreasuryContract>;
+    let secondUser: SandboxContract<TreasuryContract>;
     let pool: SandboxContract<Pool>;
     let sampleJetton: SandboxContract<SampleJetton>;
     let dToken: SandboxContract<DToken>;
@@ -24,6 +26,7 @@ describe('Pool', () => {
         blockchain = await Blockchain.create();
         pool = blockchain.openContract(await Pool.fromInit());
         deployer = await blockchain.treasury('deployer');
+        secondUser = await blockchain.treasury('secondUser');
         const sender = deployer.getSender();
 
         await deployPool(pool, deployer);
@@ -37,6 +40,7 @@ describe('Pool', () => {
         };
         sampleJetton = await deployJetton(blockchain, deployer, jettonParams);
         await mintJetton(sampleJetton, sender, deployer.address, toNano(100n));
+        await mintJetton(sampleJetton, secondUser.getSender(), secondUser.address, toNano(10000n));
 
         const poolWalletAddress = await sampleJetton.getGetWalletAddress(pool.address);
         const { dTokenAddress, aTokenDTokenContents } = await addReserve(
@@ -54,10 +58,15 @@ describe('Pool', () => {
         // supply
         const amount = toNano(100n);
         const deployerWalletAddress = await sampleJetton.getGetWalletAddress(deployer.address!!);
+        const secondUserWalletAddress = await sampleJetton.getGetWalletAddress(secondUser.address!!);
         const deployerJettonDefaultWallet = blockchain.openContract(
             JettonDefaultWallet.fromAddress(deployerWalletAddress),
         );
+        const secondUserJettonDefaultWallet = blockchain.openContract(
+            JettonDefaultWallet.fromAddress(secondUserWalletAddress),
+        );
         await supplyJetton(deployerJettonDefaultWallet, deployer, pool.address, amount);
+        await supplyJetton(secondUserJettonDefaultWallet, secondUser, pool.address, toNano(10000n));
     });
 
     describe('borrow jetton', () => {
@@ -169,6 +178,7 @@ describe('Pool', () => {
             const walletBalanceAfter = walletDataAfter.balance;
             expect(Number(fromNano(walletBalanceAfter))).toBeCloseTo(50);
         });
+
         it('check hf successfully', async () => {
             const userAccountAddress = await UserAccount.fromInit(pool.address, deployer.address);
             const borrowAmount = toNano(60n);
@@ -244,7 +254,7 @@ describe('Pool', () => {
             );
 
             const userAccountsData: Dictionary<Address, UserAccountData> = Dictionary.empty(Dictionary.Keys.Address());
-            userAccountsData.set(deployer.address, accountData)
+            userAccountsData.set(deployer.address, accountData);
             // userAccountsData.set(pool.address, accountData)
             // console.log(await pool.getBatchUserAccountHealthInfo(userAccountsData))
         });
@@ -284,6 +294,79 @@ describe('Pool', () => {
                 to: pool.address,
                 success: false,
             });
+        });
+
+        it('Reentrancy borrow should be failed', async () => {
+            const borrowMessage = senderArgsToMessageRelaxed({
+                to: pool.address,
+                value: toNano('0.4'),
+                body: beginCell()
+                    .store(
+                        storeBorrowToken({
+                            $$type: 'BorrowToken',
+                            tokenAddress: sampleJetton.address,
+                            amount: toNano(60n),
+                        }),
+                    )
+                    .endCell(),
+            });
+            const result = await deployer.sendMessages([borrowMessage, borrowMessage]);
+            // the second borrow transaction will be failed
+            expect(result.transactions).toHaveTransaction({
+                from: deployer.address,
+                to: pool.address,
+                success: false,
+                exitCode: 53463,
+            });
+            // printTransactionFees(result.transactions);
+            const userAccount = blockchain.openContract(await UserAccount.fromInit(pool.address, deployer.address));
+            const accountData = await userAccount.getAccount();
+            const userHealthInfo = await pool.getUserAccountHealthInfo(accountData);
+            expect(accountData.positionsDetail.get(sampleJetton.address)?.borrow).toEqual(toNano(60n));
+            expect(userHealthInfo.totalDebtInBaseCurrency).toEqual(toNano(60n));
+            expect(userHealthInfo.healthFactorInRay).toBeGreaterThan(RAY);
+            expect(await pool.getUserLock(deployer.address)).toEqual(false);
+        });
+
+        it('should release lock successfully when failed to validationForAction', async () => {
+            const borrowMessage = senderArgsToMessageRelaxed({
+                to: pool.address,
+                value: toNano('0.4'),
+                body: beginCell()
+                    .store(
+                        storeBorrowToken({
+                            $$type: 'BorrowToken',
+                            tokenAddress: sampleJetton.address,
+                            amount: toNano(600n), // collateral can't cover new borrow
+                        }),
+                    )
+                    .endCell(),
+            });
+            const result = await deployer.sendMessages([borrowMessage]);
+            const userAccount = blockchain.openContract(await UserAccount.fromInit(pool.address, deployer.address));
+            // collateral can't cover new borrow
+            expect(result.transactions).toHaveTransaction({
+                from: userAccount.address,
+                to: pool.address,
+                success: false,
+                exitCode: 48281,
+            });
+            // cashback
+            expect(result.transactions).toHaveTransaction({
+                from: userAccount.address,
+                to: deployer.address,
+                success: true,
+                op: 0,
+            });
+
+            // printTransactionFees(result.transactions);
+            const accountData = await userAccount.getAccount();
+            const userHealthInfo = await pool.getUserAccountHealthInfo(accountData);
+            expect(accountData.positionsDetail.get(sampleJetton.address)?.borrow).toEqual(toNano(0));
+            expect(userHealthInfo.totalDebtInBaseCurrency).toEqual(toNano(0));
+            expect(userHealthInfo.healthFactorInRay).toBeGreaterThan(RAY);
+            // should release lock successfully.
+            expect(await pool.getUserLock(deployer.address)).toEqual(false);
         });
     });
 
@@ -342,6 +425,62 @@ describe('Pool', () => {
             expect(accountData.positions?.get(1n)!!.equals(pool.address)).toBeTruthy();
             expect(Number(fromNano(accountData.positionsDetail?.get(pool.address)!!.supply))).toBeCloseTo(100, 3);
             expect(Number(fromNano(accountData.positionsDetail?.get(pool.address)!!.borrow))).toBeCloseTo(50, 3);
+        });
+
+        it('Reentrancy borrow ton should be failed', async () => {
+            // Add TON as reserve
+            await addReserve(pool, deployer, pool.address, pool.address);
+
+            const supplyAmount = toNano(100);
+            // Supply Ton first to add liquidity
+            await pool.send(
+                deployer.getSender(),
+                {
+                    value: toNano('100.25'),
+                },
+                {
+                    $$type: 'SupplyTon',
+                    amount: supplyAmount,
+                },
+            );
+            await pool.send(
+                secondUser.getSender(),
+                {
+                    value: toNano('100.25'),
+                },
+                {
+                    $$type: 'SupplyTon',
+                    amount: supplyAmount,
+                },
+            );
+            const borrowMessage = senderArgsToMessageRelaxed({
+                to: pool.address,
+                value: toNano('0.4'),
+                body: beginCell()
+                    .store(
+                        storeBorrowTon({
+                            $$type: 'BorrowTon',
+                            amount: toNano(50),
+                        }),
+                    )
+                    .endCell(),
+            });
+            const result = await deployer.sendMessages([borrowMessage, borrowMessage]);
+            // the second borrow transaction will be failed
+            expect(result.transactions).toHaveTransaction({
+                from: deployer.address,
+                to: pool.address,
+                success: false,
+                exitCode: 53463,
+            });
+            // printTransactionFees(result.transactions);
+            const userAccount = blockchain.openContract(await UserAccount.fromInit(pool.address, deployer.address));
+            const accountData = await userAccount.getAccount();
+            const userHealthInfo = await pool.getUserAccountHealthInfo(accountData);
+            expect(accountData.positionsDetail.get(pool.address)?.borrow).toEqual(toNano(50n));
+            expect(userHealthInfo.totalDebtInBaseCurrency).toEqual(toNano(50n));
+            expect(userHealthInfo.healthFactorInRay).toBeGreaterThan(RAY);
+            expect(await pool.getUserLock(deployer.address)).toEqual(false);
         });
     });
 
