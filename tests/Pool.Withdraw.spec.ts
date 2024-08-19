@@ -344,7 +344,7 @@ describe('Pool Withdraw', () => {
         );
 
         const totalTransactionFee = sumTransactionsFee(result.transactions);
-        expect(totalTransactionFee).toBeLessThanOrEqual(0.107); // real: 0.10622801200000001
+        expect(totalTransactionFee).toBeLessThanOrEqual(0.108); // real: 0.107057885
     });
 
     it('withdraw max amount when user have the debt and check HF successfully', async () => {
