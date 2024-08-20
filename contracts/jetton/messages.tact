@@ -39,6 +39,7 @@ message(0xd53276db) TokenExcesses {
 message TokenUpdateContent {
     content: Cell;
 }
+// custom messages
 message TokenTransferByPool {
     payload: Slice as remaining;
 }
@@ -48,10 +49,11 @@ message CheckAndTransferAToken {
     amount: Int as coins;
     payload: Slice as remaining;
 }
-
-// custom Mint message
 message Mint {
     queryId: Int as uint64;
     amount: Int;
     receiver: Address;
+}
+message SetMintable {
+    mintable: Bool;
 }

@@ -43,6 +43,7 @@ export const TESTNET_ADDRESS = {
     MAS: 'EQA3artTJWoOgxwbttoYSXFs4_ETzGMC54HyK8cdkanCSaBd',
     NOT: 'EQAidZnvEzP9y5Gh_O94l3VzVCEvDN5M7j51ANP-XW4HTcb7',
     pTON: 'EQBAnuhcK0cHhCsLa8B_-J2_yM_62MakfI2a8iNqpK1rEtf3', // based on sampleJetton
+    TAY: "EQDyjWqVmjFiwCuElzbOYzluD52qH-0fhHh8n51b_ua1AF1f",
     
     pool: "EQDlTidB1AZqnPwrtgYoai88pgr_rA1ATzB0pKke2cuQR2rI",
     
