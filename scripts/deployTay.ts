@@ -7,8 +7,8 @@ import { MockTay } from '../wrappers/MockTay';
 export async function run(provider: NetworkProvider) {
     const owner = provider.sender().address!!;
     const jettonParams = {
-        name: 'Tonlayer Token',
-        description: 'Tonlayer Token',
+        name: 'TonLayer Token',
+        description: 'TonLayer Token',
         // TODO: update image url
         image: 'https://ipfs.io/ipfs/bafybeicn7i3soqdgr7dwnrwytgq4zxy7a5jpkizrvhm5mv6bgjd32wm3q4/welcome-to-IPFS.jpg',
         symbol: 'TAY',
