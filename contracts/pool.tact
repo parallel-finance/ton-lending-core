@@ -651,6 +651,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
     }
 
     fun syncPrices(msg: SyncPrices) {
+        require(sender() == self.oracleProvider!!, "Not from oracle provider");
         foreach (reserve, price in msg.prices) {
             let reserveData: ReserveData? = self.reservesData.get(reserve);
             if (reserveData != null) {
