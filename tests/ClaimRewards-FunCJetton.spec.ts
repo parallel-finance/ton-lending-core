@@ -1,4 +1,4 @@
-import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
+import { Blockchain, printTransactionFees, SandboxContract, TreasuryContract } from '@ton/sandbox';
 import { beginCell, Cell, toNano } from '@ton/core';
 import '@ton/test-utils';
 import { SampleJetton } from '../build/SampleJetton/tact_SampleJetton';
@@ -9,6 +9,7 @@ import { JettonVault } from '../wrappers/JettonVault';
 import { RewardJettonMaster } from '../wrappers/RewardJettonMaster';
 import { compile } from '@ton/blueprint';
 import { JettonWallet } from '../wrappers/JettonWallet';
+import { sumTransactionsFee } from '../jest.setup';
 
 describe('ClaimRewards', () => {
     let blockchain: Blockchain;
@@ -185,7 +186,7 @@ describe('ClaimRewards', () => {
             {
                 $$type: 'ConfigureJettonMapping',
                 originJettonAddress: usdtRewardJettonMaster.address,
-                claimableJettonAddress: usdt.address,
+                claimableJettonAddress: jettonVaultUsdtWalletAddress,
                 claimHelper: usdtClaimHelper.address,
             },
         );
@@ -374,7 +375,6 @@ describe('ClaimRewards', () => {
                 success: true,
             })
 
-
             const jettonVaultUsdtRewardJettonWalletBalance = await jettonVaultUsdtRewardJettonWallet.getJettonBalance();
             const usdtClaimHelperUsdtRewardJettonWalletBalance = await usdtClaimHelperUsdtRewardJettonWallet.getJettonBalance();
             const senderUsdtRewardJettonWalletBalance = await senderUsdtRewardJettonWallet.getJettonBalance();
@@ -407,6 +407,24 @@ describe('ClaimRewards', () => {
 
             expect(jettonVaultUsdtWalletBalanceBefore - jettonVaultUsdtWalletBalance).toEqual(claimAmount);
             expect(senderUsdtWalletBalance).toEqual(claimAmount);
+
+            // ┌─────────┬──────────────┬────────────────┬────────────────┬────────────────┬────────────────┬────────────────┬────────────┬────────────────┬──────────┬────────────┐
+            // │ (index) │ op           │ valueIn        │ valueOut       │ totalFees      │ inForwardFee   │ outForwardFee  │ outActions │ computeFee     │ exitCode │ actionCode │
+            // ├─────────┼──────────────┼────────────────┼────────────────┼────────────────┼────────────────┼────────────────┼────────────┼────────────────┼──────────┼────────────┤
+            // │ 0       │ 'N/A'        │ 'N/A'          │ '0.7 TON'      │ '0.002061 TON' │ 'N/A'          │ '0.000775 TON' │ 1          │ '0.000775 TON' │ 0        │ 0          │
+            // │ 1       │ '0x3ee943f1' │ '0.7 TON'      │ '0.69228 TON'  │ '0.004911 TON' │ '0.000517 TON' │ '0.004214 TON' │ 1          │ '0.003506 TON' │ 0        │ 0          │
+            // │ 2       │ '0xce30d1dc' │ '0.69228 TON'  │ '0.662666 TON' │ '0.004357 TON' │ '0.00281 TON'  │ '0.001053 TON' │ 2          │ '0.004006 TON' │ 0        │ 0          │
+            // │ 3       │ '0x4fb8dedc' │ '0.35 TON'     │ '0.299348 TON' │ '0.006515 TON' │ '0.000436 TON' │ '0.000681 TON' │ 1          │ '0.006288 TON' │ 0        │ 0          │
+            // │ 4       │ '0x7d7aec1d' │ '0.312666 TON' │ '0 TON'        │ '0.000124 TON' │ '0.000267 TON' │ 'N/A'          │ 0          │ '0.000124 TON' │ 0        │ 0          │
+            // │ 5       │ '0x2daf1323' │ '0.299348 TON' │ '0.05 TON'     │ '0.007443 TON' │ '0.000454 TON' │ '0.000709 TON' │ 1          │ '0.007206 TON' │ 0        │ 0          │
+            // │ 6       │ '0xf8a7ea5'  │ '0.05 TON'     │ '0.033059 TON' │ '0.011073 TON' │ '0.000473 TON' │ '0.008804 TON' │ 1          │ '0.008138 TON' │ 0        │ 0          │
+            // │ 7       │ '0x178d4519' │ '0.033059 TON' │ '0.003777 TON' │ '0.007272 TON' │ '0.00587 TON'  │ '0.000479 TON' │ 1          │ '0.007112 TON' │ 0        │ 0          │
+            // │ 8       │ '0xd53276db' │ '0.003777 TON' │ '0 TON'        │ '0.000124 TON' │ '0.000319 TON' │ 'N/A'          │ 0          │ '0.000124 TON' │ 0        │ 0          │
+            // └─────────┴──────────────┴────────────────┴────────────────┴────────────────┴────────────────┴────────────────┴────────────┴────────────────┴──────────┴────────────┘
+
+            printTransactionFees(claimUsdtRewardResult.transactions)
+            const totalTransactionFee = sumTransactionsFee(claimUsdtRewardResult.transactions);
+            expect(totalTransactionFee).toBeLessThanOrEqual(0.044); // real: 0.043874311
         });
     });
 });
