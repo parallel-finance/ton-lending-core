@@ -59,7 +59,7 @@ contract ATokenDefaultWallet
         );
     }
 
-    // FromWallet.TokenTransfer -> Pool.checkUserHF -> FromWallet.TokenTransferByPool -> ToWallet.TokenTransferInternal
+    // FromWallet.TokenTransfer -> Pool.CheckAndTransferAToken -> FromWallet.TokenTransferByPool -> ToWallet.TokenTransferInternal
     receive(msg: TokenTransfer){
         // 0xf8a7ea5
         let ctx: Context = context(); // Check sender

@@ -47,6 +47,7 @@ describe('UserAccoount', () => {
                     supply: toNano('100'),
                     borrow: 0n,
                     releaseUserLock: false,
+                    onlyUpdateAccount: false
                 },
             );
 
@@ -76,6 +77,7 @@ describe('UserAccoount', () => {
                     supply: toNano('100'),
                     borrow: 0n,
                     releaseUserLock: false,
+                    onlyUpdateAccount: false
                 },
             );
 
@@ -91,6 +93,7 @@ describe('UserAccoount', () => {
                     supply: -toNano('50'),
                     borrow: toNano(20n),
                     releaseUserLock: false,
+                    onlyUpdateAccount: false
                 },
             );
 

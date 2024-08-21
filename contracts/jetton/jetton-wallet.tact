@@ -33,20 +33,20 @@ contract JettonDefaultWallet {
         let init: StateInit = initOf JettonDefaultWallet(self.master, msg.destination);
         let walletAddress: Address = contractAddress(init);
         send(SendParameters{
-        to: walletAddress,
-        value: 0,
-        mode: SendRemainingValue,
-        bounce: false,
-        body: TokenTransferInternal{
-        queryId: msg.queryId,
-        amount: msg.amount,
-        from: self.owner,
-        response_destination: msg.response_destination,
-        forward_ton_amount: msg.forward_ton_amount,
-        forward_payload: msg.forward_payload
-        }.toCell(),
-        code: init.code,
-        data: init.data
+            to: walletAddress,
+            value: 0,
+            mode: SendRemainingValue,
+            bounce: false,
+            body: TokenTransferInternal{
+                queryId: msg.queryId,
+                amount: msg.amount,
+                from: self.owner,
+                response_destination: msg.response_destination,
+                forward_ton_amount: msg.forward_ton_amount,
+                forward_payload: msg.forward_payload
+            }.toCell(),
+            code: init.code,
+            data: init.data
         });
     }
 

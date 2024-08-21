@@ -1,4 +1,4 @@
-import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
+import { Blockchain, printTransactionFees, SandboxContract, TreasuryContract } from '@ton/sandbox';
 import { beginCell, Cell, toNano } from '@ton/core';
 import { Pool, UpdatePositionBounce } from '../wrappers/Pool';
 import '@ton/test-utils';
@@ -38,6 +38,7 @@ describe('Pool Supply', () => {
         };
         sampleJetton = await deployJetton(blockchain, deployer, jettonParams);
         await mintJetton(sampleJetton, sender, deployer.address, toNano(100n));
+        await mintJetton(sampleJetton, secondUser.getSender(), sender.address, toNano(100n));
 
         const poolWalletAddress = await sampleJetton.getGetWalletAddress(pool.address);
         const { aTokenAddress, aTokenDTokenContents } = await addReserve(
@@ -188,6 +189,9 @@ describe('Pool Supply', () => {
             const userAccountContract = blockchain.openContract(
                 await UserAccount.fromInit(pool.address, deployer.address),
             );
+            const secondUserAccountContract = blockchain.openContract(
+                await UserAccount.fromInit(pool.address, secondUser.address),
+            );
 
             const borrowAmount = toNano(50n);
             let result = await pool.send(
@@ -201,6 +205,7 @@ describe('Pool Supply', () => {
                     amount: borrowAmount,
                 },
             );
+            // printTransactionFees(result.transactions);
 
             const reserveData = await pool.getReserveDataAndConfiguration(sampleJetton.address);
             const { price } = reserveData.reserveData;
@@ -208,11 +213,12 @@ describe('Pool Supply', () => {
 
             const maxATokenTransferAmount =
                 amount - (borrowAmount * price * (PERCENTAGE_FACTOR + 1n)) / liquidationThreshold / price;
+            const userAccountDataBefore = await userAccountContract.getAccount();
 
             result = await aTokenWallet.send(
                 deployer.getSender(),
                 {
-                    value: toNano('1.5'),
+                    value: toNano('0.5'),
                 },
                 {
                     $$type: 'TokenTransfer',
@@ -221,10 +227,11 @@ describe('Pool Supply', () => {
                     destination: secondUser.address,
                     response_destination: deployer.getSender().address!!,
                     custom_payload: null,
-                    forward_ton_amount: toNano('1'),
+                    forward_ton_amount: 0n,
                     forward_payload: Cell.EMPTY,
                 },
             );
+            // printTransactionFees(result.transactions);
             expect(result.transactions).toHaveTransaction({
                 from: deployer.address,
                 to: aTokenWallet.address,
@@ -255,9 +262,31 @@ describe('Pool Supply', () => {
                 to: secondUserWallet.address,
                 success: true,
             });
+            expect(result.transactions).toHaveTransaction({
+                from: pool.address,
+                to: userAccountContract.address,
+                success: true,
+            });
+            expect(result.transactions).toHaveTransaction({
+                from: pool.address,
+                to: secondUserAccountContract.address,
+                success: true,
+            });
             const secondUserWalletData = await secondUserWallet.getGetWalletData();
             expect(secondUserWalletData.balance).toEqual(maxATokenTransferAmount);
             expect(secondUserWalletData.master.toString()).toEqual(aToken.address.toString());
+            const secondUserAccountData = await secondUserAccountContract.getAccount();
+            expect(secondUserAccountData.positionsDetail.get(sampleJetton.address)?.supply).toEqual(
+                maxATokenTransferAmount,
+            );
+            expect(secondUserAccountData.positionsDetail.get(sampleJetton.address)?.supply).toEqual(
+                maxATokenTransferAmount,
+            );
+            const userAccountDataAfter = await userAccountContract.getAccount();
+            expect(userAccountDataAfter.positionsDetail.get(sampleJetton.address)?.supply).toEqual(
+                userAccountDataBefore.positionsDetail.get(sampleJetton.address)?.supply!! - maxATokenTransferAmount,
+            );
+            expect(await pool.getUserLock(deployer.address)).toEqual(false);
         });
 
         it('transfer AToken failed because of lower hf', async () => {
