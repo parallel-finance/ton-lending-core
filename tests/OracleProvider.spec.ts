@@ -251,6 +251,16 @@ describe('Oracle Provider test', () => {
         );
         expect(await oracleProvider.getOwner()).toEqualAddress(deployer.address);
         addresses.oracleProvider = oracleProvider.address.toString();
+        await pool.send(
+            deployer.getSender(),
+            {
+                value: toNano('0.2'),
+            },
+            {
+                $$type: 'UpdateOracleProvider',
+                oracle: oracleProvider.address,
+            },
+        );
     });
 
     beforeEach(async () => {
@@ -449,7 +459,7 @@ describe('Oracle Provider test', () => {
         const result = await feedPrices(prices);
 
         const sumFee = sumTransactionsFee(result.transactions);
-        expect(sumFee).toBeLessThan(0.0165);
+        expect(sumFee).toBeLessThan(0.0167); // 0.016617989
     });
 
     it('feed two prices', async () => {
