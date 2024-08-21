@@ -1,6 +1,6 @@
 import { Config } from '@ton/blueprint';
 
-process.setMaxListeners(20);
+process.setMaxListeners(30);
 
 export const config: Config = {
     // It will use TonClient rather than TonClient v4 if we use custom network which will be failed to fetch the user health info
