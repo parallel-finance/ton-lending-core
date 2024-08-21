@@ -11,11 +11,12 @@ contract JettonVault with Ownable, Deployable, Resumable {
     const TOKEN_TRANSFER_GAS_CONSUMPTION: Int = ton("0.05");
     const TOKEN_CLAIM_GAS_CONSUMPTION: Int = ton("0.05");
     const PROCESS_NOTIFICATION_GAS_CONSUMPTION: Int = ton("0.05");
+    const INITIATE_TIME_VESTING_GAS_CONSUMPTION: Int = ton("0.04");
     owner: Address;
     stopped: Bool;
     jettonWalletAddess: Address;
-    claimableJettonMapping: map<Address, ClaimableJettonConfiguration>;
-    jettonMappingLength: Int = 0;
+    claimableConfigurations: map<Address, ClaimableConfiguration>;
+    claimableConfigurationLength: Int = 0;
     queryId: Int = 0;
     init(){
         self.owner = sender();
@@ -24,41 +25,42 @@ contract JettonVault with Ownable, Deployable, Resumable {
         self.jettonWalletAddess = myAddress();
     }
 
-    receive(msg: ResetJettonWalletAddress) {
+    receive(msg: SetJettonWalletAddress) {
         self.requireOwner();
         self.jettonWalletAddess = msg.newAddress;
         // could also be reset by calling 'Resume'
         self.stopped = false;
     }
 
-    receive(msg: ConfigureJettonMapping){
+    receive(msg: ConfigureClaimableConfiguration){
         self.requireOwner();
-        let existedClaimableJettonAddress: ClaimableJettonConfiguration? = self.claimableJettonMapping.get(msg.originJettonAddress);
-        require(existedClaimableJettonAddress == null, "Claimable Jetton already configured");
-        self.claimableJettonMapping.set(msg.originJettonAddress, ClaimableJettonConfiguration {
-            jettonAddress: msg.claimableJettonAddress,
+        let existedClaimableAddress: ClaimableConfiguration? = self.claimableConfigurations.get(msg.originJettonAddress);
+        // require(existedClaimableAddress == null, "Claimable Jetton already configured");
+        self.claimableConfigurations.set(msg.originJettonAddress, ClaimableConfiguration {
+            jettonWalletAddress: msg.jettonWalletAddress,
+            targetBeneficiary: msg.targetBeneficiary,
+            claimType: msg.claimType,
             claimHelper: msg.claimHelper,
         });
-        self.jettonMappingLength += 1;
-        self.reply("JettonMapping Configured".asComment());
+        self.claimableConfigurationLength += 1;
+        self.reply("ClaimableConfiguration Added".asComment());
     }
 
     receive(msg: DropJettonMapping){
         self.requireOwner();
-        let existedClaimableJettonAddress: ClaimableJettonConfiguration? = self.claimableJettonMapping.get(msg.originJettonAddress);
-        require(existedClaimableJettonAddress != null, "Claimable Jetton not configured");
-        self.claimableJettonMapping.del(msg.originJettonAddress);
-        self.jettonMappingLength += 1;
-        self.reply("JettonMapping Dropped".asComment());
+        let existedClaimableConfiguration: ClaimableConfiguration? = self.claimableConfigurations.get(msg.originJettonAddress);
+        require(existedClaimableConfiguration != null, "Claimable Jetton not configured");
+        self.claimableConfigurations.del(msg.originJettonAddress);
+        self.claimableConfigurationLength -= 1;
+        self.reply("ClaimableConfiguration Dropped".asComment());
     }
 
     receive(msg: ClaimTargetJetton){
         let ctx: Context = context();
-        let mapping: ClaimableJettonConfiguration? = self.claimableJettonMapping.get(msg.jettonAddress);
-        require(mapping != null, "Invalid jetton address");
-        // let claimableJettonAddress: Address = mapping!!.jettonAddress;
-        let claimHelper: Address = mapping!!.claimHelper;
-        require(ctx.sender == claimHelper, "Invalid sender");
+        let config: ClaimableConfiguration? = self.claimableConfigurations.get(msg.jettonAddress);
+        require(config != null, "Invalid jetton address");
+        let jettonWalletAddress: Address = config!!.jettonWalletAddress;
+        require(ctx.sender == config!!.claimHelper, "Invalid sender");
 
         let fwdFee: Int = ctx.readForwardFee() * 5;
         let storageFee: Int = self.MIN_TONS_FOR_STORAGE;
@@ -68,11 +70,17 @@ contract JettonVault with Ownable, Deployable, Resumable {
 
         let selfConsumption: Int = self.PROCESS_NOTIFICATION_GAS_CONSUMPTION + ctx.readForwardFee();
         let remainingMsgValue: Int = self.remainingValue(ctx.value, selfConsumption);
-        self.sendTokenTransferByVault(msg.owner, msg.amount);
-        return;
+
+        let claimType: Int = config!!.claimType;
+        if (claimType == 0) {
+            self.sendJettonTransferViaVault(jettonWalletAddress, msg.owner, msg.amount);
+        }
+        if (claimType == 1) {
+            self.initiateTimeVestingViaVault(jettonWalletAddress, config!!.targetBeneficiary, msg.owner, msg.amount);
+        }
     }
 
-    fun sendTokenTransferByVault(toAddress: Address, amount: Int) {
+    fun sendJettonTransferViaVault(jettonWalletAddress: Address, toAddress: Address, amount: Int) {
         let tokenTransferMsg: TokenTransfer = TokenTransfer{
             queryId: self.queryId,
             amount: amount,
@@ -85,7 +93,7 @@ contract JettonVault with Ownable, Deployable, Resumable {
         self.queryId += 1;
 
         send(SendParameters{
-            to: self.jettonWalletAddess,
+            to: jettonWalletAddress,
             value: self.TOKEN_TRANSFER_GAS_CONSUMPTION,
             bounce: true,
             mode: SendPayGasSeparately,
@@ -93,8 +101,29 @@ contract JettonVault with Ownable, Deployable, Resumable {
         });
     }
 
-    get fun allClaimableJettonMapping(): map<Address, ClaimableJettonConfiguration> {
-        return self.claimableJettonMapping;
+    fun initiateTimeVestingViaVault(jettonWalletAddress: Address, toAddress: Address, owner: Address, amount: Int) {
+        let tokenTransferMsg: TokenTransfer = TokenTransfer{
+            queryId: self.queryId,
+            amount: amount,
+            destination: toAddress,
+            response_destination: toAddress,
+            custom_payload: null,
+            forward_ton_amount: self.INITIATE_TIME_VESTING_GAS_CONSUMPTION,
+            forward_payload: beginCell().storeUint(0x63ed65e, 32).endCell().asSlice()
+        };
+        self.queryId += 1;
+
+        send(SendParameters{
+            to: jettonWalletAddress,
+            value: self.TOKEN_TRANSFER_GAS_CONSUMPTION,
+            bounce: true,
+            mode: SendPayGasSeparately,
+            body: tokenTransferMsg.toCell()
+        });
+    }
+
+    get fun allClaimableJettonMapping(): map<Address, ClaimableConfiguration> {
+        return self.claimableConfigurations;
     }
 
     fun remainingValue(value: Int, selfConsumption: Int): Int {

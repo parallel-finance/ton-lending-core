@@ -1,5 +1,5 @@
 import { Blockchain, printTransactionFees, SandboxContract, TreasuryContract } from '@ton/sandbox';
-import { beginCell, Cell, toNano } from '@ton/core';
+import { beginCell, Cell, toNano, Address } from '@ton/core';
 import '@ton/test-utils';
 import { SampleJetton } from '../build/SampleJetton/tact_SampleJetton';
 import { buildOnchainMetadata } from '../scripts/utils';
@@ -10,22 +10,31 @@ import { RewardJettonMaster } from '../wrappers/RewardJettonMaster';
 import { compile } from '@ton/blueprint';
 import { JettonWallet } from '../wrappers/JettonWallet';
 import { sumTransactionsFee } from '../jest.setup';
+import { MockTay } from '../wrappers/MockTay';
+import { TimeVestingMaster } from '../wrappers/TimeVestingMaster';
 
 describe('ClaimRewards', () => {
     let blockchain: Blockchain;
     let deployer: SandboxContract<TreasuryContract>;
+    let timeVestingMaster: SandboxContract<TimeVestingMaster>;
+    let tay: SandboxContract<MockTay>;
     let usdt: SandboxContract<SampleJetton>;
 
     // FunC implemented jetton contract
-    let usdtRewardJettonMasterCode: Cell;
-    let usdtRewardJettonWalletCode: Cell;
+    let rewardJettonMasterCode: Cell;
+    let rewardJettonWalletCode: Cell;
     let usdtRewardJettonMaster: SandboxContract<RewardJettonMaster>;
     let usdtRewardJettonWallet: SandboxContract<JettonWallet>;
+    let tayRewardJettonMaster: SandboxContract<RewardJettonMaster>;
+    let tayRewardJettonWallet: SandboxContract<JettonWallet>;
 
     let jettonVault: SandboxContract<JettonVault>;
     let usdtClaimHelper: SandboxContract<ClaimHelper>;
+    let tayClaimHelper: SandboxContract<ClaimHelper>;
     let constructJettonWalletConfig: any;
-    let constructRewardJettonMasterConfig;
+    let constructRewardJettonMasterConfig: any;
+
+    let mintMockTay: any;
 
     beforeEach(async () => {
         blockchain = await Blockchain.create();
@@ -42,55 +51,64 @@ describe('ClaimRewards', () => {
             name: 'USDT-Reward-Jetton',
             symbol: "T-USDT",
         }
+        const tayJettonParams = {
+            ...jettonParams,
+            name: 'TonLayer Token',
+            description: 'TonLayer Token',
+            symbol: "TAY",
+            decimal: "9",
+        }
+        const tayRewardJettonParams = {
+            ...jettonParams,
+            name: 'TAY-Reward-Jetton',
+            description: 'TonLayer Reward Token',
+            symbol: "T-TAY",
+            decimal: "9",
+        }
 
         // It's the largest value I can use for max_supply in the tests
         let max_supply = (1n << 120n) - 1n;
         // let max_supply = toNano(1000000n); // 🔴 Set the specific total supply in nano
         let content = buildOnchainMetadata(jettonParams);
+        let tayContent = buildOnchainMetadata(tayJettonParams);
         let usdtRewardJettonContent = buildOnchainMetadata(usdtRewardJettonParams);
+        let tayRewardJettonContent = buildOnchainMetadata(tayRewardJettonParams);
 
         usdt = blockchain.openContract(await SampleJetton.fromInit(deployer.address, content, max_supply));
+        tay = blockchain.openContract(await MockTay.fromInit(deployer.address, tayContent, max_supply));
+        timeVestingMaster = blockchain.openContract(await TimeVestingMaster.fromInit());
 
-        // usdtRewardJetton = blockchain.openContract(await RewardJettonMaster.fromInit(deployer.address, usdtRewardJettonContent, max_supply));
-        // const deployUsdtRewardJetton = await usdtRewardJetton.send(
-        //     deployer.getSender(),
-        //     {
-        //         value: toNano('0.05'),
-        //     },
-        //     {
-        //         $$type: 'Deploy',
-        //         queryId: 0n,
-        //     },
-        // );
-        usdtRewardJettonWalletCode = await compile('JettonWallet');
-        usdtRewardJettonMasterCode = await compile('RewardJettonMaster');
+        rewardJettonWalletCode = await compile('JettonWallet');
+        rewardJettonMasterCode = await compile('RewardJettonMaster');
 
-        constructRewardJettonMasterConfig = (ownerAddress: any) =>
+        constructRewardJettonMasterConfig = (ownerAddress: Address, contentData: any) =>
             blockchain.openContract(RewardJettonMaster.createFromConfig(
                 {
                     admin: ownerAddress,
-                    content: usdtRewardJettonContent,
-                    walletCode: usdtRewardJettonWalletCode,
+                    content: contentData,
+                    walletCode: rewardJettonWalletCode,
                 },
-                usdtRewardJettonMasterCode
+                rewardJettonMasterCode
             ));
 
-        constructJettonWalletConfig = (ownerAddress: any, jetton: any = JettonWallet) =>
+        constructJettonWalletConfig = (ownerAddress: Address, minterAddress: Address) =>
             blockchain.openContract(
-                jetton.createFromConfig(
+                JettonWallet.createFromConfig(
                     {
                         owner: ownerAddress,
-                        minter: usdtRewardJettonMaster.address,
-                        walletCode: usdtRewardJettonWalletCode,
+                        minter: minterAddress,
+                        walletCode: rewardJettonWalletCode,
                     },
-                    usdtRewardJettonWalletCode
+                    rewardJettonWalletCode
                 ));
 
-        usdtRewardJettonMaster = constructRewardJettonMasterConfig(deployer.address)
-        usdtRewardJettonWallet = constructJettonWalletConfig(deployer.address)
+        usdtRewardJettonMaster = constructRewardJettonMasterConfig(deployer.address, usdtRewardJettonContent);
+        usdtRewardJettonWallet = constructJettonWalletConfig(deployer.address, usdtRewardJettonMaster.address)
+        tayRewardJettonMaster = constructRewardJettonMasterConfig(deployer.address, tayRewardJettonContent);
+        tayRewardJettonWallet = constructJettonWalletConfig(deployer.address, tayRewardJettonMaster.address)
 
         jettonVault = blockchain.openContract(await JettonVault.fromInit());
-        const deployResult = await usdt.send(
+        const usdtDeployResult = await usdt.send(
             deployer.getSender(),
             {
                 value: toNano('0.05'),
@@ -100,24 +118,86 @@ describe('ClaimRewards', () => {
                 queryId: 0n,
             },
         );
-        expect(deployResult.transactions).toHaveTransaction({
+        expect(usdtDeployResult.transactions).toHaveTransaction({
             from: deployer.address,
             to: usdt.address,
             deploy: true,
             success: true,
         });
 
+        const tayDeployResult = await tay.send(
+            deployer.getSender(),
+            {
+                value: toNano('0.05'),
+            },
+            {
+                $$type: 'Deploy',
+                queryId: 0n,
+            },
+        );
+        expect(tayDeployResult.transactions).toHaveTransaction({
+            from: deployer.address,
+            to: tay.address,
+            deploy: true,
+            success: true,
+        });
+        await timeVestingMaster.send(
+            deployer.getSender(),
+            {
+                value: toNano('0.05'),
+            },
+            {
+                $$type: 'Deploy',
+                queryId: 0n,
+            },
+        );
+        const timeVestingMasterTayWallet = await tay.getGetWalletAddress(timeVestingMaster.address);
+        await timeVestingMaster.send(
+            deployer.getSender(),
+            {
+                value: toNano('0.5'),
+            },
+            {
+                $$type: 'SetTayWallet',
+                tayWallet: timeVestingMasterTayWallet,
+            },
+        );
+        mintMockTay = async (jetton: SandboxContract<MockTay>, receiver: Address, amount: bigint) => {
+            await jetton.send(
+                deployer.getSender(),
+                {
+                    value: toNano('0.05'),
+                },
+                {
+                    $$type: 'Mint',
+                    queryId: 0n,
+                    amount,
+                    receiver,
+                },
+            );
+        };
+
         const deployUsdtRewardJetton = await usdtRewardJettonMaster.sendDeploy(
             deployer.getSender(),
             toNano('0.05'),
         );
-
         expect(deployUsdtRewardJetton.transactions).toHaveTransaction({
             from: deployer.address,
             to: usdtRewardJettonMaster.address,
             deploy: true,
             success: true,
         })
+        const deployTayRewardJetton = await tayRewardJettonMaster.sendDeploy(
+            deployer.getSender(),
+            toNano('0.05'),
+        );
+        expect(deployTayRewardJetton.transactions).toHaveTransaction({
+            from: deployer.address,
+            to: tayRewardJettonMaster.address,
+            deploy: true,
+            success: true,
+        })
+
         const deployJettonVault = await jettonVault.send(
             deployer.getSender(),
             {
@@ -142,11 +222,23 @@ describe('ClaimRewards', () => {
             },
             {
 
-                $$type: 'ResetJettonWalletAddress',
+                $$type: 'SetJettonWalletAddress',
                 newAddress: jettonVaultUsdtWalletAddress,
             },
         )
 
+        const jettonVaultTayWalletAddress = await tay.getGetWalletAddress(jettonVault.address);
+        await jettonVault.send(
+            deployer.getSender(),
+            {
+                value: toNano("0.05"),
+            },
+            {
+
+                $$type: 'SetJettonWalletAddress',
+                newAddress: jettonVaultTayWalletAddress,
+            },
+        )
 
         usdtClaimHelper = blockchain.openContract(await ClaimHelper.fromInit(usdtRewardJettonMaster.address, jettonVault.address));
         const deployUsdtClaimHelper = await usdtClaimHelper.send(
@@ -165,6 +257,18 @@ describe('ClaimRewards', () => {
             deploy: true,
             success: true,
         })
+        tayClaimHelper = blockchain.openContract(await ClaimHelper.fromInit(tayRewardJettonMaster.address, jettonVault.address));
+        await tayClaimHelper.send(
+            deployer.getSender(),
+            {
+                value: toNano('0.05'),
+            },
+            {
+                $$type: 'Deploy',
+                queryId: 0n,
+            },
+        )
+
         const usdtClaimHelperUsdtRewardJettonWalletAddress = await usdtRewardJettonMaster.getWalletAddress(usdtClaimHelper.address);
         await usdtClaimHelper.send(
             deployer.getSender(),
@@ -173,8 +277,20 @@ describe('ClaimRewards', () => {
             },
             {
 
-                $$type: 'ResetJettonWalletAddress',
+                $$type: 'SetJettonWalletAddress',
                 newAddress: usdtClaimHelperUsdtRewardJettonWalletAddress,
+            },
+        )
+        const tayClaimHelperTayRewardJettonWalletAddress = await tayRewardJettonMaster.getWalletAddress(tayClaimHelper.address);
+        await tayClaimHelper.send(
+            deployer.getSender(),
+            {
+                value: toNano("0.05"),
+            },
+            {
+
+                $$type: 'SetJettonWalletAddress',
+                newAddress: tayClaimHelperTayRewardJettonWalletAddress,
             },
         )
 
@@ -184,9 +300,11 @@ describe('ClaimRewards', () => {
                 value: toNano('0.05'),
             },
             {
-                $$type: 'ConfigureJettonMapping',
+                $$type: 'ConfigureClaimableConfiguration',
                 originJettonAddress: usdtRewardJettonMaster.address,
-                claimableJettonAddress: jettonVaultUsdtWalletAddress,
+                jettonWalletAddress: jettonVaultUsdtWalletAddress,
+                targetBeneficiary: jettonVaultUsdtWalletAddress,
+                claimType: 0n,
                 claimHelper: usdtClaimHelper.address,
             },
         );
@@ -196,13 +314,32 @@ describe('ClaimRewards', () => {
             success: true,
         });
 
+        const setTayClaimable = await jettonVault.send(
+            deployer.getSender(),
+            {
+                value: toNano('0.05'),
+            },
+            {
+                $$type: 'ConfigureClaimableConfiguration',
+                originJettonAddress: tayRewardJettonMaster.address,
+                jettonWalletAddress: jettonVaultTayWalletAddress,
+                targetBeneficiary: timeVestingMaster.address,
+                claimType: 1n,
+                claimHelper: tayClaimHelper.address,
+            },
+        );
+        expect(setTayClaimable.transactions).toHaveTransaction({
+            from: deployer.address,
+            to: jettonVault.address,
+            success: true,
+        });
+
         // const mapping = await jettonVault.getAllClaimableJettonMapping();
         // console.log(mapping);
     });
 
-    describe('claim USDT rewards', () => {
+    describe('claim USDT & TAY rewards', () => {
         it('should claim USDT successfully', async () => {
-            // const receiverAddress = (await blockchain.createWallets(1))[0].address;
             await usdt.send(
                 deployer.getSender(),
                 {
@@ -216,18 +353,6 @@ describe('ClaimRewards', () => {
                 },
             );
 
-            // await usdtRewardJetton.send(
-            //     deployer.getSender(),
-            //     {
-            //         value: toNano('0.05'),
-            //     },
-            //     {
-            //         $$type: 'Mint',
-            //         queryId: 0n,
-            //         amount: toNano(1),
-            //         receiver: senderAddress,
-            //     },
-            // );
             const sender = deployer.getSender();
             const senderAddress = sender.address;
             const mintAmount = toNano("1")
@@ -252,9 +377,9 @@ describe('ClaimRewards', () => {
             const senderUsdtWalletAddress = await usdt.getGetWalletAddress(senderAddress);
             const usdtClaimHelperWalletAddress = await usdt.getGetWalletAddress(usdtClaimHelper.address);
 
-            const jettonVaultUsdtRewardJettonWallet = constructJettonWalletConfig(jettonVault.address)
-            const usdtClaimHelperUsdtRewardJettonWallet = constructJettonWalletConfig(usdtClaimHelper.address)
-            const senderUsdtRewardJettonWallet = constructJettonWalletConfig(senderAddress)
+            const jettonVaultUsdtRewardJettonWallet = constructJettonWalletConfig(jettonVault.address, usdtRewardJettonMaster.address)
+            const usdtClaimHelperUsdtRewardJettonWallet = constructJettonWalletConfig(usdtClaimHelper.address, usdtRewardJettonMaster.address)
+            const senderUsdtRewardJettonWallet = constructJettonWalletConfig(senderAddress, usdtRewardJettonMaster.address)
 
             const jettonVaultUsdtWallet = blockchain.openContract(JettonDefaultWallet.fromAddress(jettonVaultUsdtWalletAddress));
             const senderUsdtWallet = blockchain.openContract(JettonDefaultWallet.fromAddress(senderUsdtWalletAddress));
@@ -291,16 +416,6 @@ describe('ClaimRewards', () => {
             //     senderUsdtWalletAddress: senderUsdtWalletAddress.toString(),
             //     usdtClaimHelperWalletAddress: usdtClaimHelperWalletAddress.toString(),
             // })
-
-            // senderAddress: 'EQBGhqLAZseEqRXz4ByFPTGV7SVMlI4hrbs-Sps_Xzx01x8G',
-            // usdt: 'EQCLXahLiLxTBrl2nqtkC-XuYS-NMQBn0Lorqenu7Ro-WHgh',
-            // usdtRewardJettonMaster: 'EQB9bNGR1Oq-H7o3I2QuDcRFqPArz8iOP4Frw85nnpO8O_Ut',
-            // usdtClaimHelper: 'EQBRoMCuKrGmsQVMjiSLE_4FuAxQc_ma59MQwUjwwSNmAzz2',
-            // jettonVault: 'EQBFCcgN9vjvGkHHbsF5K2a_ISUJ0ivwWte0JhtN9uxKALxH',
-            // jettonVaultUsdtRewardJettonWalletAddress: 'EQCeXuFHt9P8oD2naWyIsMrwTlaVYqcyT-6FLI3Jtndu70fp',
-            // senderUsdtRewardJettonWalletAddress: 'EQClxuVYg2sIzsZKhtQ2JzduYFmamsjn80MzM9Y8a6qCmdDH',
-            // usdtClaimHelperUsdtRewardJettonWalletAddress: 'EQB2FoacPJaE-2z024MV_5n46qki04VZ_fRU1cJprQ1JaKxl'
-
             // external message
             expect(claimUsdtRewardResult.transactions).toHaveTransaction({
                 from: undefined,
@@ -347,23 +462,17 @@ describe('ClaimRewards', () => {
             })
             // TokenTransfer message
             expect(claimUsdtRewardResult.transactions).toHaveTransaction({
-                from: usdtClaimHelper.address,
-                to: jettonVault.address,
-                outMessagesCount: 1,
-                success: true,
-            })
-
-            // TokenTransfer message
-            expect(claimUsdtRewardResult.transactions).toHaveTransaction({
-                // from: usdtClaimHelper.address,
-                // to: jettonVault.address,
+                from: jettonVault.address,
+                to: jettonVaultUsdtWalletAddress,
                 outMessagesCount: 1,
                 success: true,
             })
             // op::internal_transfer message
             expect(claimUsdtRewardResult.transactions).toHaveTransaction({
-                from: usdtClaimHelper.address,
-                to: jettonVault.address,
+                from: jettonVaultUsdtWalletAddress,
+                to: senderUsdtWalletAddress,
+                oldStatus: "uninitialized",
+                endStatus: "active",
                 outMessagesCount: 1,
                 success: true,
             })
@@ -424,7 +533,202 @@ describe('ClaimRewards', () => {
 
             printTransactionFees(claimUsdtRewardResult.transactions)
             const totalTransactionFee = sumTransactionsFee(claimUsdtRewardResult.transactions);
-            expect(totalTransactionFee).toBeLessThanOrEqual(0.044); // real: 0.043874311
+            expect(totalTransactionFee).toBeLessThanOrEqual(0.045076311); // real: 0.044076311
+        });
+
+        it('should claim TAY successfully', async () => {
+            await mintMockTay(tay, jettonVault.address, toNano("1"));
+            const sender = deployer.getSender();
+            const senderAddress = sender.address;
+
+            const mintAmount = toNano("1")
+            const mintTayRewardJettonResult = await tayRewardJettonMaster.sendMint(
+                sender,
+                senderAddress,
+                mintAmount,
+                toNano('0.05'),
+                toNano('0.06'),
+            );
+            expect(mintTayRewardJettonResult.transactions).toHaveTransaction({
+                from: await tayRewardJettonMaster.getWalletAddress(senderAddress),
+                to: senderAddress,
+                oldStatus: "active",
+                endStatus: "active",
+                success: true,
+            });
+
+            const jettonVaultTayRewardJettonWalletAddress = await tayRewardJettonMaster.getWalletAddress(jettonVault.address);
+            const senderTayRewardJettonWalletAddress = await tayRewardJettonMaster.getWalletAddress(senderAddress);
+            const tayClaimHelperTayRewardJettonWalletAddress = await tayRewardJettonMaster.getWalletAddress(tayClaimHelper.address);
+            const jettonVaultTayWalletAddress = await tay.getGetWalletAddress(jettonVault.address);
+            const senderTayWalletAddress = await tay.getGetWalletAddress(senderAddress);
+            const tayClaimHelperWalletAddress = await tay.getGetWalletAddress(tayClaimHelper.address);
+
+            const jettonVaultTayRewardJettonWallet = constructJettonWalletConfig(jettonVault.address, tayRewardJettonMaster.address)
+            const tayClaimHelperTayRewardJettonWallet = constructJettonWalletConfig(tayClaimHelper.address, tayRewardJettonMaster.address)
+            const senderTayRewardJettonWallet = constructJettonWalletConfig(senderAddress, tayRewardJettonMaster.address)
+
+            // const jettonVaultTayWallet = blockchain.openContract(JettonDefaultWallet.fromAddress(jettonVaultTayWalletAddress));
+            // const senderTayWallet = blockchain.openContract(JettonDefaultWallet.fromAddress(senderTayWalletAddress));
+            // const tayClaimHelperWallet = blockchain.openContract(JettonDefaultWallet.fromAddress(tayClaimHelperWalletAddress));
+
+            const senderTayRewardJettonWalletBalanceBefore = await senderTayRewardJettonWallet.getJettonBalance();
+            const tayClaimHelperTayRewardJettonWalletBalanceBefore = await tayClaimHelperTayRewardJettonWallet.getJettonBalance();
+            const jettonVaultTayRewardJettonWalletBalanceBefore = await jettonVaultTayRewardJettonWallet.getJettonBalance();
+
+            console.log({
+                senderAddress,
+                senderTayRewardJettonWalletBalanceBefore: senderTayRewardJettonWalletBalanceBefore.toString()
+            })
+
+            const claimAmount = toNano("0.3");
+            const claimTayRewardResult = await tayRewardJettonWallet.sendTransfer(
+                sender,
+                toNano('0.3'),
+                toNano('0.3'),
+                tayClaimHelper.address,
+                claimAmount,
+                beginCell().storeUint(0x7994ff68, 32).endCell(), // opcode: ClaimReward
+            );
+
+            console.log({
+                senderAddress: deployer.getSender().address.toString(),
+                tay: tay.address.toString(),
+                tayRewardJettonMaster: tayRewardJettonMaster.address.toString(),
+                tayClaimHelper: tayClaimHelper.address.toString(),
+                jettonVault: jettonVault.address.toString(),
+                jettonVaultTayRewardJettonWalletAddress: jettonVaultTayRewardJettonWalletAddress.toString(),
+                senderTayRewardJettonWalletAddress: senderTayRewardJettonWalletAddress.toString(),
+                tayClaimHelperTayRewardJettonWalletAddress: tayClaimHelperTayRewardJettonWallet.address.toString(),
+                jettonVaultTayWalletAddress: jettonVaultTayWalletAddress.toString(),
+                senderTayWalletAddress: senderTayWalletAddress.toString(),
+                tayClaimHelperWalletAddress: tayClaimHelperWalletAddress.toString(),
+                timeVestingMaster: timeVestingMaster.address.toString(),
+                senderTimeVestingMasterWalletAddress: await timeVestingMaster.getUserTimeVestingAddress(deployer.address),
+                timeVestingMasterTayWallet: await tay.getGetWalletAddress(timeVestingMaster.address),
+            })
+
+            // senderAddress: 'EQBGhqLAZseEqRXz4ByFPTGV7SVMlI4hrbs-Sps_Xzx01x8G',
+            // tay: 'EQDfYQy8JIuzvEJkUSgEPjGm3fVOzxmDj4m5lPDk2jkv0n_y',
+            // tayRewardJettonMaster: 'EQB9bNGR1Oq-H7o3I2QuDcRFqPArz8iOP4Frw85nnpO8O_Ut',
+            // tayClaimHelper: 'EQBy_sXKfpIEYOBpoVAv4V08cuqATmq-8kEEvfTv7y9UrQBP',
+            // jettonVault: 'EQD8Jqa9neYMAgZrWEHXbsH-NTlbyu0LgSPhXUZPa4U3Iesn',
+            // jettonVaultTayRewardJettonWalletAddress: 'EQAOKVUuNXTJkByWeoNGkrrI-7aHLYnXIrwtIaOITkTPSv_K',
+            // senderTayRewardJettonWalletAddress: 'EQClxuVYg2sIzsZKhtQ2JzduYFmamsjn80MzM9Y8a6qCmdDH',
+            // tayClaimHelperTayRewardJettonWalletAddress: 'EQCp-N4FC2aH4yX98qkXVy96IcFzb0UFQfCJVrukGMx0Ba21',
+            // jettonVaultTayWalletAddress: 'EQDZipBNYMzuVCuN7Wl-NOiPtmCkXh6RFO96GYZxHCsNs0nx',
+            // senderTayWalletAddress: 'EQAlE0952GHF4KMRTA1gExNMnJkMd2B_XPJ6OW6kEwn8cCoN',
+            // tayClaimHelperWalletAddress: 'EQDuWrNbLB8hOkFdeeyXuHDUHcGunT4tgJ5zbz_yyJHUE9gt',
+            // timeVestingMaster: 'EQAdcfYT7Pq4mSAdSl8snZXHj_bR4fsIsh03XbrcZzSNKg9d',
+            // senderTimeVestingMasterWalletAddress: EQAIUB5t6AQCrMnB_bRNDHlTs-IQQbatZLAiigFHcv34Tf7X
+
+            // external message
+            expect(claimTayRewardResult.transactions).toHaveTransaction({
+                from: undefined,
+                to: senderAddress,
+                outMessagesCount: 1,
+                success: true,
+            });
+            // op::transfer message
+            expect(claimTayRewardResult.transactions).toHaveTransaction({
+                from: senderAddress,
+                to: senderTayRewardJettonWalletAddress,
+                outMessagesCount: 1,
+                success: true,
+            });
+            // op::internal_transfer message
+            expect(claimTayRewardResult.transactions).toHaveTransaction({
+                from: senderTayRewardJettonWalletAddress,
+                to: tayClaimHelperTayRewardJettonWalletAddress,
+                outMessagesCount: 2,
+                oldStatus: "uninitialized",
+                endStatus: "active",
+                success: true,
+            });
+            // op::transfer_notification message
+            expect(claimTayRewardResult.transactions).toHaveTransaction({
+                from: tayClaimHelperTayRewardJettonWalletAddress,
+                to: tayClaimHelper.address,
+                outMessagesCount: 1,
+                success: true,
+            });
+            // op::excesses message
+            expect(claimTayRewardResult.transactions).toHaveTransaction({
+                from: tayClaimHelperTayRewardJettonWalletAddress,
+                to: senderAddress,
+                outMessagesCount: 0,
+                success: true,
+            })
+            // ClaimReward message
+            expect(claimTayRewardResult.transactions).toHaveTransaction({
+                from: tayClaimHelper.address,
+                to: jettonVault.address,
+                outMessagesCount: 1,
+                success: true,
+            })
+            // TokenTransfer message
+            expect(claimTayRewardResult.transactions).toHaveTransaction({
+                from: jettonVault.address,
+                to: jettonVaultTayWalletAddress,
+                outMessagesCount: 1,
+                success: true,
+            })
+
+            // console.log(await timeVestingMaster.getUserTimeVestingAddress(deployer.address))
+            // const deployerTimeVesting = blockchain.openContract(
+            //     TimeVesting.fromAddress(await timeVestingMaster.getUserTimeVestingAddress(deployer.address)),
+            // );
+            // const lockedTAY = await deployerTimeVesting.getTimeVestingData();
+            // console.log(deployerTimeVesting.address)
+            // console.log(lockedTAY);
+
+            // op::internal_transfer message
+            expect(claimTayRewardResult.transactions).toHaveTransaction({
+                from: jettonVaultTayWalletAddress,
+                to: senderTayWalletAddress,
+                oldStatus: "uninitialized",
+                endStatus: "active",
+                outMessagesCount: 1,
+                success: true,
+            })
+            // op::transfer_notification message
+            expect(claimTayRewardResult.transactions).toHaveTransaction({
+                from: senderTayWalletAddress,
+                to: senderAddress,
+                outMessagesCount: 0,
+                success: true,
+            })
+
+            // const jettonVaultTayRewardJettonWalletBalance = await jettonVaultTayRewardJettonWallet.getJettonBalance();
+            const tayClaimHelperTayRewardJettonWalletBalance = await tayClaimHelperTayRewardJettonWallet.getJettonBalance();
+            const senderTayRewardJettonWalletBalance = await senderTayRewardJettonWallet.getJettonBalance();
+
+            // const senderTayWalletBalance = (await senderTayWallet.getGetWalletData()).balance;
+            // const tayClaimHelperWalletBalance = (await tayClaimHelperWallet.getGetWalletData()).balance;
+            // const jettonVaultTayWalletBalance = (await jettonVaultTayWallet.getGetWalletData()).balance;
+
+            console.table([
+                {
+                    "JettonVault-T-TAY": jettonVaultTayRewardJettonWalletBalanceBefore,
+                    "ClaimHelper-T-TAY": tayClaimHelperTayRewardJettonWalletBalanceBefore,
+                    "Sender-T-TAY": senderTayRewardJettonWalletBalanceBefore,
+                    "JettonVault-TAY": 0,
+                    "ClaimHelper-TAY": 0,
+                    "Sender-TAY": 0,
+                },
+                {
+                    "JettonVault-T-TAY": 0,
+                    "ClaimHelper-T-TAY": tayClaimHelperTayRewardJettonWalletBalance,
+                    "Sender-T-TAY": senderTayRewardJettonWalletBalance,
+                    "JettonVault-TAY": 0,
+                    "ClaimHelper-TAY": 0,
+                    "Sender-TAY": 0,
+                }
+            ])
+
+            printTransactionFees(claimTayRewardResult.transactions)
+            const totalTransactionFee = sumTransactionsFee(claimTayRewardResult.transactions);
+            expect(totalTransactionFee).toBeLessThanOrEqual(0.045076311); // real: 0.044076311
         });
     });
 });

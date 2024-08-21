@@ -4,9 +4,11 @@ message(0x2daf1323) ClaimTargetJetton {
     amount: Int as coins;
 }
 
-message(0x8aed76c1) ConfigureJettonMapping {
+message(0x8aed76c1) ConfigureClaimableConfiguration {
     originJettonAddress: Address;
-    claimableJettonAddress: Address;
+    jettonWalletAddress: Address;
+    targetBeneficiary: Address;
+    claimType: Int;
     claimHelper: Address;
 }
 
@@ -14,6 +16,6 @@ message(0x5891a820) DropJettonMapping {
     originJettonAddress: Address;
 }
 
-message(0x4b6be393) ResetJettonWalletAddress {
+message(0x4b6be393) SetJettonWalletAddress {
     newAddress: Address
 }
