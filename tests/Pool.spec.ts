@@ -111,9 +111,9 @@ describe('Pool', () => {
                 success: true,
             });
 
-            // TODO: the aToken calculated from Atoken.fromInit and pool.getCalculateATokenAddress is different!!! why?
-            // const aToken = blockchain.openContract(await AToken.fromInit(pool.address, contents.aTokenContent, reserveAddress))
+            const aTokenCalculated = blockchain.openContract(await AToken.fromInit(pool.address, contents.aTokenContent, reserveAddress))
             const aToken = blockchain.openContract(AToken.fromAddress(reserveConfiguration.aTokenAddress));
+            expect(aTokenCalculated.address.toString()).toEqual(aToken.address.toString());
             expect((await aToken.getOwner()).toString()).toEqual(pool.address.toString());
             expect((await aToken.getGetPoolData()).pool.toString()).toEqual(pool.address.toString());
             expect((await aToken.getGetPoolData()).asset.toString()).toEqual(reserveAddress.toString());

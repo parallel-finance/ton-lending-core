@@ -21,6 +21,14 @@ message(0x7362d09c) TokenNotification {
     from: Address;
     forward_payload: Slice as remaining;
 }
+// "op::transfer_notification"c (FunC)
+message(0x4fb8dedc) TransferNotification {
+    queryId: Int as uint64;
+    amount: Int as coins;
+    from: Address;
+    forward_payload: Slice as remaining;
+}
+
 message(0x595f07bc) TokenBurn {
     queryId: Int as uint64;
     amount: Int as coins;

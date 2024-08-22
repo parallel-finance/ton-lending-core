@@ -2,10 +2,6 @@ import "@stdlib/deploy";
 import "@stdlib/ownable";
 import "@stdlib/stoppable";
 import "./user-account";
-import "./jetton/assetToken/atoken";
-import "./jetton/debtToken/dtoken";
-import "./jetton/assetToken/atoken-wallet";
-import "./jetton/debtToken/dtoken-wallet";
 import "./types/struct";
 import "./types/message";
 import "./libraries/logic/reserve-logic";
@@ -44,7 +40,7 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
     // baseTokenAddress -> reserveConfiguration
     reservesConfiguration: map<Address, ReserveConfiguration>;
     reservesInterestRateStrategy: map<Address, ReserveInterestRateStrategy>;
-    
+
     // oracle provider address
     oracleProvider: Address?;
     // ACL admins
@@ -1131,10 +1127,10 @@ contract Pool with Deployable, Ownable, Resumable, PoolView, PoolConfigurator, P
             user: ownerAddress,
             msg: msg
         };
-        
+
         self.updatePositionMsg.set(queryId, updatePositionBounce);
         self.queryId += 1;
-        
+
         // TODO: more gas check
         send(SendParameters{
             to: userAccountAddress,

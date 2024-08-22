@@ -1,0 +1,17 @@
+const op::transfer = "op::transfer"c;
+const op::transfer_notification = "op::transfer_notification"c;
+const op::internal_transfer = "op::internal_transfer"c;
+const op::excesses = "op::excesses"c;
+const op::burn = "op::burn"c;
+const op::burn_notification = "op::burn_notification"c;
+
+;; Minter
+const op::receiveInit = "op::receiveInit"c;
+const op::mint = "op::mint"c;
+const op::mint = "op::mint"c;
+
+const op::redeemMessage = "op::redeemMessage"c;
+
+;; Discovery params
+const op::provide_wallet_address = "op::provide_wallet_address"c;
+const op::take_wallet_address = "op::take_wallet_address"c;

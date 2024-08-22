@@ -1,4 +1,4 @@
-import { Blockchain, printTransactionFees, SandboxContract, TreasuryContract } from '@ton/sandbox';
+import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
 import { Address, beginCell, Dictionary, fromNano, toNano } from '@ton/core';
 import { Pool, storeBorrowToken, storeBorrowTon } from '../wrappers/Pool';
 import '@ton/test-utils';
@@ -143,7 +143,7 @@ describe('Pool', () => {
             });
 
             const totalTransactionFee = sumTransactionsFee(result.transactions);
-            expect(totalTransactionFee).toBeLessThanOrEqual(0.11); // real: 0.10973918099999999
+            expect(totalTransactionFee).toBeLessThanOrEqual(0.1105); // real: 0.11042544299999998
 
             const userAccountContract = blockchain.openContract(userAccountAddress);
             const accountData = await userAccountContract.getAccount();

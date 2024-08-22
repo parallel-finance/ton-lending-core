@@ -1,5 +1,5 @@
 import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
-import { toNano } from '@ton/core';
+import { Cell, toNano } from '@ton/core';
 import '@ton/test-utils';
 import { SampleJetton } from '../build/SampleJetton/tact_SampleJetton';
 import { buildOnchainMetadata } from '../scripts/utils';
@@ -92,4 +92,67 @@ describe('SampleJetton', () => {
             expect(walletData.balance).toEqual(1000000000n);
         });
     });
+
+    // TODO: Fix Exit Code `5` (Integer out of expected range.)
+    // describe('transfer', () => {
+    //     it("should transfer token successfully", async () => {
+    //         const sender = (await blockchain.createWallets(1))[0];
+    //         const senderAddress = sender.address;
+    //         const amount = toNano("1")
+    //         const result = await sampleJetton.send(
+    //             deployer.getSender(),
+    //             {
+    //                 value: toNano('0.05'),
+    //             },
+    //             {
+    //                 $$type: 'Mint',
+    //                 queryId: 0n,
+    //                 amount: amount,
+    //                 receiver: senderAddress,
+    //             },
+    //         );
+    //         expect(result.transactions).toHaveTransaction({
+    //             from: deployer.address,
+    //             to: sampleJetton.address,
+    //             success: true,
+    //         });
+
+    //         const senderSampleJettonWalletAddress = await sampleJetton.getGetWalletAddress(senderAddress);
+    //         const senderSampleJettonWallet = blockchain.openContract(
+    //             JettonDefaultWallet.fromAddress(senderSampleJettonWalletAddress),
+    //         );
+    //         const walletData = await senderSampleJettonWallet.getGetWalletData();
+    //         expect(walletData.balance).toEqual(amount);
+
+    //         const receiver = (await blockchain.createWallets(2))[1];
+    //         const receiverAddress = receiver.address;
+    //         const transferAmount = toNano("0.3")
+    //         const transferResult = await senderSampleJettonWallet.send(
+    //             sender.getSender(),
+    //             {
+    //                 value: toNano('0.05'),
+    //             },
+    //             {
+    //                 $$type: 'TokenTransfer',
+    //                 queryId: 0n,
+    //                 amount: transferAmount,
+    //                 destination: receiverAddress,
+    //                 response_destination: receiverAddress,
+    //                 custom_payload: null,
+    //                 forward_ton_amount: toNano('0.15'),
+    //                 forward_payload: Cell.EMPTY,
+    //             },
+    //         );
+
+    //         expect(transferResult.transactions).toHaveTransaction({
+    //             from: senderSampleJettonWalletAddress,
+    //             to: senderAddress,
+    //             success: true,
+    //         });
+
+    //         const newWalletData = await senderSampleJettonWallet.getGetWalletData();
+    //         expect(newWalletData.balance).toEqual(amount - transferAmount - BigInt(1));
+
+    //     });
+    // })
 });
