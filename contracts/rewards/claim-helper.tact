@@ -33,19 +33,19 @@ contract ClaimHelper with Ownable, Deployable, Resumable {
 
     receive(msg: TransferNotification){
         let ctx: Context = context();
-        // require(ctx.sender == self.jettonWalletAddess, "Invalid sender");
+        require(ctx.sender == self.jettonWalletAddess, "Invalid sender");
         let fwdFee: Int = ctx.readForwardFee() * 5;
         let storageFee: Int = self.MIN_TONS_FOR_STORAGE;
         let computationAndActionFee: Int = self.TOKEN_CLAIM_GAS_CONSUMPTION + self.PROCESS_NOTIFICATION_GAS_CONSUMPTION;
         let totalFee: Int = (fwdFee + storageFee) + computationAndActionFee;
-        // require(ctx.value > totalFee, "Insufficient fee");
+        require(ctx.value > totalFee, "Insufficient fee");
 
         // let forwardPayload: Slice = msg.forward_payload;
         // let opCode: Int = forwardPayload.loadUint(32);
         // "ClaimReward"c
         // if (opCode == 0x7994ff68) {
         let claimAmount: Int = msg.amount;
-        // require(claimAmount > 0, "claim zero amount");
+        require(claimAmount > 0, "claim zero amount");
         let selfConsumption: Int = self.PROCESS_NOTIFICATION_GAS_CONSUMPTION + ctx.readForwardFee();
         let remainingMsgValue: Int = self.remainingValue(ctx.value, selfConsumption);
         send(SendParameters{
