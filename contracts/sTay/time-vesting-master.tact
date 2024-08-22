@@ -60,12 +60,13 @@ contract TimeVestingMaster with Ownable, Deployable, Resumable {
 
     fun processTokenNotification(msg: TokenNotification) {
         let opCode: Int = msg.forward_payload.loadUint(32);
+        let user: Address = msg.forward_payload.loadAddress();
         // utils.calculateRequestOpcode_1("AddLock")
         if (opCode == 0x63ed65e && sender() == self.tayWallet!!) {
-            let userTimeVestingInit: StateInit = self.userTimeVestingInit(msg.from);
+            let userTimeVestingInit: StateInit = self.userTimeVestingInit(user);
             self.totalLocked += msg.amount;
             self.forward(contractAddress(userTimeVestingInit),
-                AddLock{user: msg.from, amount: msg.amount, releaseTime: now() + self.vestingPeriod}.toCell(),
+                AddLock{user: user, amount: msg.amount, releaseTime: now() + self.vestingPeriod}.toCell(),
                 false,
                 userTimeVestingInit
             );
