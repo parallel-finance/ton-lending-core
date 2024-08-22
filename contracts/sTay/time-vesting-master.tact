@@ -24,6 +24,8 @@ contract TimeVestingMaster with Ownable, Deployable, Resumable {
     tayWallet: Address?;
     // 90 days 90 * 24 * 60 * 60
     vestingPeriod: Int as uint32 = 7776000;
+    // totalLocked
+    totalLocked: Int as coins = 0;
     init(){
         self.owner = sender();
         self.stopped = false;
@@ -58,11 +60,13 @@ contract TimeVestingMaster with Ownable, Deployable, Resumable {
 
     fun processTokenNotification(msg: TokenNotification) {
         let opCode: Int = msg.forward_payload.loadUint(32);
+        let user: Address = msg.forward_payload.loadAddress();
         // utils.calculateRequestOpcode_1("AddLock")
         if (opCode == 0x63ed65e && sender() == self.tayWallet!!) {
-            let userTimeVestingInit: StateInit = self.userTimeVestingInit(msg.from);
+            let userTimeVestingInit: StateInit = self.userTimeVestingInit(user);
+            self.totalLocked += msg.amount;
             self.forward(contractAddress(userTimeVestingInit),
-                AddLock{user: msg.from, amount: msg.amount, releaseTime: now() + self.vestingPeriod}.toCell(),
+                AddLock{user: user, amount: msg.amount, releaseTime: now() + self.vestingPeriod}.toCell(),
                 false,
                 userTimeVestingInit
             );
@@ -70,6 +74,8 @@ contract TimeVestingMaster with Ownable, Deployable, Resumable {
     }
 
     fun sendTayTokenTransfer(msg: LockClaimed) {
+        // pre-check Tay balance of myAddress()
+        self.totalLocked -= msg.amount;
         self.forward(self.tayWallet!!,
             TokenTransfer{
                 queryId: 0,

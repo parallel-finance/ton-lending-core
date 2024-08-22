@@ -154,7 +154,7 @@ describe('TimeVesting test', () => {
                 ? 0n
                 : (await timeVestingMasterTayWallet.getGetWalletData()).balance;
         // utils.calculateRequestOpcode_1("AddLock")
-        const forward_payload: Cell = beginCell().storeUint(0x63ed65e, 32).endCell();
+        const forward_payload: Cell = beginCell().storeUint(0x63ed65e, 32).storeAddress(deployer.address).endCell();
         const messageSender = deployer.getSender();
         let result = await deployerJettonWallet.send(
             messageSender,
