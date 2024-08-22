@@ -207,7 +207,13 @@ describe('TimeVesting test', () => {
         );
         const masterBalanceAfter = (await timeVestingMasterTayWallet.getGetWalletData()).balance;
         expect(masterBalanceAfter).toEqual(masterBalanceBefore + amount);
-        // console.log(fromNano((await blockchain.provider(deployerTimeVesting.address).getState()).balance));
+        const timeVestingMasterTonBalance = (await blockchain.provider(timeVestingMaster.address).getState()).balance;
+        const deployerTimeVestingTonBalance = (await blockchain.provider(deployerTimeVesting.address).getState())
+            .balance;
+        // console.log(fromNano(timeVestingMasterTonBalance));
+        // console.log(fromNano(deployerTimeVestingTonBalance));
+        expect(Number(timeVestingMasterTonBalance)).toBeCloseTo(Number(toNano('0.005')), -5);
+        expect(Number(deployerTimeVestingTonBalance)).toBeCloseTo(Number(toNano('0.02')), -5);
     };
 
     it('set time vesting period', async () => {

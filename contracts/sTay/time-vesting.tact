@@ -25,7 +25,7 @@ message LockClaimed {
 }
 
 contract TimeVesting {
-    const MIN_TONS_FOR_STORAGE: Int = ton("0.01");
+    override const storageReserve: Int = ton("0.02");
     const GAS_CONSUMPTION: Int = ton("0.01");
     const TOKEN_TRANSFER_GAS_CONSUMPTION: Int = ton("0.05");
     master: Address;
@@ -55,29 +55,22 @@ contract TimeVesting {
     fun addLock(msg: AddLock) {
         require(sender() == self.master, "Not from master");
         
-        let ctx: Context = context();
         self.locks.set(self.index, Lock{amount: msg.amount, releaseTime: msg.releaseTime});
         self.index += 1;
-        let msgValue: Int = self.remainingValue(ctx.value, self.GAS_CONSUMPTION);
-        let fwdFee: Int = ctx.readForwardFee();
 
-        if (msgValue > fwdFee) {
-            send(SendParameters{
-                    to: self.owner,
-                    value: msgValue - fwdFee,
-                    bounce: false,
-                    mode: SendPayGasSeparately,
-                    body: "cashback for vesting".asComment()
-                }
-            );
-        }
+        self.forward(
+            self.owner,
+            "cashback for vesting".asComment(),
+            false,
+            null
+        );
     }
 
     // Notice: max claim size: 5
     // the computationAndActionFee of claim 5 lock is about 0.01
     fun claim(msg: Claim) {
         let ctx: Context = context();
-        let storageFee: Int = self.MIN_TONS_FOR_STORAGE;
+        let storageFee: Int = self.storageReserve;
         let fwdFee: Int = ctx.readForwardFee();
         let computationAndActionFee: Int = self.GAS_CONSUMPTION + self.TOKEN_TRANSFER_GAS_CONSUMPTION;
         let totalFee: Int = (storageFee + fwdFee) + computationAndActionFee;
@@ -97,24 +90,14 @@ contract TimeVesting {
             }
         }
 
-        let remainingValue: Int = self.remainingValue(ctx.value, fwdFee + self.GAS_CONSUMPTION);
-        send(SendParameters{
-                to: self.master,
-                value: remainingValue,
-                bounce: true,
-                mode: SendPayGasSeparately,
-                body: LockClaimed{user: self.owner, amount: amount}.toCell()
-            }
+        self.forward(
+            self.master,
+            LockClaimed{user: self.owner, amount: amount}.toCell(),
+            true,
+            null
         );
     }
 
-    fun remainingValue(value: Int, selfConsumption: Int): Int {
-        let msgValue: Int = value;
-        let tonBalanceBeforeMsg: Int = myBalance() - msgValue;
-        let storageFee: Int = self.MIN_TONS_FOR_STORAGE - min(tonBalanceBeforeMsg, self.MIN_TONS_FOR_STORAGE);
-        msgValue = msgValue - (storageFee + selfConsumption);
-        return msgValue;
-    }
     // ====== Get Methods ====== //
 
     get fun timeVestingData(): TimeVestingData {
