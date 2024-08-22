@@ -64,7 +64,7 @@ contract JettonVault with Ownable, Deployable, Resumable {
 
         let fwdFee: Int = ctx.readForwardFee() * 5;
         let storageFee: Int = self.MIN_TONS_FOR_STORAGE;
-        let computationAndActionFee: Int = self.TOKEN_CLAIM_GAS_CONSUMPTION + self.PROCESS_NOTIFICATION_GAS_CONSUMPTION;
+        let computationAndActionFee: Int = self.TOKEN_CLAIM_GAS_CONSUMPTION;
         let totalFee: Int = (fwdFee + storageFee) + computationAndActionFee;
         require(ctx.value > totalFee, "Insufficient fee");
 
@@ -94,9 +94,9 @@ contract JettonVault with Ownable, Deployable, Resumable {
 
         send(SendParameters{
             to: jettonWalletAddress,
-            value: self.TOKEN_TRANSFER_GAS_CONSUMPTION,
+            value: 0,
             bounce: true,
-            mode: SendPayGasSeparately,
+            mode: SendRemainingValue,
             body: tokenTransferMsg.toCell()
         });
     }
@@ -106,18 +106,22 @@ contract JettonVault with Ownable, Deployable, Resumable {
             queryId: self.queryId,
             amount: amount,
             destination: toAddress,
-            response_destination: toAddress,
+            response_destination: owner,
             custom_payload: null,
             forward_ton_amount: self.INITIATE_TIME_VESTING_GAS_CONSUMPTION,
-            forward_payload: beginCell().storeUint(0x63ed65e, 32).endCell().asSlice()
+            forward_payload: beginCell()
+                .storeUint(0x63ed65e, 32) // opcode: AddLock
+                .storeAddress(owner)
+                .endCell()
+                .asSlice()
         };
         self.queryId += 1;
 
         send(SendParameters{
             to: jettonWalletAddress,
-            value: self.TOKEN_TRANSFER_GAS_CONSUMPTION,
+            value: 0,
             bounce: true,
-            mode: SendPayGasSeparately,
+            mode: SendRemainingValue,
             body: tokenTransferMsg.toCell()
         });
     }

@@ -62,49 +62,6 @@ export class JettonWallet implements Contract {
         });
     }
 
-    async sendTransfer2(
-        provider: ContractProvider,
-        via: Sender,
-        value: bigint,
-        queryId: bigint,
-        amount: bigint,
-        destination: Address,
-        customPayload: Cell | null,
-        forwardTonAmount: bigint,
-        forwardPayload: Cell
-    ) {
-        const storeTokenTransferBody = () => {
-            let b_0 = beginCell()
-            b_0.storeUint(0x3ee943f1, 32);
-            b_0.storeUint(queryId, 64);
-            b_0.storeCoins(amount);
-            b_0.storeAddress(destination);
-            b_0.storeAddress(via.address);
-            // if (customPayload !== null && customPayload !== undefined) { b_0.storeBit(true).storeRef(customPayload); } else { b_0.storeBit(false); }
-            b_0.storeRef(Cell.EMPTY)
-            b_0.storeCoins(forwardTonAmount);
-            b_0.storeRef(forwardPayload)
-            return b_0.endCell()
-        };
-
-        await provider.internal(via, {
-            sendMode: SendMode.PAY_GAS_SEPARATELY,
-            body: storeTokenTransferBody(),
-            // .storeTokenTransferBody
-            // .storeUint(0x3ee943f1, 32) // op::transfer
-            // .storeUint(0, 64)
-            // .storeCoins(amount)
-            // .storeAddress(destination)
-            // .storeAddress(via.address)
-            // .storeUint(0, 1)
-            // .storeCoins(forwardValue)
-            // .storeUint(1, 1)
-            // .storeRef(forwardPayload)
-            // .endCell(),
-            value: forwardTonAmount + value
-        });
-    }
-
     async getJettonBalance(provider: ContractProvider) {
         let state = await provider.getState();
         if (state.state.type !== 'active') {
